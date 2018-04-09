@@ -14,6 +14,7 @@ object Dependencies {
     Akka.`akka-remote`,
     AkkaHttp.`akka-http`,
     AkkaHttp.`akka-http-spray-json`,
+    Libs.`scopt`,
 
     Libs.`scalatest` % Test,
     AkkaHttp.`akka-http-testkit` % Test

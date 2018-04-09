@@ -29,7 +29,7 @@ object Common extends AutoPlugin {
     javacOptions in (Compile, doc) ++= Seq("-Xdoclint:none"),
     testOptions in Test ++= Seq(
       // show full stack traces and test case durations
-      Tests.Argument("-oDF"),
+      Tests.Argument("-oDF")
     ),
 //    resolvers += "twtmt-maven" at "http://dl.bintray.com/twtmt/maven/",
     version := "0.0.1",
