@@ -8,11 +8,14 @@ object StreamAdmin extends Directives with JsonSupport {
 
   private var streams: Set[StreamInfo] = Set.empty
 
-  private def streamExists(name: String): Boolean = streams.exists(_.name == name)
+  private def streamExists(name: String): Boolean =
+    streams.exists(_.name == name)
 
-  private def addStream(name: String): Unit = streams = streams + StreamInfo(name)
+  private def addStream(name: String): Unit =
+    streams = streams + StreamInfo(name)
 
-  private def deleteStream(name: String): Unit = streams = streams.filter(_.name != name)
+  private def deleteStream(name: String): Unit =
+    streams = streams.filter(_.name != name)
 
   val route =
     pathPrefix("vbds" / "admin" / "streams") {

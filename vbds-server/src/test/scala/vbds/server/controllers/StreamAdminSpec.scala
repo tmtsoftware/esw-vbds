@@ -5,7 +5,11 @@ import org.scalatest.{Matchers, WordSpec}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import vbds.server.models.{JsonSupport, StreamInfo}
 
-class StreamAdminSpec extends WordSpec with Matchers with ScalatestRouteTest with JsonSupport {
+class StreamAdminSpec
+    extends WordSpec
+    with Matchers
+    with ScalatestRouteTest
+    with JsonSupport {
   "The service" should {
 
     "return initial empty list of streams" in {
@@ -33,7 +37,8 @@ class StreamAdminSpec extends WordSpec with Matchers with ScalatestRouteTest wit
     "return list of streams" in {
       Get("/vbds/admin/streams") ~> StreamAdmin.route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[Set[StreamInfo]] shouldEqual Set(StreamInfo("firstStream"), StreamInfo("secondStream"))
+        responseAs[Set[StreamInfo]] shouldEqual Set(StreamInfo("firstStream"),
+                                                    StreamInfo("secondStream"))
       }
     }
 

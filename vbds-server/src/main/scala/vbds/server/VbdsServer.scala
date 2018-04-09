@@ -7,12 +7,17 @@ import vbds.server.controllers.StreamAdmin
 
 import scala.concurrent.Future
 
-object VbdsServer {
-  implicit val system = ActorSystem("my-system")
+class VbdsServer(implicit system: ActorSystem) {
+  import system.dispatcher
   implicit val materializer = ActorMaterializer()
-  implicit val executionContext = system.dispatcher
 
-  def start(): Future[Http.ServerBinding] = Http().bindAndHandle(StreamAdmin.route, "localhost", 9999)
+  // XXX TODO: add other routes, possibly based on command line options ...
+  val route = StreamAdmin.route
 
-  def stop(binding: Http.ServerBinding): Unit = binding.unbind().onComplete(_ => system.terminate())
+  // XXX TODO: configure port and host
+  def start(): Future[Http.ServerBinding] =
+    Http().bindAndHandle(route, "localhost", 9999)
+
+  def stop(binding: Http.ServerBinding): Unit =
+    binding.unbind().onComplete(_ => system.terminate())
 }
