@@ -21,6 +21,7 @@ object Akka {
   val `akka-testkit-typed` = "com.typesafe.akka" %% "akka-testkit-typed" % Version
   val `akka-distributed-data` = "com.typesafe.akka" %% "akka-distributed-data" % Version
   val `akka-multi-node-testkit` = "com.typesafe.akka" %% "akka-multi-node-testkit" % Version
+  val `akka-cluster` = "com.typesafe.akka" %% "akka-cluster" % Version
   val `akka-cluster-tools` = "com.typesafe.akka" %% "akka-cluster-tools" % Version
   val `akka-cluster-typed` = "com.typesafe.akka" %% "akka-cluster-typed" % Version
   val `akka-slf4j` = "com.typesafe.akka" %% "akka-slf4j" % Version
