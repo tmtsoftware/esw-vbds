@@ -9,6 +9,7 @@ object Libs {
   val `logback-classic` = "ch.qos.logback" % "logback-classic" % "1.2.3" // GNU Lesser General Public License version 2.1
   val `akka-management-cluster-http` = "com.lightbend.akka" %% "akka-management-cluster-http" % "0.6" //N/A at the moment
 //  val `spray-json` = "io.spray" %% "spray-json" % "1.3.3"
+  val `boopickle` = "io.suzaku" %% "boopickle" % "1.3.0" // Apache License 2.0
 }
 
 object Akka {

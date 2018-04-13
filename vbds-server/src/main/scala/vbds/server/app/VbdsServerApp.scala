@@ -9,6 +9,9 @@ import vbds.server.actors.{AdminDataWrapper, SharedDataActor}
 
 import scala.util.{Failure, Success}
 
+/**
+  * VIZ Bulk Data System HTTP server and Akka cluster.
+  */
 object VbdsServerApp extends App {
   val systemName = "vbds-system"
 
@@ -87,8 +90,7 @@ object VbdsServerApp extends App {
     }
 
     // Generate the akka config for the akka and http ports as well as the cluster seed nodes
-    val config = ConfigFactory.parseString(
-      s"""
+    val config = ConfigFactory.parseString(s"""
             akka.remote.netty.tcp.hostname=${options.akkaHost}
             akka.remote.netty.tcp.port=${options.akkaPort}
             akka.remote.artery.canonical.hostname=${options.akkaHost}

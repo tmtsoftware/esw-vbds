@@ -11,7 +11,7 @@ class StreamAdminSpec
     with ScalatestRouteTest
     with JsonSupport {
 
-  val route = new StreamAdmin(new LocalAdminData(system)).route
+  val route = new AdminRoute(new LocalAdminData(system)).route
 
   "The service" should {
 

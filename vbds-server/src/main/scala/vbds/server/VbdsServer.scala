@@ -4,16 +4,17 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import vbds.server.actors.AdminData
-import vbds.server.controllers.StreamAdmin
+import vbds.server.controllers.{AdminRoute, TransferRoute}
+import akka.http.scaladsl.server.RouteConcatenation._
 
 import scala.concurrent.Future
 
-class VbdsServer(sharedData: AdminData)(implicit system: ActorSystem) {
+class VbdsServer(adminData: AdminData)(implicit system: ActorSystem) {
   import system.dispatcher
   implicit val materializer = ActorMaterializer()
 
   // XXX TODO: add other routes, possibly based on command line options ...
-  val route = new StreamAdmin(sharedData).route
+  val route = new AdminRoute(adminData).route ~ new TransferRoute(adminData).route
 
   /**
     * Starts the server on the given host and port
