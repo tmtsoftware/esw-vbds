@@ -35,12 +35,12 @@ object Common extends AutoPlugin {
     version := "0.0.1",
     fork := true,
     parallelExecution in Test := false,
-    autoCompilerPlugins := true,
-    if (formatOnCompile) scalafmtOnCompile := true else scalafmtOnCompile := false
+    autoCompilerPlugins := true
+//    if (formatOnCompile) scalafmtOnCompile := true else scalafmtOnCompile := false
   )
 
-  private def formatOnCompile = sys.props.get("format.on.compile") match {
-    case Some("false") ⇒ false
-    case _             ⇒ true
-  }
+//  private def formatOnCompile = sys.props.get("format.on.compile") match {
+//    case Some("false") ⇒ false
+//    case _             ⇒ true
+//  }
 }

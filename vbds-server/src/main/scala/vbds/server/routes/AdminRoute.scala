@@ -1,15 +1,15 @@
-package vbds.server.controllers
+package vbds.server.routes
 
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives
-import vbds.server.actors.AdminData
+import vbds.server.actors.AdminApi
 import vbds.server.models.JsonSupport
 
 /**
   * Provides the HTTP route for the VBDS Admin Service.
   * @param adminData used to access the distributed list of streams (using cluster + CRDT)
   */
-class AdminRoute(adminData: AdminData) extends Directives with JsonSupport {
+class AdminRoute(adminData: AdminApi) extends Directives with JsonSupport {
 
   val route =
     pathPrefix("vbds" / "admin" / "streams") {

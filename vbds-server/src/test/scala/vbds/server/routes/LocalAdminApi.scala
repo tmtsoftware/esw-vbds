@@ -1,13 +1,13 @@
-package vbds.server.controllers
+package vbds.server.routes
 
 import akka.actor.ActorSystem
-import vbds.server.actors.AdminData
+import vbds.server.actors.AdminApi
 import vbds.server.models.StreamInfo
 
 import scala.concurrent.Future
 
 // Dummy class that stores the data locally, just to test the route
-class LocalAdminData(system: ActorSystem) extends AdminData {
+class LocalAdminApi(system: ActorSystem) extends AdminApi {
   private var streams: Set[StreamInfo] = Set.empty
 
   def listStreams(): Future[Set[StreamInfo]] = {

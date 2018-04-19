@@ -9,12 +9,27 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
+  * Represents stream admin data shared between admin servers
+  */
+trait AdminApi {
+
+  def listStreams(): Future[Set[StreamInfo]]
+
+  def streamExists(name: String): Future[Boolean]
+
+  def addStream(name: String): Future[StreamInfo]
+
+  def deleteStream(name: String): Future[StreamInfo]
+}
+
+/**
   * A wrapper around the shared data actor.
   */
-class AdminDataWrapper(sharedDataActor: ActorRef)(implicit system: ActorSystem,
-                                                  timeout: Timeout = Timeout(
-                                                    3.seconds))
-    extends AdminData {
+class AdminApiImpl(sharedDataActor: ActorRef)(implicit system: ActorSystem,
+                                              timeout: Timeout = Timeout(
+                                                3.seconds))
+    extends AdminApi {
+
   import SharedDataActor._
   import system.dispatcher
 

@@ -4,8 +4,7 @@ import akka.actor.ActorSystem
 import akka.cluster.Cluster
 import akka.cluster.ddata.DistributedData
 import com.typesafe.config.ConfigFactory
-import vbds.server.VbdsServer
-import vbds.server.actors.{AdminDataWrapper, SharedDataActor}
+import vbds.server.actors.SharedDataActor
 
 import scala.util.{Failure, Success}
 
@@ -106,12 +105,14 @@ object VbdsServerApp extends App {
     implicit val node = Cluster(system)
     val sharedDataActor = system.actorOf(SharedDataActor.props(replicator))
 
-    new VbdsServer(new AdminDataWrapper(sharedDataActor))
+    new VbdsServer(sharedDataActor)
       .start(options.httpHost, options.httpPort)
       .onComplete {
         case Success(result) =>
           println(s"HTTP Server running on: http:/${result.localAddress}")
-        case Failure(error) => println(error)
+        case Failure(error) =>
+          println(error)
+          System.exit(1)
       }
   }
 }

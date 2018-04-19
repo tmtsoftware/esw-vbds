@@ -1,4 +1,4 @@
-package vbds.server.controllers
+package vbds.server.routes
 
 import akka.http.scaladsl.model.StatusCodes
 import org.scalatest.{Matchers, WordSpec}
@@ -11,7 +11,7 @@ class StreamAdminSpec
     with ScalatestRouteTest
     with JsonSupport {
 
-  val route = new AdminRoute(new LocalAdminData(system)).route
+  val route = new AdminRoute(new LocalAdminApi(system)).route
 
   "The service" should {
 
