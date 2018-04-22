@@ -67,15 +67,13 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
     case AddStream(name) =>
       log.info("Adding: {}", name)
       val info = StreamInfo(name)
-      replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(
-        _ + info)
+      replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(_ + info)
       sender() ! info
 
     case DeleteStream(name) =>
       log.info("Removing: {}", name)
       val info = StreamInfo(name)
-      replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(
-        _ - info)
+      replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(_ - info)
       sender() ! info
 
     case ListStreams =>

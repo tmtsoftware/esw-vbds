@@ -9,7 +9,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
-  * Represents stream admin data shared between admin servers
+  * Internal Admin API
   */
 trait AdminApi {
 
@@ -23,7 +23,7 @@ trait AdminApi {
 }
 
 /**
-  * A wrapper around the shared data actor.
+  * A wrapper around the admin API of the shared data actor.
   */
 class AdminApiImpl(sharedDataActor: ActorRef)(implicit system: ActorSystem,
                                               timeout: Timeout = Timeout(

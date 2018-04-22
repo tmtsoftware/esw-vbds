@@ -7,6 +7,9 @@ import vbds.server.actors.SharedDataActor.Publish
 
 import scala.concurrent.Future
 
+/**
+  * Internal data transfer API
+  */
 trait TransferApi {
   def publish(streamName: String,
               byteArrays: Source[ByteString, Any]): Future[Unit]

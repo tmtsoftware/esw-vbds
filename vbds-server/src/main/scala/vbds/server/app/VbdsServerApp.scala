@@ -24,7 +24,7 @@ object VbdsServerApp extends App {
                              clusterSeeds: String = "")
 
   // Parser for the command line options
-  private val parser = new scopt.OptionParser[Options]("vbds") {
+  private val parser = new scopt.OptionParser[Options]("vbds-server") {
     head(BuildInfo.name, BuildInfo.version)
 
     opt[String]('n', "name") valueName "<name>" action { (x, c) =>

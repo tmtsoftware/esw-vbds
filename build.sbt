@@ -3,3 +3,9 @@ lazy val `vbds-server` = project
   .settings(
     libraryDependencies ++= Dependencies.vbdsServer
   )
+
+lazy val `vbds-client` = project
+  .enablePlugins(DeployApp, VbdsBuildInfo)
+  .settings(
+    libraryDependencies ++= Dependencies.vbdsClient
+  )
