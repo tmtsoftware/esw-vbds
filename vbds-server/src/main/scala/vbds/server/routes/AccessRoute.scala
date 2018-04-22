@@ -16,7 +16,8 @@ import vbds.server.models.JsonSupport
   * @param adminData used to access the distributed list of streams (using cluster + CRDT)
   */
 class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit mat: ActorMaterializer)
-    extends Directives with JsonSupport with CustomDirectives {
+    extends Directives with JsonSupport {
+//      with CustomDirectives {
 
   // handleWebSocket requires a source, and we need a sink to write the images to
   // See https://discuss.lightbend.com/t/create-source-from-sink-and-vice-versa/605
@@ -50,8 +51,11 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit mat: Acto
               if (exists) {
                 val (source, sink) = getWsSourceSink
                 onSuccess(accessData.addSubscription(name, sink)) { info =>
-                  handleWebsocketMessages(Sink.ignore, source.map(BinaryMessage(_))) ~
-                    complete(info)
+                  extractUpgradeToWebSocket { upgrade =>
+                    complete(upgrade.handleMessagesWithSinkSource(Sink.ignore, source.map(BinaryMessage(_))))
+                  }
+//                  handleWebsocketMessages(Sink.ignore, source.map(BinaryMessage(_))) ~
+//                    complete(info)
                 }
               } else {
                 complete(NotFound -> s"The stream $name does not exists")
