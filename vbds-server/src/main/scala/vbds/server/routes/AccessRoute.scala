@@ -1,7 +1,6 @@
 package vbds.server.routes
 
 import akka.NotUsed
-import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.ws.BinaryMessage
 import akka.http.scaladsl.server.Directives
@@ -16,13 +15,12 @@ import vbds.server.models.JsonSupport
   *
   * @param adminData used to access the distributed list of streams (using cluster + CRDT)
   */
-class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit system: ActorSystem, mat: ActorMaterializer)
-  extends Directives with JsonSupport with CustomDirectives {
+class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit mat: ActorMaterializer)
+    extends Directives with JsonSupport with CustomDirectives {
 
   // handleWebSocket requires a source, and we need a sink to write the images to
   // See https://discuss.lightbend.com/t/create-source-from-sink-and-vice-versa/605
-  private def getWsSourceSink
-    : (Source[ByteString, NotUsed], Sink[ByteString, NotUsed]) = {
+  private def getWsSourceSink: (Source[ByteString, NotUsed], Sink[ByteString, NotUsed]) = {
     val in = Sink.asPublisher[ByteString](fanout = false)
     val out = Source.asSubscriber[ByteString]
 
@@ -52,8 +50,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit system: A
               if (exists) {
                 val (source, sink) = getWsSourceSink
                 onSuccess(accessData.addSubscription(name, sink)) { info =>
-                  handleWebsocketMessages(Sink.ignore,
-                                          source.map(BinaryMessage(_))) ~
+                  handleWebsocketMessages(Sink.ignore, source.map(BinaryMessage(_))) ~
                     complete(info)
                 }
               } else {

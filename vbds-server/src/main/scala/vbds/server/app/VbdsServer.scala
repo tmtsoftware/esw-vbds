@@ -5,18 +5,13 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.RouteConcatenation._
 import akka.stream.ActorMaterializer
 import vbds.server.actors.SharedDataActor.LocalAddress
-import vbds.server.actors.{
-  AccessApiImpl,
-  AdminApiImpl,
-  TransferApiImpl
-}
+import vbds.server.actors.{AccessApiImpl, AdminApiImpl, TransferApiImpl}
 import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute}
 
 import scala.concurrent.Future
 
-class VbdsServer(sharedDataActor: ActorRef)(implicit system: ActorSystem) {
+class VbdsServer(sharedDataActor: ActorRef)(implicit system: ActorSystem, mat: ActorMaterializer) {
   import system.dispatcher
-  implicit val mat = ActorMaterializer()
 
   val adminApi = new AdminApiImpl(sharedDataActor)
   val accessApi = new AccessApiImpl(sharedDataActor)

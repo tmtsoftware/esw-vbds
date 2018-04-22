@@ -8,6 +8,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.cluster.Cluster
 import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.ddata.Replicator._
+import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import vbds.server.models.{AccessInfo, StreamInfo}
@@ -30,15 +31,24 @@ object SharedDataActor {
 
   case object ListSubscriptions
 
-  case class Publish(set: Set[AccessInfo], byteArrays: Source[ByteString, Any])
+  case class Publish(subscriberSet: Set[AccessInfo], byteArrays: Source[ByteString, Any])
 
-  def props(replicator: ActorRef)(implicit cluster: Cluster): Props =
+  def props(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer): Props =
     Props(new SharedDataActor(replicator))
+
+  /**
+    * Represents a remote http server that receives images that it then distributes to its local subscribers
+    *
+    * @param streamName name of the stream
+    * @param host       subscriber's http host
+    * @param port       subscriber's http port
+    */
+  private case class RemoteAccessInfo(streamName: String, host: String, port: Int)
 }
 
-class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster)
-    extends Actor
-    with ActorLogging {
+// XXX TODO: Split into separate actors?lkjpoi098
+class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer)
+  extends Actor with ActorLogging {
 
   import SharedDataActor._
 
@@ -71,7 +81,7 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster)
     case ListStreams =>
       replicator ! Get(adminDataKey, ReadLocal, request = Some(sender()))
 
-    case g @ GetSuccess(`adminDataKey`, Some(replyTo: ActorRef)) ⇒
+    case g@GetSuccess(`adminDataKey`, Some(replyTo: ActorRef)) ⇒
       val value = g.get(adminDataKey).elements
       replyTo ! value
 
@@ -83,31 +93,29 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster)
 
     case _: UpdateResponse[_] ⇒ // ignore
 
-    case c @ Changed(`adminDataKey`) ⇒
+    case c@Changed(`adminDataKey`) ⇒
       val data = c.get(adminDataKey)
       log.info("Current streams: {}", data.elements)
 
     case AddSubscription(name, sink) =>
       log.info("Adding Subscription: {}", name)
       val info = AccessInfo(name,
-                            localAddress.getAddress.getHostAddress,
-                            localAddress.getPort,
-                            UUID.randomUUID().toString)
-      replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(
-        _ + info)
+        localAddress.getAddress.getHostAddress,
+        localAddress.getPort,
+        UUID.randomUUID().toString)
+      replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ + info)
       localSubscribers = localSubscribers + (info -> sink)
       sender() ! info
 
     case DeleteSubscription(info) =>
       log.info("Removing Subscription with id: {}", info)
-      replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(
-        _ - info)
+      replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ - info)
       sender() ! info
 
     case ListSubscriptions =>
       replicator ! Get(accessDataKey, ReadLocal, request = Some(sender()))
 
-    case g @ GetSuccess(`accessDataKey`, Some(replyTo: ActorRef)) ⇒
+    case g@GetSuccess(`accessDataKey`, Some(replyTo: ActorRef)) ⇒
       val value = g.get(accessDataKey).elements
       replyTo ! value
 
@@ -117,15 +125,27 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster)
     case NotFound(`accessDataKey`, Some(replyTo: ActorRef)) ⇒
       replyTo ! Set.empty
 
-    case c @ Changed(`accessDataKey`) ⇒
+    case c@Changed(`accessDataKey`) ⇒
       val data = c.get(accessDataKey)
       log.info("Current subscriptions: {}", data.elements)
 
-    case Publish(set, byteArrays) =>
-//      val localSinks = set.filter(localSubscribers.contains(_))
-    // XXX TODO: Broadcase to these sinks
-//      localSinks
-    // XXX TODO: distribute to remote http servers
+    case Publish(subscriberSet, byteArrays) =>
+      publish(subscriberSet, byteArrays)
+
+  }
+
+  private def publish(subscriberSet: Set[AccessInfo], byteArrays: Source[ByteString, Any]): Unit = {
+    val f = localSubscribers.contains _
+    subscriberSet.filter(f(_)).map(localSubscribers).foreach { sink =>
+      println(s"XXX publish to local sink")
+      byteArrays.runWith(sink) // XXX TODO: Run in parallel, but wait for all to complete?
+    }
+
+    val remoteServers = subscriberSet.filter(!f(_)).map(a => RemoteAccessInfo(a.streamName, a.host, a.port))
+    // XXX TODO: distribute to remote http servers (Add new route for distributing image between servers)
+    remoteServers.foreach { a =>
+      println(s"XXX remote server $a")
+    }
 
   }
 

@@ -3,6 +3,7 @@ package vbds.server.app
 import akka.actor.ActorSystem
 import akka.cluster.Cluster
 import akka.cluster.ddata.DistributedData
+import akka.stream.ActorMaterializer
 import com.typesafe.config.ConfigFactory
 import vbds.server.actors.SharedDataActor
 
@@ -98,6 +99,7 @@ object VbdsServerApp extends App {
             """).withFallback(ConfigFactory.load())
 
     implicit val system = ActorSystem(systemName, config)
+    implicit val mat = ActorMaterializer()
     import system.dispatcher
 
     // Initialize the cluster for replicating the data

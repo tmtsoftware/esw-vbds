@@ -8,11 +8,10 @@ import akka.stream.scaladsl.{Sink, Source}
 
 trait CustomDirectives {
 
-  def handleWebsocketMessages(inSink: Sink[Message, Any],
-                              outSource: Source[Message, Any]): Route =
+  def handleWebsocketMessages(inSink: Sink[Message, Any], outSource: Source[Message, Any]): Route = {
     optionalHeaderValueByType[UpgradeToWebSocket]() {
-      case Some(upgrade) ⇒
-        complete(upgrade.handleMessagesWithSinkSource(inSink, outSource))
+      case Some(upgrade) ⇒ complete(upgrade.handleMessagesWithSinkSource(inSink, outSource))
       case None ⇒ reject(ExpectedWebSocketRequestRejection)
     }
+  }
 }

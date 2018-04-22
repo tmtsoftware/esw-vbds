@@ -5,11 +5,7 @@ import org.scalatest.{Matchers, WordSpec}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import vbds.server.models.{JsonSupport, StreamInfo}
 
-class StreamAdminSpec
-    extends WordSpec
-    with Matchers
-    with ScalatestRouteTest
-    with JsonSupport {
+class StreamAdminSpec extends WordSpec with Matchers with ScalatestRouteTest with JsonSupport {
 
   val route = new AdminRoute(new LocalAdminApi(system)).route
 
