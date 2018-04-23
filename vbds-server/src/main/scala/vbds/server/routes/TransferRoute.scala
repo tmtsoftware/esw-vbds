@@ -15,19 +15,12 @@ import vbds.server.marshalling.BinaryMarshallers
   *
   * @param adminApi used to access the distributed list of streams (using cluster + CRDT)
   */
-class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: TransferApi)
-                   (implicit val system: ActorSystem)
-    extends Directives with JsonSupport with BinaryMarshallers {
-
-//  import system.dispatcher
-
-//  val transferDir = "/tmp" // XXX TODO FIXME
-
-//  def publish(name: String, byteArrays: Source[ByteString, Any]) = {
-//    val file = new File(s"$transferDir/$name")
-//    println(s"writing to $file") // XXX FIXME
-//    byteArrays.runWith(FileIO.toPath(file.toPath)).map(_ => ())
-//  }
+class TransferRoute(adminApi: AdminApi,
+                    accessApi: AccessApi,
+                    transferApi: TransferApi)(implicit val system: ActorSystem)
+    extends Directives
+    with JsonSupport
+    with BinaryMarshallers {
 
   val route =
     pathPrefix("vbds" / "transfer" / "streams") {

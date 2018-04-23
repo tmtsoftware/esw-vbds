@@ -3,7 +3,7 @@ package vbds.client.app
 import java.io.File
 
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.HttpResponse
+import akka.stream.ActorMaterializer
 
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success, Try}
@@ -23,7 +23,8 @@ object VbdsClientApp extends App {
                              subscribe: Option[String] = None,
                              action: Option[String] = None,
                              list: Boolean = false,
-                             publish: Option[File] = None,
+                             publish: Option[String] = None,
+                             delay: Option[String] = None,
                              data: Option[File] = None)
 
   // Parser for the command line options
@@ -50,6 +51,10 @@ object VbdsClientApp extends App {
       c.copy(delete = Some(x))
     } text "Deletes the VBDS stream with the given name"
 
+    opt[Unit]('l', "list") action { (_, c) =>
+      c.copy(list = true)
+    } text "List the available streams"
+
     opt[String]("subscribe") valueName "<stream name>" action { (x, c) =>
       c.copy(subscribe = Some(x))
     } text "Subscribes to the given VBDS stream (see --action option)"
@@ -58,17 +63,17 @@ object VbdsClientApp extends App {
       c.copy(action = Some(x))
     } text "A shell command to execute when a new file is received (args: stream-name file-name)"
 
-    opt[Unit]('l', "list") action { (_, c) =>
-      c.copy(list = true)
-    } text "List the available streams"
-
-    opt[File]("publish") valueName "<stream-name>" action { (x, c) =>
+    opt[String]("publish") valueName "<stream-name>" action { (x, c) =>
       c.copy(publish = Some(x))
     } text "Publish to the given stream (see --data option)"
 
+    opt[String]("delay") valueName "<duration>" action { (x, c) =>
+      c.copy(delay = Some(x))
+    } text "Delay between publishing files in a directory (see --data)"
+
     opt[File]("data") valueName "<file-name>" action { (x, c) =>
       c.copy(data = Some(x))
-    } text "Specifies the file to publish (default: stdin)"
+    } text "Specifies the file (or directory full of files) to publish"
 
     help("help")
     version("version")
@@ -90,16 +95,23 @@ object VbdsClientApp extends App {
   // Run the application
   private def run(options: Options): Unit = {
     implicit val system = ActorSystem()
-//    implicit val materializer = ActorMaterializer()
+    implicit val materializer = ActorMaterializer()
 
     val client = new VbdsClient(options.host, options.port)
     options.create.foreach(s => handleHttpResponse(client.createStream(s)))
     options.delete.foreach(s => handleHttpResponse(client.deleteStream(s)))
     if (options.list) handleHttpResponse(client.listStreams())
+
+    if (options.publish.isDefined && options.data.isDefined) {
+      val delay = options.delay.map(Duration(_)).getOrElse(Duration.Zero)
+      options.publish.foreach(s => handleHttpResponse(client.publish(s, options.data.get, delay.asInstanceOf[FiniteDuration])))
+    }
+
+    options.subscribe.foreach(s => handleHttpResponse(client.subscribe(s, options.action)))
   }
 
   // Prints the result of the HTTP request and exits
-  private def handleHttpResponse(resp: Future[HttpResponse])(implicit system: ActorSystem): Unit = {
+  private def handleHttpResponse(resp: Future[Any])(implicit system: ActorSystem): Unit = {
 //    implicit val executionContext = system.dispatcher
     val result = Try(Await.result(resp, 60.seconds))
     result match {

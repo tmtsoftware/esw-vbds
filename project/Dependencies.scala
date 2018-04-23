@@ -20,7 +20,7 @@ object Dependencies {
 
   val vbdsClient = Seq(
     Akka.`akka-stream`,
-    AkkaHttp.`akka-http-core`,
+    AkkaHttp.`akka-http`,
     Libs.`scopt`,
 
     Libs.`scalatest` % Test,
