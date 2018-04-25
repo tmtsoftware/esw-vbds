@@ -6,7 +6,8 @@ import java.nio.file.Path
 import akka.Done
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse}
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message}
+import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse, Uri}
 import akka.stream.Materializer
 
 import scala.concurrent.Future
@@ -64,7 +65,17 @@ class VbdsClient(host: String, port: Int)(implicit val system: ActorSystem, impl
 
   // XXX TODO FIXME: Change action to general purpose handler
   def subscribe(streamName: String, action: Option[String]): Future[HttpResponse] = {
-    Http().singleRequest(HttpRequest(method = HttpMethods.POST, uri = s"http://$host:$port$accessRoute/$streamName"))
+    println(s"XXX subscribe to $streamName")
+    def handler(msg: Message): Unit = {
+      msg match {
+        case bm: BinaryMessage => println(s"XXX Received binary message: $bm")
+        case x => println(s"XXX Wrong message type: $x")
+      }
+    }
+    val wsListener = new WebSocketListener
+    wsListener.subscribe(Uri(s"ws://$host:$port$accessRoute/$streamName"), handler)
+
+//    Http().singleRequest(HttpRequest(method = HttpMethods.POST, uri = s"http://$host:$port$accessRoute/$streamName"))
   }
 
 }

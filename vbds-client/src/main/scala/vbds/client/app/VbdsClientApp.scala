@@ -107,12 +107,12 @@ object VbdsClientApp extends App {
       options.publish.foreach(s => handleHttpResponse(client.publish(s, options.data.get, delay.asInstanceOf[FiniteDuration])))
     }
 
-    options.subscribe.foreach(s => handleHttpResponse(client.subscribe(s, options.action)))
+//    options.subscribe.foreach(s => handleHttpResponse(client.subscribe(s, options.action)))
+    options.subscribe.foreach(s => client.subscribe(s, options.action))
   }
 
   // Prints the result of the HTTP request and exits
   private def handleHttpResponse(resp: Future[Any])(implicit system: ActorSystem): Unit = {
-//    implicit val executionContext = system.dispatcher
     val result = Try(Await.result(resp, 60.seconds))
     result match {
       case Success(res) =>
@@ -120,6 +120,6 @@ object VbdsClientApp extends App {
       case Failure(ex) =>
         ex.printStackTrace()
     }
-    Await.ready(system.terminate(), 60.seconds)
+//    Await.ready(system.terminate(), 60.seconds)
   }
 }

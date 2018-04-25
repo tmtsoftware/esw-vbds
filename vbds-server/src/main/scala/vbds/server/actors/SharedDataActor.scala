@@ -3,7 +3,7 @@ package vbds.server.actors
 import java.net.InetSocketAddress
 import java.util.UUID
 
-import akka.NotUsed
+import akka.{Done, NotUsed}
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.cluster.Cluster
 import akka.cluster.ddata.{ORSet, ORSetKey}
@@ -129,20 +129,21 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
 
     case Publish(subscriberSet, byteArrays) =>
       publish(subscriberSet, byteArrays)
-
+      sender() ! Done
   }
 
   private def publish(subscriberSet: Set[AccessInfo], byteArrays: Source[ByteString, Any]): Unit = {
     val f = localSubscribers.contains _
+    log.info(s"Number of subscribers: ${subscriberSet.size}")
     subscriberSet.filter(f(_)).map(localSubscribers).foreach { sink =>
-      println(s"XXX publish to local sink")
+      log.info(s"XXX publish to local sink")
       byteArrays.runWith(sink) // XXX TODO: Run in parallel, but wait for all to complete?
     }
 
     val remoteServers = subscriberSet.filter(!f(_)).map(a => RemoteAccessInfo(a.streamName, a.host, a.port))
     // XXX TODO: distribute to remote http servers (Add new route for distributing image between servers)
     remoteServers.foreach { a =>
-      println(s"XXX remote server $a")
+      log.info(s"XXX remote server $a")
     }
 
   }

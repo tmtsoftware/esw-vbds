@@ -1,6 +1,8 @@
 package vbds.server.routes
 
 import akka.NotUsed
+import akka.actor.ActorSystem
+import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.ws.BinaryMessage
 import akka.http.scaladsl.server.Directives
@@ -15,9 +17,16 @@ import vbds.server.models.JsonSupport
   *
   * @param adminData used to access the distributed list of streams (using cluster + CRDT)
   */
-class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit mat: ActorMaterializer)
-    extends Directives with JsonSupport {
-//      with CustomDirectives {
+class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val system: ActorSystem, implicit val mat: ActorMaterializer)
+  extends Directives with JsonSupport {
+
+  implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
+    def genString(o: AnyRef): String = o.getClass.getName
+
+    override def getClazz(o: AnyRef): Class[_] = o.getClass
+  }
+
+  val log = Logging(system, this)
 
   // handleWebSocket requires a source, and we need a sink to write the images to
   // See https://discuss.lightbend.com/t/create-source-from-sink-and-vice-versa/605
@@ -43,26 +52,26 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit mat: Acto
         onSuccess(adminData.listStreams()) { streams =>
           complete(streams)
         }
-      } ~
-        // Create a stream subscription: Response: OK - [Stream name and any other details returned as JSON???]; Creates a websocket connection to the Access Service
-        post {
-          path(Remaining) { name =>
-            onSuccess(adminData.streamExists(name)) { exists =>
-              if (exists) {
-                val (source, sink) = getWsSourceSink
-                onSuccess(accessData.addSubscription(name, sink)) { info =>
-                  extractUpgradeToWebSocket { upgrade =>
-                    complete(upgrade.handleMessagesWithSinkSource(Sink.ignore, source.map(BinaryMessage(_))))
-                  }
-//                  handleWebsocketMessages(Sink.ignore, source.map(BinaryMessage(_))) ~
-//                    complete(info)
+        // Create a stream subscription: Response: OK - Creates a websocket connection to the Access Service
+        path(Remaining) { name =>
+          log.info(s"XXX subscribe to $name")
+          onSuccess(adminData.streamExists(name)) { exists =>
+            if (exists) {
+              log.info(s"XXX subscribe to $name exists")
+              val (source, sink) = getWsSourceSink
+              onSuccess(accessData.addSubscription(name, sink)) { info =>
+                log.info(s"XXX subscribe to $name info: $info")
+                extractUpgradeToWebSocket { upgrade =>
+                  log.info(s"XXX subscribe to $name extractUpgradeToWebSocket: $extractUpgradeToWebSocket")
+                  complete(upgrade.handleMessagesWithSinkSource(Sink.ignore, source.map(BinaryMessage(_))))
                 }
-              } else {
-                complete(NotFound -> s"The stream $name does not exists")
               }
+            } else {
+              complete(NotFound -> s"The stream $name does not exists")
             }
           }
-        } ~
+        }
+      } ~
         // Deletes a stream subscription: Response: 204 – Success (no content) or 404 – Subscription not found
         delete {
           path(Remaining) { id => // id returned as part of AccessData response to subscription request
