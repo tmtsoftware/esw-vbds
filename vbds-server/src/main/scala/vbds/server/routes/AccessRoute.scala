@@ -1,13 +1,12 @@
 package vbds.server.routes
 
-import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.model.ws.BinaryMessage
 import akka.http.scaladsl.server.Directives
 import akka.stream._
-import akka.stream.scaladsl.{Keep, Sink, Source}
+import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import vbds.server.actors.{AccessApi, AdminApi}
 import vbds.server.models.JsonSupport
@@ -28,22 +27,22 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
 
   val log = Logging(system, this)
 
-  // handleWebSocket requires a source, and we need a sink to write the images to
-  // See https://discuss.lightbend.com/t/create-source-from-sink-and-vice-versa/605
-  private def getWsSourceSink: (Source[ByteString, NotUsed], Sink[ByteString, NotUsed]) = {
-    val in = Sink.asPublisher[ByteString](fanout = false)
-    val out = Source.asSubscriber[ByteString]
-
-    val (source, sink) =
-      out
-        .toMat(in)(Keep.both)
-        .mapMaterializedValue {
-          case (sub, pub) =>
-            (Source.fromPublisher(pub), Sink.fromSubscriber(sub))
-        }
-        .run()
-    (source, sink)
-  }
+//  // handleWebSocket requires a source, and we need a sink to write the images to
+//  // See https://discuss.lightbend.com/t/create-source-from-sink-and-vice-versa/605
+//  private def getWsSourceSink: (Source[ByteString, NotUsed], Sink[ByteString, NotUsed]) = {
+//    val in = Sink.asPublisher[ByteString](fanout = false)
+//    val out = Source.asSubscriber[ByteString]
+//
+//    val (source, sink) =
+//      out
+//        .toMat(in)(Keep.both)
+//        .mapMaterializedValue {
+//          case (sub, pub) =>
+//            (Source.fromPublisher(pub), Sink.fromSubscriber(sub))
+//        }
+//        .run()
+//    (source, sink)
+//  }
 
   val route =
     pathPrefix("vbds" / "access" / "streams") {
@@ -59,11 +58,11 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
             if (exists) {
               log.info(s"XXX subscribe to $name exists")
 
-//              val (queue, source) = Source.queue[ByteString](10, OverflowStrategy.backpressure).preMaterialize
+              val (queue, source) = Source.queue[ByteString](10, OverflowStrategy.backpressure).preMaterialize
 
-              val (source, sink) = getWsSourceSink
+//              val (source, sink) = getWsSourceSink
 
-              onSuccess(accessData.addSubscription(name, sink)) { info =>
+              onSuccess(accessData.addSubscription(name, queue)) { info =>
                 log.info(s"XXX subscribe to $name info: $info")
                 extractUpgradeToWebSocket { upgrade =>
                   log.info(s"XXX subscribe to $name extractUpgradeToWebSocket: $extractUpgradeToWebSocket")

@@ -36,3 +36,10 @@ object AkkaHttp { //ApacheV2
   val `akka-http-spray-json` = "com.typesafe.akka" %% "akka-http-spray-json" % Version
 }
 
+object Chill {
+  val Version           = "0.9.2"
+  val `chill-akka`      = "com.twitter" %% "chill-akka" % Version //Apache License 2.0
+//  val `chill-bijection` = "com.twitter" %% "chill-bijection" % Version //Apache License 2.0
+}
+
+

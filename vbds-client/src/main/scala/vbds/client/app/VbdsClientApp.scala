@@ -25,7 +25,8 @@ object VbdsClientApp extends App {
                              list: Boolean = false,
                              publish: Option[String] = None,
                              delay: Option[String] = None,
-                             data: Option[File] = None)
+                             data: Option[File] = None,
+                             chunkSize: Int = 1024*1024)
 
   // Parser for the command line options
   private val parser = new scopt.OptionParser[Options]("vbds-client") {
@@ -74,6 +75,10 @@ object VbdsClientApp extends App {
     opt[File]("data") valueName "<file-name>" action { (x, c) =>
       c.copy(data = Some(x))
     } text "Specifies the file (or directory full of files) to publish"
+
+    opt[Int]("chunk-size") valueName "<num-bytes>" action { (x, c) =>
+      c.copy(chunkSize = x)
+    } text "Optional chunk size (to tune file transfer performance)"
 
     help("help")
     version("version")

@@ -14,7 +14,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success, Try}
 
-class VbdsClient(host: String, port: Int)(implicit val system: ActorSystem, implicit val mat: Materializer) {
+class VbdsClient(host: String, port: Int, chunkSize: Int = 1024*1024)(implicit val system: ActorSystem, implicit val mat: Materializer) {
 
   implicit val executionContext = system.dispatcher
   val adminRoute = "/vbds/admin/streams"
@@ -58,7 +58,7 @@ class VbdsClient(host: String, port: Int)(implicit val system: ActorSystem, impl
     } else {
       List(file.toPath)
     }
-    val uploader = new FileUploader()
+    val uploader = new FileUploader(chunkSize)
     uploader.uploadFiles(uri, paths, delay, handler)
   }
 
@@ -68,14 +68,13 @@ class VbdsClient(host: String, port: Int)(implicit val system: ActorSystem, impl
     println(s"XXX subscribe to $streamName")
     def handler(msg: Message): Unit = {
       msg match {
+          // XXX TODO FIXME: consume binary message source
         case bm: BinaryMessage => println(s"XXX Received binary message: $bm")
         case x => println(s"XXX Wrong message type: $x")
       }
     }
     val wsListener = new WebSocketListener
     wsListener.subscribe(Uri(s"ws://$host:$port$accessRoute/$streamName"), handler)
-
-//    Http().singleRequest(HttpRequest(method = HttpMethods.POST, uri = s"http://$host:$port$accessRoute/$streamName"))
   }
 
 }

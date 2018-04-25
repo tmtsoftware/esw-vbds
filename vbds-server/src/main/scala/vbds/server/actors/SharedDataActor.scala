@@ -3,15 +3,18 @@ package vbds.server.actors
 import java.net.InetSocketAddress
 import java.util.UUID
 
-import akka.{Done, NotUsed}
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.Done
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.cluster.Cluster
 import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.ddata.Replicator._
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.scaladsl.{Source, SourceQueueWithComplete}
 import akka.util.ByteString
 import vbds.server.models.{AccessInfo, StreamInfo}
+import akka.pattern.pipe
+
+import scala.concurrent.Future
 
 object SharedDataActor {
 
@@ -24,8 +27,7 @@ object SharedDataActor {
   // Sets the host and port that the http server is listening on
   case class LocalAddress(a: InetSocketAddress)
 
-  case class AddSubscription(streamName: String,
-                             sink: Sink[ByteString, NotUsed])
+  case class AddSubscription(streamName: String, queue: SourceQueueWithComplete[ByteString])
 
   case class DeleteSubscription(info: AccessInfo)
 
@@ -33,7 +35,7 @@ object SharedDataActor {
 
   case class Publish(subscriberSet: Set[AccessInfo], byteArrays: Source[ByteString, Any])
 
-  def props(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer): Props =
+  def props(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem): Props =
     Props(new SharedDataActor(replicator))
 
   /**
@@ -44,16 +46,18 @@ object SharedDataActor {
     * @param port       subscriber's http port
     */
   private case class RemoteAccessInfo(streamName: String, host: String, port: Int)
+
 }
 
-// XXX TODO: Split into separate actors?lkjpoi098
-class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer)
+// XXX TODO: Split into separate actors
+class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem)
   extends Actor with ActorLogging {
 
+  import system._
   import SharedDataActor._
 
   var localAddress: InetSocketAddress = _
-  var localSubscribers = Map[AccessInfo, Sink[ByteString, NotUsed]]()
+  var localSubscribers = Map[AccessInfo, SourceQueueWithComplete[ByteString]]()
   val adminDataKey = ORSetKey[StreamInfo]("streamInfo")
   val accessDataKey = ORSetKey[AccessInfo]("accessInfo")
 
@@ -95,14 +99,14 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
       val data = c.get(adminDataKey)
       log.info("Current streams: {}", data.elements)
 
-    case AddSubscription(name, sink) =>
+    case AddSubscription(name, queue) =>
       log.info("Adding Subscription: {}", name)
       val info = AccessInfo(name,
         localAddress.getAddress.getHostAddress,
         localAddress.getPort,
         UUID.randomUUID().toString)
       replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ + info)
-      localSubscribers = localSubscribers + (info -> sink)
+      localSubscribers = localSubscribers + (info -> queue)
       sender() ! info
 
     case DeleteSubscription(info) =>
@@ -128,26 +132,29 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
       log.info("Current subscriptions: {}", data.elements)
 
     case Publish(subscriberSet, byteArrays) =>
-      publish(subscriberSet, byteArrays)
-      sender() ! Done
+      publish(subscriberSet, byteArrays, sender())
   }
 
-  private def publish(subscriberSet: Set[AccessInfo], byteArrays: Source[ByteString, Any]): Unit = {
-    val f = localSubscribers.contains _
+  private def publish(subscriberSet: Set[AccessInfo],
+                      byteArrays: Source[ByteString, Any],
+                      replyTo: ActorRef
+                     ): Unit = {
     log.info(s"Number of subscribers: ${subscriberSet.size}")
-    subscriberSet.filter(f(_)).map(localSubscribers).foreach { sink =>
-      log.info(s"XXX publish to local sink")
-      byteArrays.runWith(sink) // XXX TODO: Run in parallel, but wait for all to complete?
-    }
 
-    val remoteServers = subscriberSet.filter(!f(_)).map(a => RemoteAccessInfo(a.streamName, a.host, a.port))
-    // XXX TODO: distribute to remote http servers (Add new route for distributing image between servers)
-    remoteServers.foreach { a =>
-      log.info(s"XXX remote server $a")
+    val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains _)
+
+    // Write the published data to each local subscriber's queue
+    val result = localSet.map(localSubscribers).map { queue =>
+      log.info(s"XXX publish to local queue")
+      byteArrays.runForeach(queue.offer)
     }
+    val f = Future.sequence(result).map(_ => Done)
+    pipe(f) to replyTo
+
+    //    remoteSet.foreach { accessInfo =>
+    //      log.info(s"XXX publish to remote server: $accessInfo")
+    //    }
 
   }
-
-  //  override def postStop(): Unit = ???
 
 }

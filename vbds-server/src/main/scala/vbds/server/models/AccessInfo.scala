@@ -1,5 +1,7 @@
 package vbds.server.models
 
+import vbds.server.marshalling.VbdsSerializable
+
 /**
   * Represents a subscriber to a stream of images
   *
@@ -8,4 +10,4 @@ package vbds.server.models
   * @param port subscriber's http port
   * @param id unique ID for this subscription
   */
-case class AccessInfo(streamName: String, host: String, port: Int, id: String)
+case class AccessInfo(streamName: String, host: String, port: Int, id: String) extends VbdsSerializable

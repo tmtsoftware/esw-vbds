@@ -13,6 +13,7 @@ object Dependencies {
     AkkaHttp.`akka-http-spray-json`,
     Libs.`scopt`,
     Libs.`boopickle`,
+    Chill.`chill-akka`,
 
     Libs.`scalatest` % Test,
     AkkaHttp.`akka-http-testkit` % Test

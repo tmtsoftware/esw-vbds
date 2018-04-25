@@ -1,8 +1,7 @@
 package vbds.server.actors
 
-import akka.NotUsed
 import akka.actor.{ActorRef, ActorSystem}
-import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.util.ByteString
 import akka.pattern.ask
 import akka.util.Timeout
@@ -15,8 +14,7 @@ import scala.concurrent.duration._
   * Internal API to manage VBDS subscriptions
   */
 trait AccessApi {
-  def addSubscription(streamName: String,
-                      sink: Sink[ByteString, NotUsed]): Future[AccessInfo]
+  def addSubscription(streamName: String, queue: SourceQueueWithComplete[ByteString]): Future[AccessInfo]
 
   def listSubscriptions(): Future[Set[AccessInfo]]
 
@@ -28,15 +26,13 @@ trait AccessApi {
 /**
   * Uses the sharedDataActor to distribute subscription info, while saving the associated subscriber sinks locally in a map.
   */
-class AccessApiImpl(sharedDataActor: ActorRef)(implicit system: ActorSystem,
-                                               timeout: Timeout = Timeout(
-                                                 3.seconds))
+class AccessApiImpl(sharedDataActor: ActorRef)(implicit system: ActorSystem, timeout: Timeout = Timeout(3.seconds))
     extends AccessApi {
   import SharedDataActor._
   import system.dispatcher
 
-  def addSubscription(streamName: String, sink: Sink[ByteString, NotUsed]): Future[AccessInfo] = {
-    (sharedDataActor ? AddSubscription(streamName, sink)).mapTo[AccessInfo]
+  def addSubscription(streamName: String, queue: SourceQueueWithComplete[ByteString]): Future[AccessInfo] = {
+    (sharedDataActor ? AddSubscription(streamName, queue)).mapTo[AccessInfo]
   }
 
   def listSubscriptions(): Future[Set[AccessInfo]] = {
