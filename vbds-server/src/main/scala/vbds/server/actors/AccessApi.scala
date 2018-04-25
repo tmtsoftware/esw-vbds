@@ -35,8 +35,7 @@ class AccessApiImpl(sharedDataActor: ActorRef)(implicit system: ActorSystem,
   import SharedDataActor._
   import system.dispatcher
 
-  def addSubscription(streamName: String,
-                      sink: Sink[ByteString, NotUsed]): Future[AccessInfo] = {
+  def addSubscription(streamName: String, sink: Sink[ByteString, NotUsed]): Future[AccessInfo] = {
     (sharedDataActor ? AddSubscription(streamName, sink)).mapTo[AccessInfo]
   }
 

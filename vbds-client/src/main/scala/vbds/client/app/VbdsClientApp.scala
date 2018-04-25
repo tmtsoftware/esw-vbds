@@ -120,6 +120,6 @@ object VbdsClientApp extends App {
       case Failure(ex) =>
         ex.printStackTrace()
     }
-//    Await.ready(system.terminate(), 60.seconds)
+    Await.ready(system.terminate(), 60.seconds)
   }
 }

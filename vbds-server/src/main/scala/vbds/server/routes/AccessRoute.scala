@@ -58,7 +58,11 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
           onSuccess(adminData.streamExists(name)) { exists =>
             if (exists) {
               log.info(s"XXX subscribe to $name exists")
+
+//              val (queue, source) = Source.queue[ByteString](10, OverflowStrategy.backpressure).preMaterialize
+
               val (source, sink) = getWsSourceSink
+
               onSuccess(accessData.addSubscription(name, sink)) { info =>
                 log.info(s"XXX subscribe to $name info: $info")
                 extractUpgradeToWebSocket { upgrade =>
