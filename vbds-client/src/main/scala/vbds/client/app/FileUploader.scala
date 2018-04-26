@@ -19,12 +19,23 @@ class FileUploader(chunkSize: Int = 1024*1024)(implicit val system: ActorSystem,
 
   import system.dispatcher
 
+  // XXX TODO FIXME: Errors on exit
   private def poolClientFlow(uri: Uri) = {
     println(s"XXX Pool client flow ${uri.authority.host.address()}, ${uri.authority.port}")
     Http().cachedHostConnectionPool[Path](uri.authority.host.address(), uri.authority.port)
   }
 
   private def createUploadRequest(uri: Uri, path: Path): Future[(HttpRequest, Path)] = {
+    /*
+          Multipart.FormData(
+        Source.single(
+          Multipart.FormData.BodyPart(
+            "test",
+            HttpEntity(MediaTypes.`application/octet-stream`, file.length(), SynchronousFileSource(file, chunkSize = 100000)), // the chunk size here is currently critical for performance
+            Map("filename" -> file.getName))))
+    Marshal(formData).to[RequestEntity]
+
+     */
     val bodyPart = FormData.BodyPart.fromPath(path.toFile.getName, ContentTypes.`application/octet-stream`, path, chunkSize)
 
     val body = FormData(bodyPart) // only one file per upload

@@ -27,23 +27,6 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
 
   val log = Logging(system, this)
 
-//  // handleWebSocket requires a source, and we need a sink to write the images to
-//  // See https://discuss.lightbend.com/t/create-source-from-sink-and-vice-versa/605
-//  private def getWsSourceSink: (Source[ByteString, NotUsed], Sink[ByteString, NotUsed]) = {
-//    val in = Sink.asPublisher[ByteString](fanout = false)
-//    val out = Source.asSubscriber[ByteString]
-//
-//    val (source, sink) =
-//      out
-//        .toMat(in)(Keep.both)
-//        .mapMaterializedValue {
-//          case (sub, pub) =>
-//            (Source.fromPublisher(pub), Sink.fromSubscriber(sub))
-//        }
-//        .run()
-//    (source, sink)
-//  }
-
   val route =
     pathPrefix("vbds" / "access" / "streams") {
       // List all streams: Response: OK: Stream names and descriptions in JSON; empty document if no streams
@@ -59,8 +42,6 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
               log.info(s"XXX subscribe to $name exists")
 
               val (queue, source) = Source.queue[ByteString](10, OverflowStrategy.backpressure).preMaterialize
-
-//              val (source, sink) = getWsSourceSink
 
               onSuccess(accessData.addSubscription(name, queue)) { info =>
                 log.info(s"XXX subscribe to $name info: $info")

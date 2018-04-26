@@ -33,7 +33,7 @@ object SharedDataActor {
 
   case object ListSubscriptions
 
-  case class Publish(subscriberSet: Set[AccessInfo], byteArrays: Source[ByteString, Any])
+  case class Publish(subscriberSet: Set[AccessInfo], byteStrings: Source[ByteString, Any])
 
   def props(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem): Props =
     Props(new SharedDataActor(replicator))
@@ -136,7 +136,7 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
   }
 
   private def publish(subscriberSet: Set[AccessInfo],
-                      byteArrays: Source[ByteString, Any],
+                      byteStrings: Source[ByteString, Any],
                       replyTo: ActorRef
                      ): Unit = {
     log.info(s"Number of subscribers: ${subscriberSet.size}")
@@ -144,17 +144,23 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
     val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains _)
 
     // Write the published data to each local subscriber's queue
-    val result = localSet.map(localSubscribers).map { queue =>
-      log.info(s"XXX publish to local queue")
-      byteArrays.runForeach(queue.offer)
+    // XXX TODO FIXME: Fan out if multiple subscribers!
+    val f = if (localSet.nonEmpty) {
+      val result = localSet.map(localSubscribers).map { queue =>
+        log.info(s"XXX publish to local queue")
+        byteStrings.runForeach(queue.offer)
+      }
+      Future.sequence(result).map(_ => Done)
+    } else {
+      Future.successful(Done)
     }
-    val f = Future.sequence(result).map(_ => Done)
-    pipe(f) to replyTo
 
     //    remoteSet.foreach { accessInfo =>
     //      log.info(s"XXX publish to remote server: $accessInfo")
     //    }
 
+    // XXX TODO: Merge local f and remote results in reply!
+    pipe(f) to replyTo
   }
 
 }

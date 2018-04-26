@@ -66,13 +66,25 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024*1024)(implicit v
   // XXX TODO FIXME: Change action to general purpose handler
   def subscribe(streamName: String, action: Option[String]): Future[HttpResponse] = {
     println(s"XXX subscribe to $streamName")
+
     def handler(msg: Message): Unit = {
       msg match {
           // XXX TODO FIXME: consume binary message source
-        case bm: BinaryMessage => println(s"XXX Received binary message: $bm")
-        case x => println(s"XXX Wrong message type: $x")
+        case bm: BinaryMessage =>
+          val byteStrings = bm.dataStream
+          var x = 0
+          println(s"\n\nXXX Received binary message (strict: ${bm.isStrict}): $bm")
+          val f = byteStrings.runForeach(bs => {
+            x = x + bs.size
+            println(s"XXX received ${bs.size} bytes: ${bs.utf8String}")
+          })
+          f.onComplete(_ => println(s"XXX Total message size = $x bytes\n\n"))
+
+        case x =>
+          println(s"XXX Wrong message type: $x")
       }
     }
+
     val wsListener = new WebSocketListener
     wsListener.subscribe(Uri(s"ws://$host:$port$accessRoute/$streamName"), handler)
   }

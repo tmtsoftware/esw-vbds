@@ -8,6 +8,7 @@ import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import akka.actor.ActorSystem
 import akka.event.{LogSource, Logging}
+import akka.stream.Materializer
 import vbds.server.marshalling.BinaryMarshallers
 
 /**
@@ -15,7 +16,7 @@ import vbds.server.marshalling.BinaryMarshallers
   *
   * @param adminApi used to access the distributed list of streams (using cluster + CRDT)
   */
-class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: TransferApi)(implicit val system: ActorSystem)
+class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: TransferApi)(implicit val system: ActorSystem, mat: Materializer)
     extends Directives
     with JsonSupport
     with BinaryMarshallers {
