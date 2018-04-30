@@ -25,19 +25,8 @@ class FileUploader(chunkSize: Int = 1024*1024)(implicit val system: ActorSystem,
     Http().cachedHostConnectionPool[Path](uri.authority.host.address(), uri.authority.port)
   }
 
-  private def createUploadRequest(uri: Uri, path: Path): Future[(HttpRequest, Path)] = {
-    /*
-          Multipart.FormData(
-        Source.single(
-          Multipart.FormData.BodyPart(
-            "test",
-            HttpEntity(MediaTypes.`application/octet-stream`, file.length(), SynchronousFileSource(file, chunkSize = 100000)), // the chunk size here is currently critical for performance
-            Map("filename" -> file.getName))))
-    Marshal(formData).to[RequestEntity]
-
-     */
-    val bodyPart = FormData.BodyPart.fromPath(path.toFile.getName, ContentTypes.`application/octet-stream`, path, chunkSize)
-
+  private def createUploadRequest(streamName: String, uri: Uri, path: Path): Future[(HttpRequest, Path)] = {
+    val bodyPart = FormData.BodyPart.fromPath(streamName, ContentTypes.`application/octet-stream`, path, chunkSize)
     val body = FormData(bodyPart) // only one file per upload
     Marshal(body).to[RequestEntity].map { entity => // use marshalling to create multipart/formdata entity
       // build the request and annotate it with the original metadata
@@ -53,10 +42,10 @@ class FileUploader(chunkSize: Int = 1024*1024)(implicit val system: ActorSystem,
     * @param handler called with the results
     * @return completes when done
     */
-  def uploadFiles(uri: Uri, files: List[Path], delay: FiniteDuration, handler: ((Try[HttpResponse], Path)) => Unit): Future[Done] = {
+  def uploadFiles(streamName: String, uri: Uri, files: List[Path], delay: FiniteDuration, handler: ((Try[HttpResponse], Path)) => Unit): Future[Done] = {
     Source(files)
       .delay(delay)
-      .mapAsync(1)(path => createUploadRequest(uri, path))
+      .mapAsync(1)(path => createUploadRequest(streamName, uri, path))
       .via(poolClientFlow(uri))
       .runForeach(handler)
   }

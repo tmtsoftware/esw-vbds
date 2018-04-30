@@ -2,7 +2,7 @@ package vbds.server.actors
 
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem}
-import akka.stream.scaladsl.{Framing, Source}
+import akka.stream.scaladsl.Source
 import akka.util.{ByteString, Timeout}
 import akka.pattern.ask
 import vbds.server.actors.SharedDataActor.Publish
@@ -14,7 +14,7 @@ import scala.concurrent.duration._
   * Internal data transfer API
   */
 trait TransferApi {
-  def publish(streamName: String, byteStrings: Source[ByteString, Any]): Future[Unit]
+  def publish(streamName: String, byteStrings: Source[ByteString, Any]): Future[Done]
 }
 
 class TransferApiImpl(sharedDataActor: ActorRef, accessApi: AccessApi)(
@@ -24,7 +24,7 @@ class TransferApiImpl(sharedDataActor: ActorRef, accessApi: AccessApi)(
 
   import system.dispatcher
 
-  def publish(streamName: String, byteStrings: Source[ByteString, Any]): Future[Unit] = {
+  def publish(streamName: String, byteStrings: Source[ByteString, Any]): Future[Done] = {
 //    val x = byteArrays.via(Framing.delimiter(ByteString("\n"),
 //      maximumFrameLength = 256,
 //      allowTruncation = true))
@@ -32,9 +32,9 @@ class TransferApiImpl(sharedDataActor: ActorRef, accessApi: AccessApi)(
     accessApi.listSubscriptions().flatMap { subscriptions =>
       val set = subscriptions.filter(_.streamName == streamName)
       if (set.nonEmpty) {
-        (sharedDataActor ? Publish(set, byteStrings)).mapTo[Done].map(_ => ())
+        (sharedDataActor ? Publish(set, byteStrings)).mapTo[Done]
       } else {
-        Future.successful(())
+        Future.successful(Done)
       }
     }
   }

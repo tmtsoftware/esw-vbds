@@ -9,7 +9,7 @@ import akka.cluster.Cluster
 import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.ddata.Replicator._
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Source, SourceQueueWithComplete}
+import akka.stream.scaladsl.{BroadcastHub, Keep, Source, SourceQueueWithComplete}
 import akka.util.ByteString
 import vbds.server.models.{AccessInfo, StreamInfo}
 import akka.pattern.pipe
@@ -135,6 +135,8 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
       publish(subscriberSet, byteArrays, sender())
   }
 
+  // Publish the contents of th given source ByteStrings to the given set of subscribers and send a Done message to
+  // the given actor when done.
   private def publish(subscriberSet: Set[AccessInfo],
                       byteStrings: Source[ByteString, Any],
                       replyTo: ActorRef
@@ -143,17 +145,10 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
 
     val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains _)
 
-    // Write the published data to each local subscriber's queue
-    // XXX TODO FIXME: Fan out if multiple subscribers!
-    val f = if (localSet.nonEmpty) {
-      val result = localSet.map(localSubscribers).map { queue =>
-        log.info(s"XXX publish to local queue")
-        byteStrings.runForeach(queue.offer)
-      }
-      Future.sequence(result).map(_ => Done)
-    } else {
-      Future.successful(Done)
-    }
+    val producer = byteStrings.toMat(BroadcastHub.sink(bufferSize = 256))(Keep.right).run()
+    val f = Future.sequence(localSet.map(localSubscribers).map(queue => producer.runForeach(queue offer _))).map(_ => Done)
+
+    // XXX TODO Handle remote subscribers
 
     //    remoteSet.foreach { accessInfo =>
     //      log.info(s"XXX publish to remote server: $accessInfo")

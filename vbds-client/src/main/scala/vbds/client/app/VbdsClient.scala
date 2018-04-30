@@ -59,7 +59,7 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024*1024)(implicit v
       List(file.toPath)
     }
     val uploader = new FileUploader(chunkSize)
-    uploader.uploadFiles(uri, paths, delay, handler)
+    uploader.uploadFiles(streamName, uri, paths, delay, handler)
   }
 
 
@@ -71,12 +71,11 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024*1024)(implicit v
       msg match {
           // XXX TODO FIXME: consume binary message source
         case bm: BinaryMessage =>
-          val byteStrings = bm.dataStream
           var x = 0
-          println(s"\n\nXXX Received binary message (strict: ${bm.isStrict}): $bm")
-          val f = byteStrings.runForeach(bs => {
+          println(s"\n\nXXX Received binary message (strict: ${bm.isStrict})")
+          val f = bm.dataStream.runForeach(bs => {
             x = x + bs.size
-            println(s"XXX received ${bs.size} bytes: ${bs.utf8String}")
+//            println(s"XXX received ${bs.size} bytes: ${bs.utf8String}")
           })
           f.onComplete(_ => println(s"XXX Total message size = $x bytes\n\n"))
 

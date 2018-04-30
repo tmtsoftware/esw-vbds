@@ -4,11 +4,8 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives
 import vbds.server.actors.{AccessApi, AdminApi, TransferApi}
 import vbds.server.models.JsonSupport
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
 import akka.actor.ActorSystem
 import akka.event.{LogSource, Logging}
-import akka.stream.Materializer
 import vbds.server.marshalling.BinaryMarshallers
 
 /**
@@ -16,7 +13,7 @@ import vbds.server.marshalling.BinaryMarshallers
   *
   * @param adminApi used to access the distributed list of streams (using cluster + CRDT)
   */
-class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: TransferApi)(implicit val system: ActorSystem, mat: Materializer)
+class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: TransferApi)(implicit val system: ActorSystem)
     extends Directives
     with JsonSupport
     with BinaryMarshallers {
@@ -47,13 +44,15 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
             onSuccess(adminApi.streamExists(streamName)) { exists =>
               if (exists) {
                 log.info(s"XXX publish $streamName exists")
-                entity(as[Source[ByteString, Any]]) { byteStrings =>
-                  log.info(s"XXX publish $streamName got bytes: $byteStrings")
-                  val f = transferApi.publish(streamName, byteStrings)
-                  onSuccess(f) {
-                    log.info(s"XXX publish $streamName accepted")
-                    complete(f.map(_ => Accepted))
-                  }
+                fileUpload(streamName) {
+                  case (metadata, byteStrings) =>
+                    log.info(s"XXX publish $streamName")
+                    val f = transferApi.publish(streamName, byteStrings)
+                    onSuccess(f) { _ =>
+                      log.info(s"XXX publish $streamName accepted")
+                      complete(f.map(_ => Accepted))
+
+                    }
                 }
               } else {
                 complete(
