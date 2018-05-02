@@ -7,6 +7,7 @@ import vbds.server.models.JsonSupport
 
 /**
   * Provides the HTTP route for the VBDS Admin Service.
+  *
   * @param adminData used to access the distributed list of streams (using cluster + CRDT)
   */
 class AdminRoute(adminData: AdminApi) extends Directives with JsonSupport {

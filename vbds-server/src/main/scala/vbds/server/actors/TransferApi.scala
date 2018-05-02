@@ -14,7 +14,7 @@ import scala.concurrent.duration._
   * Internal data transfer API
   */
 trait TransferApi {
-  def publish(streamName: String, byteStrings: Source[ByteString, Any]): Future[Done]
+  def publish(streamName: String, byteStrings: Source[ByteString, Any], dist: Boolean): Future[Done]
 }
 
 class TransferApiImpl(sharedDataActor: ActorRef, accessApi: AccessApi)(
@@ -24,7 +24,7 @@ class TransferApiImpl(sharedDataActor: ActorRef, accessApi: AccessApi)(
 
   import system.dispatcher
 
-  def publish(streamName: String, byteStrings: Source[ByteString, Any]): Future[Done] = {
+  def publish(streamName: String, byteStrings: Source[ByteString, Any], dist: Boolean): Future[Done] = {
 //    val x = byteArrays.via(Framing.delimiter(ByteString("\n"),
 //      maximumFrameLength = 256,
 //      allowTruncation = true))
@@ -32,7 +32,7 @@ class TransferApiImpl(sharedDataActor: ActorRef, accessApi: AccessApi)(
     accessApi.listSubscriptions().flatMap { subscriptions =>
       val set = subscriptions.filter(_.streamName == streamName)
       if (set.nonEmpty) {
-        (sharedDataActor ? Publish(set, byteStrings)).mapTo[Done]
+        (sharedDataActor ? Publish(set, byteStrings, dist)).mapTo[Done]
       } else {
         Future.successful(Done)
       }
