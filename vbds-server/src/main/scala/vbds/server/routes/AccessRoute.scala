@@ -2,14 +2,16 @@ package vbds.server.routes
 
 import akka.actor.ActorSystem
 import akka.event.{LogSource, Logging}
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.model.ws.BinaryMessage
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message}
 import akka.http.scaladsl.server.Directives
 import akka.stream._
 import akka.stream.scaladsl.{Sink, Source}
 import akka.util.ByteString
 import vbds.server.actors.{AccessApi, AdminApi}
 import vbds.server.models.JsonSupport
+
+import scala.util.{Failure, Success}
 
 /**
   * Provides the HTTP route for the VBDS Access Service.
@@ -18,6 +20,8 @@ import vbds.server.models.JsonSupport
   */
 class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val system: ActorSystem, implicit val mat: ActorMaterializer)
   extends Directives with JsonSupport {
+
+  import system.dispatcher
 
   implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
     def genString(o: AnyRef): String = o.getClass.getName
@@ -41,17 +45,24 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
             if (exists) {
               log.info(s"XXX subscribe to $name exists")
 
-              val (queue, source) = Source.queue[ByteString](10, OverflowStrategy.backpressure).preMaterialize
+              val (queue, source) = Source.queue[ByteString](bufferSize = 100, overflowStrategy = OverflowStrategy.dropHead).preMaterialize
+              queue.watchCompletion().onComplete {
+                case Success(_) => log.info(s"Websocket queue for $name completed")
+                case Failure(ex) => log.error(s"Websocket queue error for stream $name: $ex")
+              }
+
+              val sink = Sink.foreach[Message](x => log.info(s"XXX Websocket input: $x"))
 
               onSuccess(accessData.addSubscription(name, queue)) { info =>
                 log.info(s"XXX subscribe to $name info: $info")
                 extractUpgradeToWebSocket { upgrade =>
                   log.info(s"XXX subscribe to $name extractUpgradeToWebSocket: $extractUpgradeToWebSocket")
-                  complete(upgrade.handleMessagesWithSinkSource(Sink.ignore, source.map(BinaryMessage(_))))
+//                  complete(upgrade.handleMessagesWithSinkSource(Sink.ignore, source.map(BinaryMessage(_))))
+                  complete(upgrade.handleMessagesWithSinkSource(sink, source.map(BinaryMessage(_))))
                 }
               }
             } else {
-              complete(NotFound -> s"The stream $name does not exists")
+              complete(StatusCodes.NotFound -> s"The stream $name does not exists")
             }
           }
         }
@@ -62,11 +73,11 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
             onSuccess(accessData.subscriptionExists(id)) { exists =>
               if (exists) {
                 onSuccess(accessData.deleteSubscription(id)) {
-                  complete(Accepted)
+                  complete(StatusCodes.Accepted)
                 }
               } else {
                 complete(
-                  NotFound -> s"The subscription with the id $id does not exist")
+                  StatusCodes.NotFound -> s"The subscription with the id $id does not exist")
               }
             }
 

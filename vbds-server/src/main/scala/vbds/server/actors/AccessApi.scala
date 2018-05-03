@@ -11,8 +11,8 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 /**
-  * Internal API to manage VBDS subscriptions
-  */
+ * Internal API to manage VBDS subscriptions
+ */
 trait AccessApi {
   def addSubscription(streamName: String, queue: SourceQueueWithComplete[ByteString]): Future[AccessInfo]
 
@@ -24,8 +24,8 @@ trait AccessApi {
 }
 
 /**
-  * Uses the sharedDataActor to distribute subscription info, while saving the associated subscriber sinks locally in a map.
-  */
+ * Uses the sharedDataActor to distribute subscription info, while saving the associated subscriber sinks locally in a map.
+ */
 class AccessApiImpl(sharedDataActor: ActorRef)(implicit system: ActorSystem, timeout: Timeout = Timeout(3.seconds))
     extends AccessApi {
   import SharedDataActor._
