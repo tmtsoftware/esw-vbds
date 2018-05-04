@@ -7,21 +7,20 @@ import vbds.server.models.JsonSupport
 import akka.actor.ActorSystem
 import akka.event.{LogSource, Logging}
 import vbds.server.marshalling.BinaryMarshallers
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.model.{ContentTypes, HttpResponse}
-import akka.http.scaladsl.model.HttpEntity.Chunked
 import akka.stream.Materializer
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import akka.stream.scaladsl.{BroadcastHub, Keep, Sink, Source}
+
+import scala.concurrent.Await
+import scala.concurrent.duration._
 
 /**
- * Provides the HTTP route for the VBDS Transfer Service.
- *
- * @param adminApi used to access the distributed list of streams (using cluster + CRDT)
- */
+  * Provides the HTTP route for the VBDS Transfer Service.
+  *
+  * @param adminApi used to access the distributed list of streams (using cluster + CRDT)
+  */
 class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: TransferApi)(implicit val system: ActorSystem,
                                                                                         implicit val mat: Materializer)
-    extends Directives
+  extends Directives
     with JsonSupport
     with BinaryMarshallers {
 
@@ -36,54 +35,55 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
   val log = Logging(system, this)
 
   val route =
-  pathPrefix("vbds" / "transfer" / "streams") {
-    // List all streams: Response: OK: Stream names and descriptions in JSON; empty document if no streams
-    get {
-      onSuccess(adminApi.listStreams()) { streams =>
-        complete(streams)
-      }
-    } ~
-    // Publish an image to a stream, Response: 204 – Success (no content) or 400 – Bad Request (non- existent stream)
-    post {
-      path(Remaining) { streamName =>
-        onSuccess(adminApi.streamExists(streamName)) { exists =>
-          if (exists) {
-            log.info(s"XXX publish $streamName exists")
-
-            fileUpload(streamName) {
-              case (metadata, byteStrings) =>
-                log.info(s"XXX publish $streamName")
-                val f = transferApi.publish(streamName, byteStrings, dist = true)
-                onSuccess(f) { _ =>
-                  f.foreach(_ => log.info(s"XXX publish $streamName accepted/completed"))
-                  complete(f.map(_ => Accepted))
-                }
-            }
-          } else {
-            complete(BadRequest -> s"The stream $streamName does not exists")
-          }
+    pathPrefix("vbds" / "transfer" / "streams") {
+      // List all streams: Response: OK: Stream names and descriptions in JSON; empty document if no streams
+      get {
+        onSuccess(adminApi.listStreams()) { streams =>
+          complete(streams)
         }
-      }
-    }
-  } ~
-  pathPrefix("vbds" / "transfer" / "internal") {
-    // Internal API: Distribute an image to another server, Response: 204 – Success (no content) or 400 – Bad Request (non- existent stream)
-    post {
-      path(Remaining) { streamName =>
-        onSuccess(adminApi.streamExists(streamName)) { exists =>
-          if (exists) {
-            extractDataBytes { byteStrings =>
-              val f = transferApi.publish(streamName, byteStrings, dist = false)
-              onSuccess(f) { _ =>
-                complete(f.map(_ => Accepted))
+      } ~
+        // Publish an image to a stream, Response: 204 – Success (no content) or 400 – Bad Request (non- existent stream)
+        post {
+          path(Remaining) { streamName =>
+            onSuccess(adminApi.streamExists(streamName)) { exists =>
+              if (exists) {
+                fileUpload("data") {
+                  case (_, byteStrings) =>
+//                    val x = Await.result(byteStrings.runWith(Sink.seq), 3.seconds)
+//                    x.foreach(bs => log.info(s"XXXXXXXXXXXXXXX Seq bs size: ${bs.size}"))
+//                    val y = Source(x)
+//                    y
+                    val producer = byteStrings.toMat(BroadcastHub.sink(1))(Keep.right).run()
+//                    val producer = y.toMat(BroadcastHub.sink)(Keep.right).run()
+//                    Await.ready(producer.runForeach(bs => log.info(s"XXXXXXXXXXXXXXXXx Producer bs size: ${bs.size}")), 3.seconds)
+                    onSuccess(transferApi.publish(streamName, producer, dist = true)) { _ =>
+                      complete(Accepted)
+                    }
+                }
+              } else {
+                complete(BadRequest -> s"The stream $streamName does not exists")
               }
             }
-          } else {
-            complete(BadRequest -> s"The stream $streamName does not exists")
+          }
+        }
+    } ~
+      pathPrefix("vbds" / "transfer" / "internal") {
+        // Internal API: Distribute an image to another server, Response: 204 – Success (no content) or 400 – Bad Request (non- existent stream)
+        post {
+          path(Remaining) { streamName =>
+            onSuccess(adminApi.streamExists(streamName)) { exists =>
+              if (exists) {
+                extractDataBytes { byteStrings =>
+                  onSuccess(transferApi.publish(streamName, byteStrings, dist = false)) { _ =>
+                    complete(Accepted)
+                  }
+                }
+              } else {
+                complete(BadRequest -> s"The stream $streamName does not exists")
+              }
+            }
           }
         }
       }
-    }
-  }
 
 }
