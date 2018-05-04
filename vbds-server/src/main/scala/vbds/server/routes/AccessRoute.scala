@@ -45,7 +45,8 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
             if (exists) {
               log.info(s"XXX subscribe to $name exists")
 
-              val (queue, source) = Source.queue[ByteString](bufferSize = 100, overflowStrategy = OverflowStrategy.dropHead).preMaterialize
+              val (queue, source) = Source.queue[ByteString](bufferSize = 0, overflowStrategy = OverflowStrategy.backpressure).preMaterialize
+//              val (actorRef, source) = Source.actorRef[ByteString](bufferSize = 100, overflowStrategy = OverflowStrategy.fail).preMaterialize
               queue.watchCompletion().onComplete {
                 case Success(_) => log.info(s"Websocket queue for $name completed")
                 case Failure(ex) => log.error(s"Websocket queue error for stream $name: $ex")
@@ -57,7 +58,6 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
                 log.info(s"XXX subscribe to $name info: $info")
                 extractUpgradeToWebSocket { upgrade =>
                   log.info(s"XXX subscribe to $name extractUpgradeToWebSocket: $extractUpgradeToWebSocket")
-//                  complete(upgrade.handleMessagesWithSinkSource(Sink.ignore, source.map(BinaryMessage(_))))
                   complete(upgrade.handleMessagesWithSinkSource(sink, source.map(BinaryMessage(_))))
                 }
               }

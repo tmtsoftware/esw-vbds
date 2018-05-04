@@ -1,3 +1,5 @@
+
+
 lazy val `vbds-server` = project
   .enablePlugins(DeployApp, VbdsBuildInfo)
   .settings(

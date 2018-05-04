@@ -15,6 +15,7 @@ import scala.concurrent.duration._
  */
 trait AccessApi {
   def addSubscription(streamName: String, queue: SourceQueueWithComplete[ByteString]): Future[AccessInfo]
+//  def addSubscription(streamName: String, actorRef: ActorRef): Future[AccessInfo]
 
   def listSubscriptions(): Future[Set[AccessInfo]]
 
@@ -32,7 +33,9 @@ class AccessApiImpl(sharedDataActor: ActorRef)(implicit system: ActorSystem, tim
   import system.dispatcher
 
   def addSubscription(streamName: String, queue: SourceQueueWithComplete[ByteString]): Future[AccessInfo] = {
+//  def addSubscription(streamName: String, actorRef: ActorRef): Future[AccessInfo] = {
     (sharedDataActor ? AddSubscription(streamName, queue)).mapTo[AccessInfo]
+//    (sharedDataActor ? AddSubscription(streamName, actorRef)).mapTo[AccessInfo]
   }
 
   def listSubscriptions(): Future[Set[AccessInfo]] = {

@@ -9,7 +9,7 @@ import akka.cluster.Cluster
 import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.ddata.Replicator._
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{BroadcastHub, Keep, Source, SourceQueueWithComplete}
+import akka.stream.scaladsl.{BroadcastHub, Keep, Sink, Source, SourceQueueWithComplete}
 import akka.util.ByteString
 import vbds.server.models.{AccessInfo, StreamInfo}
 import akka.pattern.pipe
@@ -20,8 +20,9 @@ import akka.http.scaladsl.model.HttpEntity.Chunked
 import akka.http.scaladsl.model.{ContentTypes, HttpRequest}
 import akka.stream.QueueOfferResult.Enqueued
 
-import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
+import scala.concurrent. duration._
+import scala.concurrent.{Await, Future}
+import scala.util.{Failure, Success}
 
 object SharedDataActor {
 
@@ -34,13 +35,14 @@ object SharedDataActor {
   // Sets the host and port that the http server is listening on
   case class LocalAddress(a: InetSocketAddress)
 
+//  case class AddSubscription(streamName: String, actorRef: ActorRef)
   case class AddSubscription(streamName: String, queue: SourceQueueWithComplete[ByteString])
 
   case class DeleteSubscription(info: AccessInfo)
 
   case object ListSubscriptions
 
-  case class Publish(subscriberSet: Set[AccessInfo], byteStrings: Source[ByteString, Any], dist: Boolean)
+  case class Publish(subscriberSet: Set[AccessInfo], producer: Source[ByteString, Any], dist: Boolean)
 
   def props(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem): Props =
     Props(new SharedDataActor(replicator))
@@ -69,6 +71,7 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
 
   var localAddress: InetSocketAddress = _
   var localSubscribers = Map[AccessInfo, SourceQueueWithComplete[ByteString]]()
+//  var localSubscribers = Map[AccessInfo, ActorRef]()
   val adminDataKey = ORSetKey[StreamInfo]("streamInfo")
   val accessDataKey = ORSetKey[AccessInfo]("accessInfo")
 
@@ -111,10 +114,12 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
       log.info("Current streams: {}", data.elements)
 
     case AddSubscription(name, queue) =>
+//    case AddSubscription(name, actorRef) =>
       log.info("Adding Subscription: {}", name)
       val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, UUID.randomUUID().toString)
       replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ + info)
       localSubscribers = localSubscribers + (info -> queue)
+//      localSubscribers = localSubscribers + (info -> actorRef)
       sender() ! info
 
     case DeleteSubscription(info) =>
@@ -139,8 +144,8 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
       val data = c.get(accessDataKey)
       log.info("Current subscriptions: {}", data.elements)
 
-    case Publish(subscriberSet, byteArrays, dist) =>
-      publish(subscriberSet, byteArrays, sender(), dist)
+    case Publish(subscriberSet, producer, dist) =>
+      publish(subscriberSet, producer, sender(), dist)
   }
 
   /**
@@ -148,18 +153,15 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
     * the given actor when done.
     *
     * @param subscriberSet set of subscriber info from shared data
-    * @param byteStrings   source of the data
+    * @param producer      source of the data (reusable via BroadcastHub)
     * @param replyTo       the actor to notify when done
     * @param dist          if true, also distribute the data to the HTTP servers corresponding to any remote subscribers
     */
   private def publish(subscriberSet: Set[AccessInfo],
-                      byteStrings: Source[ByteString, Any],
+                      producer: Source[ByteString, Any],
                       replyTo: ActorRef,
                       dist: Boolean): Unit = {
     log.info(s"Publish dist=$dist, Number of subscribers: ${subscriberSet.size}")
-
-    // Broadcast the image data to each of the local subscribers
-    val producer = byteStrings.toMat(BroadcastHub.sink(bufferSize = 256))(Keep.right).run()
 
     // Split subscribers into local and remote
     val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains _)
@@ -168,8 +170,10 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
       log.info(s"XXX Local subscriber: $a")
       val queue = localSubscribers(a)
       producer.runForeach { bs =>
-        log.info(s"XXX thread=${Thread.currentThread().getName}")
+        log.info(s"XXXXXXXXXX bs.size = ${bs.size},  thread=${Thread.currentThread().getName}")
         val f = queue.offer(bs) // XXX Need to wait before calling again!!!
+//        actorRef ! bs
+
         // XXX FIXME: Important error messages: don't ignore
         f.onComplete {
           case Success(Enqueued) => log.info("Enqueued message")
@@ -178,7 +182,7 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
             log.error(s"XXX Enqueue exception: $ex")
             self ! DeleteSubscription(a) // XXX TODO FIXME: recover when websocket client goes away!
         }
-        f
+        f.map(_ => Done)
       }
     }
 
