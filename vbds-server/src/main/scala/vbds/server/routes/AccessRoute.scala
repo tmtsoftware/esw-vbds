@@ -46,13 +46,12 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
               log.info(s"XXX subscribe to $name exists")
 
               val (queue, source) = Source.queue[ByteString](bufferSize = 0, overflowStrategy = OverflowStrategy.backpressure).preMaterialize
-//              val (actorRef, source) = Source.actorRef[ByteString](bufferSize = 100, overflowStrategy = OverflowStrategy.fail).preMaterialize
               queue.watchCompletion().onComplete {
                 case Success(_) => log.info(s"Websocket queue for $name completed")
                 case Failure(ex) => log.error(s"Websocket queue error for stream $name: $ex")
               }
 
-              val sink = Sink.foreach[Message](x => log.info(s"XXX Websocket input: $x"))
+              val sink = Sink.foreach[Message](x => log.info(s"XXX Websocket input: $x")) // or use Sink.ignore...
 
               onSuccess(accessData.addSubscription(name, queue)) { info =>
                 log.info(s"XXX subscribe to $name info: $info")

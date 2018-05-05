@@ -35,12 +35,6 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
 
   val log = Logging(system, this)
 
-  private def broadcast(): (Sink[String, NotUsed], Source[String, NotUsed]) = {
-      MergeHub.source[String](perProducerBufferSize = 16)
-        .toMat(BroadcastHub.sink(bufferSize = 256))(Keep.both)
-        .run()
-  }
-
   val route =
   pathPrefix("vbds" / "transfer" / "streams") {
     // List all streams: Response: OK: Stream names and descriptions in JSON; empty document if no streams
@@ -56,8 +50,7 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
           if (exists) {
             fileUpload("data") {
               case (_, byteStrings) =>
-                val producer = byteStrings.toMat(BroadcastHub.sink(1))(Keep.right).run()
-                onSuccess(transferApi.publish(streamName, producer, dist = true)) { _ =>
+                onSuccess(transferApi.publish(streamName, byteStrings, dist = true)) { _ =>
                   complete(Accepted)
                 }
             }
@@ -74,9 +67,7 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
       path(Remaining) { streamName =>
         withoutSizeLimit {
           extractDataBytes { byteStrings =>
-            val producer = byteStrings.toMat(BroadcastHub.sink(1))(Keep.right).run()
-            producer.runForeach(bs => log.info(s"WWWWWWWWWWWWW bs size = ${bs.size}"))
-            onSuccess(transferApi.publish(streamName, producer, dist = false)) { _ =>
+            onSuccess(transferApi.publish(streamName, byteStrings, dist = false)) { _ =>
               complete(Accepted)
             }
           }
