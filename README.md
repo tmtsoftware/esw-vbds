@@ -60,19 +60,19 @@ and then starting one or more other instances that can join the cluster. For exa
 
 ### Test Client Using curl and wscat
 
-* Create a stream named `XXX`:
+Create a stream named `XXX`:
 
     curl --request POST http://127.0.0.1:7777/vbds/admin/streams/XXX
 
-* Subscribe to the stream using wscat (Install with `npm install -g wscat`)
+Subscribe to the stream using wscat (Install with `npm install -g wscat`)
 
     wscat -c ws://127.0.0.1:7777/vbds/access/streams/XXX
 
-* Subscribe to the same stream from the other server:
+Subscribe to the same stream from the other server:
 
     wscat -c ws://127.0.0.1:7778/vbds/access/streams/XXX
 
-* Publish some data (Replace MyFile with the file name):
+Publish some data (Replace MyFile with the file name):
 
     curl --request POST -F data=@MyFile http://127.0.0.1:7777/vbds/transfer/streams/XXX
 
