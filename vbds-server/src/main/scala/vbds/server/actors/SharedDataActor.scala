@@ -11,18 +11,15 @@ import akka.cluster.ddata.Replicator._
 import akka.stream.{ActorMaterializer, ClosedShape}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source, SourceQueueWithComplete}
 import akka.util.ByteString
-import vbds.server.models.{AccessInfo, StreamInfo}
+import vbds.server.models.{AccessInfo, ServerInfo, StreamInfo}
 import akka.pattern.pipe
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.HttpEntity.{Chunked, IndefiniteLength}
 import akka.http.scaladsl.model.{ContentTypes, HttpRequest}
 import akka.stream.QueueOfferResult.Enqueued
 
-import scala.concurrent.{Await, Future}
-import scala.concurrent.duration._
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 object SharedDataActor {
@@ -42,7 +39,7 @@ object SharedDataActor {
 
   case object ListSubscriptions
 
-  case class Publish(subscriberSet: Set[AccessInfo], producer: Source[ByteString, Any], dist: Boolean)
+  case class Publish(streamName: String, subscriberSet: Set[AccessInfo], producer: Source[ByteString, Any], dist: Boolean)
 
   def props(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem): Props =
     Props(new SharedDataActor(replicator))
@@ -71,6 +68,7 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
 
   var localAddress: InetSocketAddress = _
   var localSubscribers                = Map[AccessInfo, SourceQueueWithComplete[ByteString]]()
+  var remoteConnections               = Map[ServerInfo, Flow[HttpRequest, HttpResponse, _]]()
   val adminDataKey                    = ORSetKey[StreamInfo]("streamInfo")
   val accessDataKey                   = ORSetKey[AccessInfo]("accessInfo")
 
@@ -141,177 +139,110 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
       val data = c.get(accessDataKey)
       log.info("Current subscriptions: {}", data.elements)
 
-    case Publish(subscriberSet, producer, dist) =>
-      publish(subscriberSet, producer, sender(), dist)
+    case Publish(streamName, subscriberSet, producer, dist) =>
+      publish(streamName, subscriberSet, producer, sender(), dist)
   }
 
   /**
    * Publishes the contents of th given data source to the given set of subscribers and send a Done message to
    * the given actor when done.
    *
-   * @param subscriberSet set of subscriber info from shared data
+   * @param streamName name of the stream to publish on
+   * @param subscriberSet set of subscriber info from shared data for the given stream
    * @param producer      source of the data (reusable via BroadcastHub)
    * @param replyTo       the actor to notify when done
    * @param dist          if true, also distribute the data to the HTTP servers corresponding to any remote subscribers
    */
-  private def publish(subscriberSet: Set[AccessInfo],
+  private def publish(streamName: String,
+                      subscriberSet: Set[AccessInfo],
                       producer: Source[ByteString, Any],
                       replyTo: ActorRef,
                       dist: Boolean): Unit = {
 
     // Split subscribers into local and remote
-    val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains _)
-    val remoteHostSet         = remoteSet.map(a => AccessInfo(a.streamName, a.host, a.port, ""))
-    val numOut                = localSet.size + remoteHostSet.size
+    val (localSet, remoteSet) = getSubscribers(subscriberSet, dist)
+    val remoteHostSet         = remoteSet.map(a => ServerInfo(a.host, a.port))
+    if (dist) checkRemoteConnections(remoteHostSet)
+
+    val numOut = localSet.size + remoteHostSet.size
     log.info(
-      s"Publish dist=$dist, Number of subscribers: ${subscriberSet.size} (${localSet.size} local, ${remoteSet.size} remote on ${remoteHostSet.size} hosts)"
+      s"Publish dist=$dist, subscribers: $numOut (${localSet.size} local, ${remoteSet.size} remote on ${remoteHostSet.size} hosts)"
     )
 
+    val g = RunnableGraph.fromGraph(GraphDSL.create(Sink.ignore) { implicit builder => out =>
+      import GraphDSL.Implicits._
 
-// XXXXXXXXXXXXXXXxx Try broadcast ~> ...
+      val bcast                      = builder.add(Broadcast[ByteString](numOut))
+      val merge                      = builder.add(Merge[ByteString](numOut))
+      def queueFlow(a: AccessInfo)   = Flow[ByteString].alsoTo(Sink.foreach(addToQueue(a, _)))
+      val localFlows                 = localSet.map(queueFlow)
+      def requestFlow(h: ServerInfo) = Flow[ByteString].map(makeHttpRequest(streamName, h, _))
+      val remoteFlows =
+        if (dist) remoteHostSet.map(h => requestFlow(h).via(remoteConnections(h)).map(_ => ByteString.empty)) else Set.empty
 
-          val g = RunnableGraph.fromGraph(GraphDSL.create(Sink.ignore) { implicit builder => out =>
-            import GraphDSL.Implicits._
+      producer ~> bcast
+      localFlows.foreach(bcast ~> _ ~> merge)
+      if (dist) remoteFlows.foreach(bcast ~> _ ~> merge)
+      merge ~> out
+      ClosedShape
+    })
 
-            val bcast = builder.add(Broadcast[ByteString](numOut))
-            val merge = builder.add(Merge[ByteString](numOut))
-            val localFlows = localSet.map(a => Flow[ByteString].alsoTo(Sink.foreach(addToQueue(a, _))))
-            val remoteFlows = remoteHostSet.map(a => Flow[ByteString].alsoTo(Sink.foreach(bs => localSubscribers(a).offer(bs))))
+    val f = g.run()
+    f.onComplete {
+      case Success(_)  => log.info("Publish complete")
+      case Failure(ex) => log.error(s"Publish failed with $ex")
+    }
 
-//            val f1, f2, f4 = Flow[Int].map{i => println(s"YYY $i"); i}
-//            val f3 = Flow[Int].map(i => println(s"XXX $i"))
+    // Send Done to the replyTo actor when done
+    pipe(f) to replyTo
 
-            producer ~> bcast
-            localFlows.foreach(bcast ~> _ ~> merge)
-            remoteFlows.foreach(bcast ~> _ ~> merge)
-            merge ~> Flow[ByteString] ~> out
-
-            ClosedShape
-          })
-
-          val x = g.run()
-          x.onComplete {
-            case Success(_) => println("BroadcastExample1 done")
-            case Failure(ex) => ex.printStackTrace()
-          }
-    // XXXXXXXXXXXXXXXxx Try broadcast ~> ...
-
-
-
-
-
-
-
-//    val f = Future
-//      .sequence(Seq(sendToLocalSubscribers(producer, localSet), sendToRemoteSubscribers(producer, remoteSet, dist)))
-//      .map(_ => Done)
-//
-//    f.onComplete {
-//      case Success(_)  => log.info("Publish complete")
-//      case Failure(ex) => log.error(s"Publish failed with $ex")
-//    }
-//
-//    // Send Done to the replyTo actor when done
-//    pipe(f) to replyTo
   }
 
-//  private def sendToLocalSubscribers(producer: Source[ByteString, Any], localSet: Set[AccessInfo]): Future[Done] = {
-//    producer.map(bs => localSet.map(addToQueue(_, bs))).runWith(Sink.ignore)
-//  }
+  /**
+    * Returns a pair of sets for the local and remote subscribers
+    * @param subscriberSet all subscribers for the stream
+    * @param dist true if published data should be distributed to remote subscribers
+    */
+  private def getSubscribers(subscriberSet: Set[AccessInfo], dist: Boolean) = {
+    val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains _)
+    if (dist) (localSet, remoteSet) else (localSet, Set.empty[AccessInfo])
+  }
 
-//  // Only want to transfer images once to a remote server, even if it has multiple local subscribers
-//  private def sendToRemoteSubscribers(producer: Source[ByteString, Any],
-//                                      remoteSet: Set[AccessInfo],
-//                                      dist: Boolean): Future[Done] = {
-//    val remoteHostSet         = remoteSet.map(a => AccessInfo(a.streamName, a.host, a.port, ""))
-//    if (dist && remoteSet.nonEmpty) {
-//      log.info(s"Number of remote hosts with subscribers: ${remoteHostSet.size}")
-//      Future.sequence(remoteHostSet.map(a => distribute(a.streamName, a.host, a.port, producer))).map(_ => Done)
-//    } else {
-//      Future.successful(Done)
-//    }
-//  }
+  /**
+    * Makes the HTTP request for the transfer to remote servers with subscribers
+    */
+  private def makeHttpRequest(streamName: String, serverInfo: ServerInfo, bs: ByteString): HttpRequest = {
+    HttpRequest(
+      HttpMethods.POST,
+      s"http://${serverInfo.host}:${serverInfo.port}$distRoute/$streamName",
+      entity = HttpEntity(ContentTypes.`application/octet-stream`, bs)
+    )
+  }
 
+  /**
+    * Make sure the remote connections for any remote hosts with subscribers is defined.
+    * (XXX TODO: Handle connection timeouts!!!)
+    */
+  private def checkRemoteConnections(remoteHostSet: Set[ServerInfo]): Unit = {
+    remoteHostSet.foreach { h =>
+      if (!remoteConnections.contains(h)) {
+        remoteConnections = remoteConnections + (h -> Http().outgoingConnection(h.host, h.port))
+      }
+    }
+  }
+
+  /**
+    * Adds a ByteString to the queue for a local subscriber's web socket
+    */
   private def addToQueue(a: AccessInfo, bs: ByteString): Future[Done] = {
-    log.info(s"XXXXXXXXXX bs.size = ${bs.size}")
     val f = localSubscribers(a).offer(bs)
     f.onComplete {
       case Success(Enqueued) => log.info("Enqueued message")
-      case Success(result)   => log.error(s"XXX Failed to enqueue message: $result")
+      case Success(result)   => log.error(s"Failed to enqueue message: $result")
       case Failure(ex) =>
-        log.error(s"XXX Enqueue exception: $ex")
+        log.error(s"Enqueue exception: $ex")
         self ! DeleteSubscription(a) // XXX TODO FIXME: recover when websocket client goes away!
     }
     f.map(_ => Done)
   }
-
-  /**
-   * Distributes the incoming data for the given stream to the HTTP server at the given host and port.
-   */
-
-//  private def distribute(streamName: String, host: String, port: Int): Future[Done] = {
-//    val uri = s"http://$host:$port$distRoute/$streamName"
-//    log.info(s"Distribute data for $streamName to $uri")
-//    // , producer: Source[ByteString, Any]
-//
-//    //    Await.ready(producer.runForeach(bs => log.info(s"ZZZZZZZZZZZZZZZZZZZz bs size = ${bs.size}")), 3.seconds)
-//
-//    val f = Http().singleRequest(
-//      HttpRequest(
-//        HttpMethods.POST,
-//        uri,
-//        entity = HttpEntity(ContentTypes.`application/octet-stream`, producer)
-//      )
-//    )
-//
-//    f.map(_ => Done)
-//  }
-
-
-    //  private def distribute(streamName: String, host: String, port: Int, producer: Source[ByteString, Any]): Future[Done] = {
-//    val uri = s"http://$host:$port$distRoute/$streamName"
-//    log.info(s"Distribute data for $streamName to $uri")
-////    Await.ready(producer.runForeach(bs => log.info(s"ZZZZZZZZZZZZZZZZZZZz bs size = ${bs.size}")), 3.seconds)
-//
-//    val f = Http().singleRequest(
-//      HttpRequest(
-//        HttpMethods.POST,
-//        uri,
-//        entity = HttpEntity(ContentTypes.`application/octet-stream`, producer)
-//      )
-//    )
-//
-//    f.map(_ => Done)
-
-//    createUploadRequest(streamName, uri, producer).flatMap { request =>
-//      val responseFuture = Http().singleRequest(request)
-//      responseFuture.onComplete {
-//        case Success(response) =>
-//          log.info(s"Distributed data to $uri")
-////          response.discardEntityBytes()
-//
-//        case Failure(ex) =>
-//          log.error(s"XXX Distributing data to $uri failed with $ex")
-//      }
-//      responseFuture.map(_ => Done)
-//    }
-//  }
-
-//  private def createUploadRequest(streamName: String, uri: Uri, producer: Source[ByteString, Any]): Future[HttpRequest] = {
-//    val bodyPart = Multipart.FormData.BodyPart("data",
-//                                               HttpEntity.IndefiniteLength(ContentTypes.`application/octet-stream`, producer),
-//                                               Map("filename" -> streamName))
-////    val body = Multipart.FormData(bodyPart)
-////    Marshal(body).to[RequestEntity].map { entity =>
-////      HttpRequest(method = HttpMethods.POST, uri = uri, entity = entity)
-////    }
-//
-//    Await.ready(producer.runForeach(bs => log.info(s"ZZZZZZZZZZZZZZZZZ bs size = ${bs.size}")), 3.seconds)
-//
-//    val request = HttpRequest(method = HttpMethods.POST,
-//                              uri = uri,
-//                              entity = Chunked.fromData(ContentTypes.`application/octet-stream`, producer))
-//    Future.successful(request)
-//  }
-
 }

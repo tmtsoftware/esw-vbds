@@ -11,3 +11,8 @@ import vbds.server.marshalling.VbdsSerializable
   * @param id unique ID for this subscription
   */
 case class AccessInfo(streamName: String, host: String, port: Int, id: String) extends VbdsSerializable
+
+/**
+  * Represents a remote HTTP server that has subscribers to image data
+  */
+case class ServerInfo(host: String, port: Int) extends VbdsSerializable

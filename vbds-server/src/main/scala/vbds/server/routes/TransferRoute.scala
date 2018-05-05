@@ -1,6 +1,5 @@
 package vbds.server.routes
 
-import akka.NotUsed
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives
 import vbds.server.actors.{AccessApi, AdminApi, TransferApi}
@@ -9,10 +8,6 @@ import akka.actor.ActorSystem
 import akka.event.{LogSource, Logging}
 import vbds.server.marshalling.BinaryMarshallers
 import akka.stream.Materializer
-import akka.stream.scaladsl.{BroadcastHub, Keep, MergeHub, Sink, Source}
-
-import scala.concurrent.Await
-import scala.concurrent.duration._
 
 /**
  * Provides the HTTP route for the VBDS Transfer Service.
