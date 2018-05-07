@@ -45,7 +45,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
             if (exists) {
               log.info(s"XXX subscribe to $name exists")
 
-              val (queue, source) = Source.queue[ByteString](bufferSize = 0, overflowStrategy = OverflowStrategy.backpressure).preMaterialize
+              val (queue, source) = Source.queue[ByteString](bufferSize = 256, overflowStrategy = OverflowStrategy.backpressure).preMaterialize
               queue.watchCompletion().onComplete {
                 case Success(_) => log.info(s"Websocket queue for $name completed")
                 case Failure(ex) => log.error(s"Websocket queue error for stream $name: $ex")

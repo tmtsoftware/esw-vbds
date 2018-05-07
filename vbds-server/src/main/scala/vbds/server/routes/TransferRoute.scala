@@ -8,6 +8,8 @@ import akka.actor.ActorSystem
 import akka.event.{LogSource, Logging}
 import vbds.server.marshalling.BinaryMarshallers
 import akka.stream.Materializer
+import akka.stream.scaladsl.Source
+import akka.util.ByteString
 
 /**
  * Provides the HTTP route for the VBDS Transfer Service.
@@ -19,8 +21,6 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
     extends Directives
     with JsonSupport
     with BinaryMarshallers {
-
-  import system.dispatcher
 
   implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
     def genString(o: AnyRef): String = o.getClass.getName
@@ -44,8 +44,10 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
         onSuccess(adminApi.streamExists(streamName)) { exists =>
           if (exists) {
             fileUpload("data") {
-              case (_, byteStrings) =>
-                onSuccess(transferApi.publish(streamName, byteStrings, dist = true)) { _ =>
+              case (_, source) =>
+                // Add a single newline to mark the end of the stream for one image
+                val terminatedSource = source.concat(Source.single(ByteString("\n")))
+                onSuccess(transferApi.publish(streamName, terminatedSource, dist = true)) { _ =>
                   complete(Accepted)
                 }
             }
@@ -61,8 +63,8 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
     post {
       path(Remaining) { streamName =>
         withoutSizeLimit {
-          extractDataBytes { byteStrings =>
-            onSuccess(transferApi.publish(streamName, byteStrings, dist = false)) { _ =>
+          extractDataBytes { source =>
+            onSuccess(transferApi.publish(streamName, source, dist = false)) { _ =>
               complete(Accepted)
             }
           }

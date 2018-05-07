@@ -21,6 +21,7 @@ object VbdsClientApp extends App {
                              create: Option[String] = None,
                              delete: Option[String] = None,
                              subscribe: Option[String] = None,
+                             dir: Option[String] = None,
                              action: Option[String] = None,
                              list: Boolean = false,
                              publish: Option[String] = None,
@@ -59,6 +60,10 @@ object VbdsClientApp extends App {
     opt[String]("subscribe") valueName "<stream name>" action { (x, c) =>
       c.copy(subscribe = Some(x))
     } text "Subscribes to the given VBDS stream (see --action option)"
+
+    opt[String]("dir") valueName "<path>" action { (x, c) =>
+      c.copy(dir = Some(x))
+    } text "Directory to hold received image files (default: current directory)"
 
     opt[String]('a', "action") valueName "<shell-command>" action { (x, c) =>
       c.copy(action = Some(x))
@@ -112,7 +117,7 @@ object VbdsClientApp extends App {
       options.publish.foreach(s => handleHttpResponse(client.publish(s, options.data.get, delay.asInstanceOf[FiniteDuration])))
     }
 
-    options.subscribe.foreach(s => client.subscribe(s, options.action))
+    options.subscribe.foreach(s => client.subscribe(s, options.dir.getOrElse("."), options.action))
   }
 
   // Prints the result of the HTTP request and exits

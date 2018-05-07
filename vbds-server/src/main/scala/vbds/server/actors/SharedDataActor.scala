@@ -9,7 +9,7 @@ import akka.cluster.Cluster
 import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.ddata.Replicator._
 import akka.stream.{ActorMaterializer, ClosedShape}
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source, SourceQueueWithComplete}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink, Source, SourceQueueWithComplete}
 import akka.util.ByteString
 import vbds.server.models.{AccessInfo, ServerInfo, StreamInfo}
 import akka.pattern.pipe
@@ -39,7 +39,7 @@ object SharedDataActor {
 
   case object ListSubscriptions
 
-  case class Publish(streamName: String, subscriberSet: Set[AccessInfo], producer: Source[ByteString, Any], dist: Boolean)
+  case class Publish(streamName: String, subscriberSet: Set[AccessInfo], source: Source[ByteString, Any], dist: Boolean)
 
   def props(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem): Props =
     Props(new SharedDataActor(replicator))
@@ -149,13 +149,13 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
    *
    * @param streamName name of the stream to publish on
    * @param subscriberSet set of subscriber info from shared data for the given stream
-   * @param producer      source of the data (reusable via BroadcastHub)
+   * @param source      source of the data (reusable via BroadcastHub)
    * @param replyTo       the actor to notify when done
    * @param dist          if true, also distribute the data to the HTTP servers corresponding to any remote subscribers
    */
   private def publish(streamName: String,
                       subscriberSet: Set[AccessInfo],
-                      producer: Source[ByteString, Any],
+                      source: Source[ByteString, Any],
                       replyTo: ActorRef,
                       dist: Boolean): Unit = {
 
@@ -180,7 +180,7 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
       val remoteFlows =
         if (dist) remoteHostSet.map(h => requestFlow(h).via(remoteConnections(h)).map(_ => ByteString.empty)) else Set.empty
 
-      producer ~> bcast
+      source ~> bcast
       localFlows.foreach(bcast ~> _ ~> merge)
       if (dist) remoteFlows.foreach(bcast ~> _ ~> merge)
       merge ~> out
