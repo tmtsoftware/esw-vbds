@@ -1,4 +1,4 @@
-package vbds.client.app
+package vbds.client
 
 import java.nio.file.Path
 

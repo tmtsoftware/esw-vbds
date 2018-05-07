@@ -1,4 +1,4 @@
-package vbds.client.app
+package vbds.client
 
 import java.io.File
 import java.nio.file.Path
@@ -9,15 +9,13 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message}
 import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse, Uri}
 import akka.stream.Materializer
-import akka.stream.scaladsl.Framing
-import akka.util.ByteString
+import vbds.client.WebSocketActor.StreamInitialized
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success, Try}
 
-class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem,
-                                                                        implicit val mat: Materializer) {
+class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem, implicit val mat: Materializer) {
 
   implicit val executionContext = system.dispatcher
   val adminRoute                = "/vbds/admin/streams"
@@ -70,31 +68,28 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
   def subscribe(streamName: String, dir: String, action: Option[String]): Future[HttpResponse] = {
     println(s"XXX subscribe to $streamName")
 
-    def handler(msg: Message): Unit = {
-      msg match {
-        case bm: BinaryMessage =>
-          val f = bm.dataStream
-//            .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = maxFrameLengthBytes, allowTruncation = false))
-            .runForeach {
-              bs =>
-                println(s"XXX received ByteString with ${bs.size} bytes")
-//            .zipWithIndex
+//    def handler(msg: Message): Unit = {
+//      msg match {
+//        case bm: BinaryMessage =>
+//          val f = bm.dataStream
 //            .runForeach {
-//              case (bs, index) =>
-//                println(s"XXX received file $index: ${bs.size} bytes")
-            }
-          f.onComplete {
-            case Success(_) =>  println("XXX ------------- XXX")
-            case Failure(ex) => ex.printStackTrace()
-          }
+//              bs =>
+//                println(s"XXX received ByteString with ${bs.size} bytes")
+//            }
+//          f.onComplete {
+//            case Success(_) =>  println("XXX ------------- XXX")
+//            case Failure(ex) => ex.printStackTrace()
+//          }
+//
+//        case x =>
+//          println(s"XXX Wrong message type: $x")
+//      }
+//    }
 
-        case x =>
-          println(s"XXX Wrong message type: $x")
-      }
-    }
-
+    val receiver = system.actorOf(WebSocketActor.props(streamName, new File(dir)))
+    receiver ! StreamInitialized // XXX TODO FIXME
     val wsListener = new WebSocketListener
-    wsListener.subscribe(Uri(s"ws://$host:$port$accessRoute/$streamName"), handler)
+    wsListener.subscribe(Uri(s"ws://$host:$port$accessRoute/$streamName"), receiver)
   }
 
 }

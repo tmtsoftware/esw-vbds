@@ -16,7 +16,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-
+// XXX Temp scratch class - to be deleted
 object TestProducer extends App {
   implicit val system = ActorSystem()
   implicit val mat    = ActorMaterializer()

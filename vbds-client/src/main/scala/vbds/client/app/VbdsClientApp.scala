@@ -4,6 +4,7 @@ import java.io.File
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
+import vbds.client.VbdsClient
 
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success, Try}
