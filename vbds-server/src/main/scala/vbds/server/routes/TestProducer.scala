@@ -1,56 +1,65 @@
-//package vbds.server.routes
-//
-//import java.nio.file.Paths
-//
-//import akka.{Done, NotUsed}
-//import akka.actor.ActorSystem
-//import akka.http.scaladsl.Http
-//import akka.http.scaladsl.model.ws.{Message, TextMessage}
-//import akka.http.scaladsl.server.Directives
-//import akka.stream._
-//import akka.stream.scaladsl.{Broadcast, BroadcastHub, FileIO, Flow, GraphDSL, Keep, Merge, MergeHub, RunnableGraph, Sink, Source}
-//import akka.util.ByteString
-//
-//import scala.collection.immutable
-//import scala.concurrent.Future
-//import scala.concurrent.duration._
-//import scala.util.{Failure, Success}
-//
-//
-//object TestProducer extends App {
-//  implicit val system = ActorSystem()
-//  implicit val mat    = ActorMaterializer()
-//  import system.dispatcher
-//
-//  //object XXX extends Directives {
-//  //  val database = new Database()
-//  //
-//  //  val measurementsWebSocketService =
-//  //    Flow[Message]
-//  //      .collect {
-//  //        case TextMessage.Strict(text) =>
-//  //          Future.successful(text)
-//  //        case TextMessage.Streamed(textStream) =>
-//  //          textStream.runFold("")(_ + _)
-//  //            .flatMap(Future.successful)
-//  //      }
-//  //      .mapAsync(1)(identity)
-//  //      .map(InsertMessage.parse)
-//  //      .groupedWithin(1000, 1 second)
-//  //      .mapAsync(10)(database.bulkInsertAsync)
-//  //      .map(messages => InsertMessage.ack(messages.last))
-//  //
-//  //  val route = path("measurements") {
-//  //    get {
-//  //      handleWebSocketMessages(measurementsWebSocketService)
-//  //    }
-//  //  }
-//  //
-//  //  val bindingFuture = Http().bindAndHandle(route, "localhost", 8080)
-//  //
-//  //}
-//  //
-//
+package vbds.server.routes
+
+import java.nio.file.Paths
+
+import akka.{Done, NotUsed}
+import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.ws.{Message, TextMessage}
+import akka.http.scaladsl.server.Directives
+import akka.stream._
+import akka.stream.scaladsl.{Broadcast, BroadcastHub, FileIO, Flow, GraphDSL, Keep, Merge, MergeHub, RunnableGraph, Sink, Source}
+import akka.util.ByteString
+
+import scala.collection.immutable
+import scala.concurrent.Future
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
+
+
+object TestProducer extends App {
+  implicit val system = ActorSystem()
+  implicit val mat    = ActorMaterializer()
+  import system.dispatcher
+
+  object MergeHubTest {
+    def run() = {
+      val (sink, source) = MergeHub.source[Int].preMaterialize()
+      source.runForeach(println)
+      Source(1 to 10).runWith(sink)
+    }
+  }
+  MergeHubTest.run()
+
+  //object XXX extends Directives {
+  //  val database = new Database()
+  //
+  //  val measurementsWebSocketService =
+  //    Flow[Message]
+  //      .collect {
+  //        case TextMessage.Strict(text) =>
+  //          Future.successful(text)
+  //        case TextMessage.Streamed(textStream) =>
+  //          textStream.runFold("")(_ + _)
+  //            .flatMap(Future.successful)
+  //      }
+  //      .mapAsync(1)(identity)
+  //      .map(InsertMessage.parse)
+  //      .groupedWithin(1000, 1 second)
+  //      .mapAsync(10)(database.bulkInsertAsync)
+  //      .map(messages => InsertMessage.ack(messages.last))
+  //
+  //  val route = path("measurements") {
+  //    get {
+  //      handleWebSocketMessages(measurementsWebSocketService)
+  //    }
+  //  }
+  //
+  //  val bindingFuture = Http().bindAndHandle(route, "localhost", 8080)
+  //
+  //}
+  //
+
 //  object ReuseFlow {
 //
 //    def test() = {
@@ -66,7 +75,7 @@
 //    }
 //
 //  }
-//
+
 //  object BroadcastExample3 {
 //    def run(): Unit = {
 //      import GraphDSL.Implicits._
@@ -86,7 +95,7 @@
 //      val matList: Seq[Future[String]] = g.run()
 //    }
 //  }
-//
+
 //  object BroadcastExample1 {
 //    def run() {
 //      import GraphDSL.Implicits._
@@ -140,7 +149,7 @@
 //      }
 //    }
 //  }
-//
+
 //  object BroadcastExample2 {
 //    def run(): Unit = {
 //      println("\nBroadcastExample2:\n")
@@ -171,7 +180,7 @@
 //    }
 //
 //  }
-//
+
 //  object MatExample {
 //    val mySource = Source(1 to 10)
 //
@@ -191,7 +200,7 @@
 //
 //    }
 //  }
-//
-////  BroadcastExample1.run()
+
+//  BroadcastExample1.run()
 //    BroadcastExample2.run()
-//}
+}

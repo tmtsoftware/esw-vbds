@@ -3,13 +3,13 @@ package vbds.server.actors
 import java.net.InetSocketAddress
 import java.util.UUID
 
-import akka.Done
+import akka.NotUsed
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.cluster.Cluster
 import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.ddata.Replicator._
 import akka.stream.{ActorMaterializer, ClosedShape}
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink, Source, SourceQueueWithComplete}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink, Source}
 import akka.util.ByteString
 import vbds.server.models.{AccessInfo, ServerInfo, StreamInfo}
 import akka.pattern.pipe
@@ -17,9 +17,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.{ContentTypes, HttpRequest}
-import akka.stream.QueueOfferResult.Enqueued
 
-import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 object SharedDataActor {
@@ -33,7 +31,7 @@ object SharedDataActor {
   // Sets the host and port that the http server is listening on
   case class LocalAddress(a: InetSocketAddress)
 
-  case class AddSubscription(streamName: String, queue: SourceQueueWithComplete[ByteString])
+  case class AddSubscription(streamName: String, sink: Sink[ByteString, NotUsed])
 
   case class DeleteSubscription(info: AccessInfo)
 
@@ -67,7 +65,7 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
   import SharedDataActor._
 
   var localAddress: InetSocketAddress = _
-  var localSubscribers                = Map[AccessInfo, SourceQueueWithComplete[ByteString]]()
+  var localSubscribers                = Map[AccessInfo, Sink[ByteString, NotUsed]]()
   var remoteConnections               = Map[ServerInfo, Flow[HttpRequest, HttpResponse, _]]()
   val adminDataKey                    = ORSetKey[StreamInfo]("streamInfo")
   val accessDataKey                   = ORSetKey[AccessInfo]("accessInfo")
@@ -110,11 +108,11 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
       val data = c.get(adminDataKey)
       log.info("Current streams: {}", data.elements)
 
-    case AddSubscription(name, queue) =>
+    case AddSubscription(name, sink) =>
       log.info("Adding Subscription: {}", name)
       val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, UUID.randomUUID().toString)
       replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ + info)
-      localSubscribers = localSubscribers + (info -> queue)
+      localSubscribers = localSubscribers + (info -> sink)
       sender() ! info
 
     case DeleteSubscription(info) =>
@@ -174,8 +172,8 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
 
       val bcast                      = builder.add(Broadcast[ByteString](numOut))
       val merge                      = builder.add(Merge[ByteString](numOut))
-      def queueFlow(a: AccessInfo)   = Flow[ByteString].alsoTo(Sink.foreach(addToQueue(a, _)))
-      val localFlows                 = localSet.map(queueFlow)
+      def websocketFlow(a: AccessInfo)   = Flow[ByteString].alsoTo(localSubscribers(a))
+      val localFlows                 = localSet.map(websocketFlow)
       def requestFlow(h: ServerInfo) = Flow[ByteString].map(makeHttpRequest(streamName, h, _))
       val remoteFlows =
         if (dist) remoteHostSet.map(h => requestFlow(h).via(remoteConnections(h)).map(_ => ByteString.empty)) else Set.empty
@@ -229,20 +227,5 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
         remoteConnections = remoteConnections + (h -> Http().outgoingConnection(h.host, h.port))
       }
     }
-  }
-
-  /**
-    * Adds a ByteString to the queue for a local subscriber's web socket
-    */
-  private def addToQueue(a: AccessInfo, bs: ByteString): Future[Done] = {
-    val f = localSubscribers(a).offer(bs)
-    f.onComplete {
-      case Success(Enqueued) => log.info("Enqueued message")
-      case Success(result)   => log.error(s"Failed to enqueue message: $result")
-      case Failure(ex) =>
-        log.error(s"Enqueue exception: $ex")
-        self ! DeleteSubscription(a) // XXX TODO FIXME: recover when websocket client goes away!
-    }
-    f.map(_ => Done)
   }
 }

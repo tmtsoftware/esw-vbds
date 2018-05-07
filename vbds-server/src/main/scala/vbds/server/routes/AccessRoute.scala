@@ -3,15 +3,14 @@ package vbds.server.routes
 import akka.actor.ActorSystem
 import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message}
+import akka.http.scaladsl.model.ws.BinaryMessage
 import akka.http.scaladsl.server.Directives
 import akka.stream._
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.scaladsl.{MergeHub, Sink}
 import akka.util.ByteString
 import vbds.server.actors.{AccessApi, AdminApi}
 import vbds.server.models.JsonSupport
 
-import scala.util.{Failure, Success}
 
 /**
   * Provides the HTTP route for the VBDS Access Service.
@@ -20,8 +19,6 @@ import scala.util.{Failure, Success}
   */
 class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val system: ActorSystem, implicit val mat: ActorMaterializer)
   extends Directives with JsonSupport {
-
-  import system.dispatcher
 
   implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
     def genString(o: AnyRef): String = o.getClass.getName
@@ -40,24 +37,20 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
         }
         // Create a stream subscription: Response: OK - Creates a websocket connection to the Access Service
         path(Remaining) { name =>
-          log.info(s"XXX subscribe to $name")
+          log.info(s"subscribe to stream: $name")
           onSuccess(adminData.streamExists(name)) { exists =>
             if (exists) {
-              log.info(s"XXX subscribe to $name exists")
+              log.info(s"subscribe to existing stream: $name")
 
-              val (queue, source) = Source.queue[ByteString](bufferSize = 256, overflowStrategy = OverflowStrategy.backpressure).preMaterialize
-              queue.watchCompletion().onComplete {
-                case Success(_) => log.info(s"Websocket queue for $name completed")
-                case Failure(ex) => log.error(s"Websocket queue error for stream $name: $ex")
-              }
+              // We need a Source for writing to the websocket, but we want a Sink:
+              // This provides a Sink that feeds the Source.
+              val (sink, source) = MergeHub.source[ByteString].preMaterialize()
 
-              val sink = Sink.foreach[Message](x => log.info(s"XXX Websocket input: $x")) // or use Sink.ignore...
-
-              onSuccess(accessData.addSubscription(name, queue)) { info =>
+              onSuccess(accessData.addSubscription(name, sink)) { info =>
                 log.info(s"XXX subscribe to $name info: $info")
                 extractUpgradeToWebSocket { upgrade =>
                   log.info(s"XXX subscribe to $name extractUpgradeToWebSocket: $extractUpgradeToWebSocket")
-                  complete(upgrade.handleMessagesWithSinkSource(sink, source.map(BinaryMessage(_))))
+                  complete(upgrade.handleMessagesWithSinkSource(Sink.ignore, source.map(BinaryMessage(_))))
                 }
               }
             } else {
