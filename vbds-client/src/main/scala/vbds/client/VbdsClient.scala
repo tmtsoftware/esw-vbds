@@ -87,7 +87,7 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
 //    }
 
     val receiver = system.actorOf(WebSocketActor.props(streamName, new File(dir)))
-    receiver ! StreamInitialized // XXX TODO FIXME
+//    receiver ! StreamInitialized // XXX TODO FIXME
     val wsListener = new WebSocketListener
     wsListener.subscribe(Uri(s"ws://$host:$port$accessRoute/$streamName"), receiver)
   }

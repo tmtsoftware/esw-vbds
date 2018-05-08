@@ -45,6 +45,7 @@ class WebSocketActor(streamName: String, dir: File)(implicit val system: ActorSy
       log.info(s"Initialized stream for $streamName")
       count = 0
       newFile()
+      sender() ! Ack
 
     case msg: Message ⇒
       msg match {
