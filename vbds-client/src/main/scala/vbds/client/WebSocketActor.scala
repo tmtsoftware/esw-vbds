@@ -22,11 +22,11 @@ object WebSocketActor {
 
   final case class StreamFailure(ex: Throwable)
 
-  def props(streamName: String, dir: File)(implicit system: ActorSystem, mat: Materializer): Props =
-    Props(new WebSocketActor(streamName, dir))
+  def props(streamName: String, dir: File, action: String)(implicit system: ActorSystem, mat: Materializer): Props =
+    Props(new WebSocketActor(streamName, dir, action))
 }
 
-class WebSocketActor(streamName: String, dir: File)(implicit val system: ActorSystem, implicit val mat: Materializer)
+class WebSocketActor(streamName: String, dir: File, action: String)(implicit val system: ActorSystem, implicit val mat: Materializer)
     extends Actor
     with ActorLogging {
 
@@ -66,6 +66,7 @@ class WebSocketActor(streamName: String, dir: File)(implicit val system: ActorSy
       if (bs.size == 1 && bs.utf8String == "\n") {
         os.close()
         log.info(s"Wrote $file")
+        doAction()
         newFile()
       } else {
         log.info(s"XXX writing ${bs.size} bytes to $streamName")
@@ -84,5 +85,18 @@ class WebSocketActor(streamName: String, dir: File)(implicit val system: ActorSy
     count = count + 1
     file = new File(dir, s"$streamName-$count")
     os = new FileOutputStream(file)
+  }
+
+  // XXX TODO: Change to actor or callback
+  private def doAction(): Unit = {
+    import sys.process._
+
+    if (action.nonEmpty) {
+      try {
+        s"$action $file" !
+      } catch {
+        case ex: Exception => log.error(ex, s"Command failed: $action")
+      }
+    }
   }
 }

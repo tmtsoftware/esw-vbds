@@ -122,14 +122,13 @@ object VbdsClientApp extends App {
   }
 
   // Prints the result of the HTTP request and exits
-  private def handleHttpResponse(resp: Future[Any]): Unit = {
-    val result = Try(Await.result(resp, 60.seconds))
-    result match {
+  private def handleHttpResponse(resp: Future[Any])(implicit system: ActorSystem): Unit = {
+    import system.dispatcher
+    resp.foreach {
       case Success(res) =>
         println(res)
       case Failure(ex) =>
         ex.printStackTrace()
     }
-//    Await.ready(system.terminate(), 60.seconds)
   }
 }

@@ -6,10 +6,8 @@ import java.nio.file.Path
 import akka.Done
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message}
 import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse, Uri}
 import akka.stream.Materializer
-import vbds.client.WebSocketActor.StreamInitialized
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -56,7 +54,10 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
 
     val uri = s"http://$host:$port$transferRoute/$streamName"
     val paths = if (file.isDirectory) {
-      file.listFiles().map(_.toPath).toList
+      file.listFiles().map(_.toPath).toList.sortWith {
+        case (p1, p2) => comparePaths(p1, p2)
+
+      }
     } else {
       List(file.toPath)
     }
@@ -64,30 +65,23 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
     uploader.uploadFiles(streamName, uri, paths, delay, handler)
   }
 
+  val fileNamePattern = """\d+""".r
+
+  def comparePaths(p1: Path, p2: Path): Boolean = {
+    val s1 = p1.getFileName.toString
+    val s2 = p2.getFileName.toString
+    val a = fileNamePattern.findAllIn(s1).toList.headOption.getOrElse("")
+    val b = fileNamePattern.findAllIn(s2).toList.headOption.getOrElse("")
+    if (a.nonEmpty && b.nonEmpty)
+      a.toInt.compareTo(b.toInt) < 0
+    else
+      s1.compareTo(s2) < 0
+  }
+
   // XXX TODO FIXME: Change action to general purpose handler
   def subscribe(streamName: String, dir: String, action: Option[String]): Future[HttpResponse] = {
-    println(s"XXX subscribe to $streamName")
-
-//    def handler(msg: Message): Unit = {
-//      msg match {
-//        case bm: BinaryMessage =>
-//          val f = bm.dataStream
-//            .runForeach {
-//              bs =>
-//                println(s"XXX received ByteString with ${bs.size} bytes")
-//            }
-//          f.onComplete {
-//            case Success(_) =>  println("XXX ------------- XXX")
-//            case Failure(ex) => ex.printStackTrace()
-//          }
-//
-//        case x =>
-//          println(s"XXX Wrong message type: $x")
-//      }
-//    }
-
-    val receiver = system.actorOf(WebSocketActor.props(streamName, new File(dir)))
-//    receiver ! StreamInitialized // XXX TODO FIXME
+    println(s"subscribe to $streamName")
+    val receiver = system.actorOf(WebSocketActor.props(streamName, new File(dir), action.getOrElse("")))
     val wsListener = new WebSocketListener
     wsListener.subscribe(Uri(s"ws://$host:$port$accessRoute/$streamName"), receiver)
   }

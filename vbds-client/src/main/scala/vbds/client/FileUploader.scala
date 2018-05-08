@@ -8,7 +8,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.Multipart.FormData
 import akka.http.scaladsl.model._
-import akka.stream.Materializer
+import akka.stream.{DelayOverflowStrategy, Materializer}
 import akka.stream.scaladsl._
 
 import scala.concurrent.Future
@@ -48,7 +48,7 @@ class FileUploader(chunkSize: Int = 1024 * 1024)(implicit val system: ActorSyste
                   delay: FiniteDuration,
                   handler: ((Try[HttpResponse], Path)) => Unit): Future[Done] = {
     Source(files)
-      .delay(delay)
+      .delay(delay, DelayOverflowStrategy.backpressure)
       .mapAsync(1)(path => createUploadRequest(streamName, uri, path))
       .via(poolClientFlow(uri))
       .runForeach(handler)

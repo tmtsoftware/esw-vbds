@@ -36,6 +36,7 @@ Usage: vbds-client [options]
   -l, --list               List the available streams
   --subscribe <stream name>
                            Subscribes to the given VBDS stream (see --action option)
+  --dir <path>             Directory to hold received image files (default: current directory)
   -a, --action <shell-command>
                            A shell command to execute when a new file is received (args: stream-name file-name)
   --publish <stream-name>  Publish to the given stream (see --data option)
