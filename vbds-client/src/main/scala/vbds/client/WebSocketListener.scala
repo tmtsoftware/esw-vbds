@@ -9,7 +9,6 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 
 import scala.concurrent.{Future, Promise}
-import akka.pattern.ask
 import akka.util.Timeout
 
 import scala.concurrent.duration._

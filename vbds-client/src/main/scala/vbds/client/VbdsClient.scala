@@ -8,6 +8,8 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse, Uri}
 import akka.stream.Materializer
+import akka.stream.scaladsl.SourceQueueWithComplete
+import vbds.client.WebSocketActor.ReceivedFile
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -42,7 +44,6 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
    * @return future indicating when done
    */
   def publish(streamName: String, file: File, delay: FiniteDuration = Duration.Zero): Future[Done] = {
-    // XXX FIXME TODO: Make this a parameter
     val handler: ((Try[HttpResponse], Path)) => Unit = {
       case (Success(response), path) =>
         // TODO: also check for response status code
@@ -78,10 +79,9 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
       s1.compareTo(s2) < 0
   }
 
-  // XXX TODO FIXME: Change action to general purpose handler
-  def subscribe(streamName: String, dir: String, action: Option[String]): Future[HttpResponse] = {
+  def subscribe(streamName: String, dir: String, queue: SourceQueueWithComplete[ReceivedFile]): Future[HttpResponse] = {
     println(s"subscribe to $streamName")
-    val receiver = system.actorOf(WebSocketActor.props(streamName, new File(dir), action.getOrElse("")))
+    val receiver = system.actorOf(WebSocketActor.props(streamName, new File(dir), queue))
     val wsListener = new WebSocketListener
     wsListener.subscribe(Uri(s"ws://$host:$port$accessRoute/$streamName"), receiver)
   }

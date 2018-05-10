@@ -1,0 +1,1 @@
+-Dakka.remote.netty.tcp.port=0 -Dakka.cluster.seed-nodes.0=akka.tcp://VbdsServerTest@127.0.0.1:8888 -Dakka.actor.provider=cluster -Dakka.cluster.run-coordinated-shutdown-when-down=off

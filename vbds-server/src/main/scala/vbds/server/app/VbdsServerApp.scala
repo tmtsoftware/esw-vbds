@@ -99,17 +99,19 @@ object VbdsServerApp extends App {
             """).withFallback(ConfigFactory.load())
 
     implicit val system = ActorSystem(systemName, config)
-    implicit val mat = ActorMaterializer()
+//    implicit val mat = ActorMaterializer()
     import system.dispatcher
 
-    // Initialize the cluster for replicating the data
-    val replicator = DistributedData(system).replicator
-    implicit val node = Cluster(system)
-    val sharedDataActor = system.actorOf(SharedDataActor.props(replicator))
+//    // Initialize the cluster for replicating the data
+//    val replicator = DistributedData(system).replicator
+//    implicit val node = Cluster(system)
+//    val sharedDataActor = system.actorOf(SharedDataActor.props(replicator))
+//
+//    new VbdsServer(sharedDataActor)
+//      .start(options.httpHost, options.httpPort)
 
-    new VbdsServer(sharedDataActor)
-      .start(options.httpHost, options.httpPort)
-      .onComplete {
+
+    VbdsServer.start(options.httpHost, options.httpPort).onComplete {
         case Success(result) =>
           println(s"HTTP Server running on: http:/${result.localAddress}")
         case Failure(error) =>

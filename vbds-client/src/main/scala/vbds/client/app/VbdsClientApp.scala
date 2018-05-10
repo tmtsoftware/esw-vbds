@@ -3,12 +3,14 @@ package vbds.client.app
 import java.io.File
 
 import akka.actor.ActorSystem
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, OverflowStrategy}
+import akka.stream.scaladsl.{Sink, Source}
 import vbds.client.VbdsClient
 
-import scala.concurrent.{Await, Future}
-import scala.util.{Failure, Success, Try}
+import scala.concurrent.Future
+import scala.util.{Failure, Success}
 import scala.concurrent.duration._
+import vbds.client.WebSocketActor._
 
 /**
   * A VIZ Bulk Data System HTTP client command line application.
@@ -28,7 +30,7 @@ object VbdsClientApp extends App {
                              publish: Option[String] = None,
                              delay: Option[String] = None,
                              data: Option[File] = None,
-                             chunkSize: Int = 1024*1024)
+                             chunkSize: Int = 1024 * 1024)
 
   // Parser for the command line options
   private val parser = new scopt.OptionParser[Options]("vbds-client") {
@@ -118,8 +120,29 @@ object VbdsClientApp extends App {
       options.publish.foreach(s => handleHttpResponse(client.publish(s, options.data.get, delay.asInstanceOf[FiniteDuration])))
     }
 
-    options.subscribe.foreach(s => client.subscribe(s, options.dir.getOrElse("."), options.action))
+    val queue = Source.queue[ReceivedFile](3, OverflowStrategy.backpressure)
+      .buffer(2, OverflowStrategy.backpressure)
+      .map { r =>
+        println(s"Received file ${r.count} for stream ${r.streamName}")
+        options.action.foreach(doAction(r, _))
+      }
+      .to(Sink.ignore)
+      .run()
+
+
+    options.subscribe.foreach(s => client.subscribe(s, options.dir.getOrElse("."), queue))
   }
+
+  // XXX TODO: Change to actor or callback
+  private def doAction(r: ReceivedFile, action: String): Unit = {
+    import sys.process._
+    try {
+      s"$action ${r.path}" !
+    } catch {
+      case ex: Exception => println(s"Error: Action for file ${r.count} of stream ${r.streamName} failed: $ex")
+    }
+  }
+
 
   // Prints the result of the HTTP request and exits
   private def handleHttpResponse(resp: Future[Any])(implicit system: ActorSystem): Unit = {

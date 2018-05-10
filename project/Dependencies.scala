@@ -15,8 +15,10 @@ object Dependencies {
     Libs.`boopickle`,
     Chill.`chill-akka`,
 
+    Libs.`commons-io` % Test,
     Libs.`scalatest` % Test,
-    AkkaHttp.`akka-http-testkit` % Test
+    AkkaHttp.`akka-http-testkit` % Test,
+    Akka.`akka-multi-node-testkit` % Test
   )
 
   val vbdsClient = Seq(

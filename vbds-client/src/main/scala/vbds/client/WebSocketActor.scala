@@ -1,13 +1,16 @@
 package vbds.client
 
 import java.io.{File, FileOutputStream}
+import java.nio.file.Path
 
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message}
 import akka.util.{ByteString, Timeout}
 import akka.pattern.ask
 import akka.stream.Materializer
+import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.scaladsl.Sink
+import vbds.client.WebSocketActor._
 
 import scala.concurrent.duration._
 import scala.util._
@@ -22,11 +25,13 @@ object WebSocketActor {
 
   final case class StreamFailure(ex: Throwable)
 
-  def props(streamName: String, dir: File, action: String)(implicit system: ActorSystem, mat: Materializer): Props =
-    Props(new WebSocketActor(streamName, dir, action))
+  final case class ReceivedFile(streamName: String, count: Int, path: Path)
+
+  def props(streamName: String, dir: File, queue: SourceQueueWithComplete[ReceivedFile])(implicit system: ActorSystem, mat: Materializer): Props =
+    Props(new WebSocketActor(streamName, dir, queue))
 }
 
-class WebSocketActor(streamName: String, dir: File, action: String)(implicit val system: ActorSystem, implicit val mat: Materializer)
+class WebSocketActor(streamName: String, dir: File, queue: SourceQueueWithComplete[ReceivedFile])(implicit val system: ActorSystem, implicit val mat: Materializer)
     extends Actor
     with ActorLogging {
 
@@ -66,7 +71,7 @@ class WebSocketActor(streamName: String, dir: File, action: String)(implicit val
       if (bs.size == 1 && bs.utf8String == "\n") {
         os.close()
         log.info(s"Wrote $file")
-        doAction()
+        queue.offer(ReceivedFile(streamName, count, file.toPath))
         newFile()
       } else {
         log.info(s"XXX writing ${bs.size} bytes to $streamName")
@@ -87,16 +92,4 @@ class WebSocketActor(streamName: String, dir: File, action: String)(implicit val
     os = new FileOutputStream(file)
   }
 
-  // XXX TODO: Change to actor or callback
-  private def doAction(): Unit = {
-    import sys.process._
-
-    if (action.nonEmpty) {
-      try {
-        s"$action $file" !
-      } catch {
-        case ex: Exception => log.error(ex, s"Command failed: $action")
-      }
-    }
-  }
 }
