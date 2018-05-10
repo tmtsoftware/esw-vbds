@@ -44,6 +44,8 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
    * @return future indicating when done
    */
   def publish(streamName: String, file: File, delay: FiniteDuration = Duration.Zero): Future[Done] = {
+    // XXX TODO: Change to only accept single file and return HttpResponse?
+
     val handler: ((Try[HttpResponse], Path)) => Unit = {
       case (Success(response), path) =>
         // TODO: also check for response status code
