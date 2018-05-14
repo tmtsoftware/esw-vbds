@@ -7,6 +7,7 @@ import scala.util.{Failure, Success}
 
 /**
   * VIZ Bulk Data System HTTP server and Akka cluster.
+  * This is the command line app used to start the server.
   */
 object VbdsServerApp extends App {
   val systemName = "vbds-system"
@@ -95,7 +96,6 @@ object VbdsServerApp extends App {
             """).withFallback(ConfigFactory.load())
 
     implicit val system = ActorSystem(systemName, config)
-//    implicit val mat = ActorMaterializer()
     import system.dispatcher
 
     VbdsServer.start(options.httpHost, options.httpPort).onComplete {

@@ -20,7 +20,7 @@ trait TransferApi {
 
 class TransferApiImpl(sharedDataActor: ActorRef, accessApi: AccessApi)(implicit val system: ActorSystem,
                                                                        implicit val mat: Materializer,
-                                                                       implicit val timeout: Timeout = 60.seconds)
+                                                                       implicit val timeout: Timeout = 5.minutes)
     extends TransferApi {
 
   import system.dispatcher

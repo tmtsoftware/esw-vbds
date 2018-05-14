@@ -25,14 +25,19 @@ object VbdsServerTestConfig extends MultiNodeConfig {
   val subscriber1 = role("subscriber1")
   val subscriber2 = role("subscriber2")
   val publisher1  = role("publisher1")
-//  val publisher2 = role("publisher2")
+  //  val publisher2 = role("publisher2")
 }
 
-class VbdsServerSpecMultiJvmServer1     extends VbdsServerTest
-class VbdsServerSpecMultiJvmServer2     extends VbdsServerTest
+class VbdsServerSpecMultiJvmServer1 extends VbdsServerTest
+
+class VbdsServerSpecMultiJvmServer2 extends VbdsServerTest
+
 class VbdsServerSpecMultiJvmSubscriber1 extends VbdsServerTest
+
 class VbdsServerSpecMultiJvmSubscriber2 extends VbdsServerTest
-class VbdsServerSpecMultiJvmPublisher1  extends VbdsServerTest
+
+class VbdsServerSpecMultiJvmPublisher1 extends VbdsServerTest
+
 //class VbdsServerSpecMultiJvmPublisher2 extends VbdsServerTest
 
 object VbdsServerTest {
@@ -91,6 +96,7 @@ object VbdsServerTest {
   implicit class RichFuture[T](val f: Future[T]) extends AnyVal {
     def await(timeout: FiniteDuration): T = Await.result(f, timeout)
   }
+
 }
 
 class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNodeSpec with ImplicitSender with BeforeAndAfterAll {
@@ -202,7 +208,9 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
 //        val client = new VbdsClient(host, server1HttpPort)
 //        enterBarrier("streamCreated")
 //        enterBarrier("subscribedToStream")
-//        enterBarrier("receivedFiles")
+//        within(longTimeout) {
+//          enterBarrier("receivedFiles")
+//        }
 //      }
 
       enterBarrier("finished")

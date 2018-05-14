@@ -14,13 +14,13 @@ class AdminRoute(adminData: AdminApi) extends Directives with JsonSupport {
 
   val route =
     pathPrefix("vbds" / "admin" / "streams") {
-      // List all streams: Response: OK: Stream names and descriptions in JSON; empty document if no streams
+      // List all streams: Response: OK: Stream names in JSON; empty document if no streams
       get {
         onSuccess(adminData.listStreams()) { streams =>
           complete(streams)
         }
       } ~
-        // Create a stream, Response: OK: Stream name and any other details returned as JSON, or 409: Conflict stream exists
+        // Create a stream, Response: OK: Stream name returned as JSON, or 409: Conflict stream exists
         post {
           path(Remaining) { name =>
             onSuccess(adminData.streamExists(name)) { exists =>
@@ -34,7 +34,7 @@ class AdminRoute(adminData: AdminApi) extends Directives with JsonSupport {
             }
           }
         } ~
-        // Deletes a stream: Reposnse: OK: Stream name and any other details returned as JSON, or 404: Stream not found
+        // Deletes a stream: Reposnse: OK: Stream name returned as JSON, or 404: Stream not found
         delete {
           path(Remaining) { name =>
             onSuccess(adminData.streamExists(name)) { exists =>

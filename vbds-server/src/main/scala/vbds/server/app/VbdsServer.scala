@@ -27,8 +27,12 @@ object VbdsServer {
   }
 }
 
-
-class VbdsServer(sharedDataActor: ActorRef)(implicit system: ActorSystem, mat: ActorMaterializer) {
+/**
+  * Top level class for the VIZ Bulk Data System (VBDS).
+  *
+  * @param sharedDataActor the cluster actor that shares data on streams and subscribers
+  */
+private class VbdsServer(sharedDataActor: ActorRef)(implicit system: ActorSystem, mat: ActorMaterializer) {
 
   import system.dispatcher
 

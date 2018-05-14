@@ -30,12 +30,12 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
 
   val route =
     pathPrefix("vbds" / "access" / "streams") {
-      // List all streams: Response: OK: Stream names and descriptions in JSON; empty document if no streams
+      // List all streams: Response: OK: Stream names in JSON; empty document if no streams
       get {
         onSuccess(adminData.listStreams()) { streams =>
           complete(streams)
         }
-        // Create a stream subscription: Response: OK - Creates a websocket connection to the Access Service
+        // Create a stream subscription: Response: SwitchingProtocols - Creates a websocket connection to the Access Service
         path(Remaining) { name =>
           log.debug(s"subscribe to stream: $name")
           onSuccess(adminData.streamExists(name)) { exists =>

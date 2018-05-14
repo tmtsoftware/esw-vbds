@@ -45,6 +45,7 @@ private[server] object SharedDataActor {
   case class Publish(streamName: String, subscriberSet: Set[AccessInfo], source: Source[ByteString, Any], dist: Boolean)
       extends SharedDataActorMessages
 
+  // Used to create the actor
   def props(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem): Props =
     Props(new SharedDataActor(replicator))
 
@@ -75,16 +76,30 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
   import system._
   import SharedDataActor._
 
+  // The local IP address, set at runtime via a message from the code that starts the HTTP server.
+  // This is used to determine which HTTP server has the websocket connection to a client.
   var localAddress: InetSocketAddress = _
-  var localSubscribers                = Map[AccessInfo, Sink[ByteString, NotUsed]]()
-  var remoteConnections               = Map[ServerInfo, Flow[HttpRequest, HttpResponse, _]]()
-  val adminDataKey                    = ORSetKey[StreamInfo]("streamInfo")
-  val accessDataKey                   = ORSetKey[AccessInfo]("accessInfo")
 
+  // A map with information about subscribers that subscribed via this server.
+  // The key is from shared cluster data (CRDT) and the value is a Sink that writes to the subscriber's websocket
+  var localSubscribers = Map[AccessInfo, Sink[ByteString, NotUsed]]()
+
+  // A map with information about remote HTTP servers with subscribers.
+  // The key is from shared cluster data (CRDT) and the value is a flow thaht sends requests to the remote server.
+  var remoteConnections = Map[ServerInfo, Flow[HttpRequest, HttpResponse, _]]()
+
+  // Key for sharing the list of streams in the cluster
+  val adminDataKey = ORSetKey[StreamInfo]("streamInfo")
+
+  // Key for sharing the subscriber information in the cluster
+  val accessDataKey = ORSetKey[AccessInfo]("accessInfo")
+
+  // Subscribe to the shared cluster info (CRDT)
   replicator ! Subscribe(adminDataKey, self)
   replicator ! Subscribe(accessDataKey, self)
 
   def receive = {
+    // Sets the local IP address
     case LocalAddress(a) =>
       localAddress = a
 
@@ -100,24 +115,33 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(_ - info)
       sender() ! info
 
+    // --- Sends a request to get the list of streams (See the following cases for the response) ---
     case ListStreams =>
       replicator ! Get(adminDataKey, ReadLocal, request = Some(sender()))
 
+    // Respond to the ListStreams message with a set of StreamInfo
     case g @ GetSuccess(`adminDataKey`, Some(replyTo: ActorRef)) ⇒
       val value = g.get(adminDataKey).elements
       replyTo ! value
 
+    // Failed ListStreams response
     case GetFailure(`adminDataKey`, Some(replyTo: ActorRef)) ⇒
       replyTo ! Set.empty
 
+    // Response to ListStreams when there are no streams defined
     case NotFound(`adminDataKey`, Some(replyTo: ActorRef)) ⇒
       replyTo ! Set.empty
+
+    // --- End of ListStreams responses ---
+
 
     case _: UpdateResponse[_] ⇒ // ignore
 
     case c @ Changed(`adminDataKey`) ⇒
       val data = c.get(adminDataKey)
       log.debug("Current streams: {}", data.elements)
+
+
 
     case AddSubscription(name, sink) =>
       log.debug("Adding Subscription: {}", name)
@@ -131,29 +155,38 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ - info)
       sender() ! info
 
+
+    // --- Sends a request to get the list of subscriptions (See the following cases for the response) ---
     case ListSubscriptions =>
       replicator ! Get(accessDataKey, ReadLocal, request = Some(sender()))
 
+    // Respond to the ListSubscriptions message with a set of AccessInfo
     case g @ GetSuccess(`accessDataKey`, Some(replyTo: ActorRef)) ⇒
       val value = g.get(accessDataKey).elements
       replyTo ! value
 
+    // Failed ListSubscriptions response
     case GetFailure(`accessDataKey`, Some(replyTo: ActorRef)) ⇒
       replyTo ! Set.empty
 
+    // Response to ListSubscriptions when there are no streams defined
     case NotFound(`accessDataKey`, Some(replyTo: ActorRef)) ⇒
       replyTo ! Set.empty
+
+    // --- End of ListSubscriptions responses ---
+
 
     case c @ Changed(`accessDataKey`) ⇒
       val data = c.get(accessDataKey)
       log.debug("Current subscriptions: {}", data.elements)
+
 
     case Publish(streamName, subscriberSet, producer, dist) =>
       publish(streamName, subscriberSet, producer, sender(), dist)
   }
 
   /**
-   * Publishes the contents of th given data source to the given set of subscribers and send a Done message to
+   * Publishes the contents of the given data source to the given set of subscribers and sends a Done message to
    * the given actor when done.
    *
    * @param streamName name of the stream to publish on
@@ -212,7 +245,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
    * @param subscriberSet all subscribers for the stream
    * @param dist true if published data should be distributed to remote subscribers
    */
-  private def getSubscribers(subscriberSet: Set[AccessInfo], dist: Boolean) = {
+  private def getSubscribers(subscriberSet: Set[AccessInfo], dist: Boolean): (Set[AccessInfo], Set[AccessInfo]) = {
     val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains _)
     if (dist) (localSet, remoteSet) else (localSet, Set.empty[AccessInfo])
   }

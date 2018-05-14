@@ -32,7 +32,7 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
 
   val route =
   pathPrefix("vbds" / "transfer" / "streams") {
-    // List all streams: Response: OK: Stream names and descriptions in JSON; empty document if no streams
+    // List all streams: Response: OK: Stream names in JSON; empty document if no streams
     get {
       onSuccess(adminApi.listStreams()) { streams =>
         complete(streams)
