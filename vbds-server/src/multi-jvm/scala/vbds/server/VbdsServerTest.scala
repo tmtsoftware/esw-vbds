@@ -122,21 +122,6 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
   import VbdsServerTestConfig._
   import VbdsServerTest._
 
-//  val startTime: Long = System.currentTimeMillis()
-//
-//  override def afterAll(): Unit = {
-//    super.afterAll()
-//    val testSecs    = (System.currentTimeMillis() - startTime) / 1000.0
-//    val secsPerFile = testSecs / numFilesToPublish
-//    println(s"""
-//         |
-//         |===================================================
-//         |* Transferred $numFilesToPublish $testFileSizeMb MB files to 2 subscribers in $testSecs seconds ($secsPerFile secs per file)
-//         |===================================================
-//         """.stripMargin)
-//
-//  }
-
   def initialParticipants = roles.size
 
   "A VbdsServerTest" must {
