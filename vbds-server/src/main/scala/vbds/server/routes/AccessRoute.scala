@@ -37,19 +37,17 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
         }
         // Create a stream subscription: Response: OK - Creates a websocket connection to the Access Service
         path(Remaining) { name =>
-          log.info(s"subscribe to stream: $name")
+          log.debug(s"subscribe to stream: $name")
           onSuccess(adminData.streamExists(name)) { exists =>
             if (exists) {
-              log.info(s"subscribe to existing stream: $name")
+              log.debug(s"subscribe to existing stream: $name")
 
               // We need a Source for writing to the websocket, but we want a Sink:
               // This provides a Sink that feeds the Source.
               val (sink, source) = MergeHub.source[ByteString].preMaterialize()
 
-              onSuccess(accessData.addSubscription(name, sink)) { info =>
-                log.info(s"XXX subscribe to $name info: $info")
+              onSuccess(accessData.addSubscription(name, sink)) { _ =>
                 extractUpgradeToWebSocket { upgrade =>
-                  log.info(s"XXX subscribe to $name extractUpgradeToWebSocket: $extractUpgradeToWebSocket")
                   complete(upgrade.handleMessagesWithSinkSource(Sink.ignore, source.map(BinaryMessage(_))))
                 }
               }

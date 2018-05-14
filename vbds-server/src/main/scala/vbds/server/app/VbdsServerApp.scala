@@ -1,11 +1,7 @@
 package vbds.server.app
 
 import akka.actor.ActorSystem
-import akka.cluster.Cluster
-import akka.cluster.ddata.DistributedData
-import akka.stream.ActorMaterializer
 import com.typesafe.config.ConfigFactory
-import vbds.server.actors.SharedDataActor
 
 import scala.util.{Failure, Success}
 
@@ -101,15 +97,6 @@ object VbdsServerApp extends App {
     implicit val system = ActorSystem(systemName, config)
 //    implicit val mat = ActorMaterializer()
     import system.dispatcher
-
-//    // Initialize the cluster for replicating the data
-//    val replicator = DistributedData(system).replicator
-//    implicit val node = Cluster(system)
-//    val sharedDataActor = system.actorOf(SharedDataActor.props(replicator))
-//
-//    new VbdsServer(sharedDataActor)
-//      .start(options.httpHost, options.httpPort)
-
 
     VbdsServer.start(options.httpHost, options.httpPort).onComplete {
         case Success(result) =>

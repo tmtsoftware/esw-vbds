@@ -3,7 +3,7 @@ package vbds.server.models
 import vbds.server.marshalling.VbdsSerializable
 
 /**
-  * Represents a subscriber to a stream of images
+  * Represents a subscriber to a stream of data files
   *
   * @param streamName name of the stream
   * @param host subscriber's http host
@@ -13,6 +13,6 @@ import vbds.server.marshalling.VbdsSerializable
 case class AccessInfo(streamName: String, host: String, port: Int, id: String) extends VbdsSerializable
 
 /**
-  * Represents a remote HTTP server that has subscribers to image data
+  * Represents a remote HTTP server that has subscribers to data files
   */
 case class ServerInfo(host: String, port: Int) extends VbdsSerializable

@@ -9,5 +9,4 @@ import spray.json.DefaultJsonProtocol
 trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val streamInfoFormat = jsonFormat1(StreamInfo)
   implicit val accessInfoFormat = jsonFormat4(AccessInfo)
-//  implicit val remoteAccessInfoFormat = jsonFormat3(RemoteAccessInfo)
 }

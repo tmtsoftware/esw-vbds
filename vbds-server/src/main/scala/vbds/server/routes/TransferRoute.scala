@@ -38,14 +38,14 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
         complete(streams)
       }
     } ~
-    // Publish an image to a stream, Response: 204 – Success (no content) or 400 – Bad Request (non- existent stream)
+    // Publish a data file to a stream, Response: 204 – Success (no content) or 400 – Bad Request (non- existent stream)
     post {
       path(Remaining) { streamName =>
         onSuccess(adminApi.streamExists(streamName)) { exists =>
           if (exists) {
             fileUpload("data") {
               case (_, source) =>
-                // Add a single newline to mark the end of the stream for one image
+                // Add a single newline to mark the end of the stream for one data file
                 val terminatedSource = source.concat(Source.single(ByteString("\n")))
                 onSuccess(transferApi.publish(streamName, terminatedSource, dist = true)) { _ =>
                   complete(Accepted)
@@ -59,7 +59,7 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
     }
   } ~
   pathPrefix("vbds" / "transfer" / "internal") {
-    // Internal API: Distribute an image to another server, Response: 204 – Success (no content) or 400 – Bad Request (non- existent stream)
+    // Internal API: Distribute a data file to another server, Response: 204 – Success (no content) or 400 – Bad Request (non- existent stream)
     post {
       path(Remaining) { streamName =>
         withoutSizeLimit {

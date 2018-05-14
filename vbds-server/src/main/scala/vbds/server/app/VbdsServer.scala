@@ -17,7 +17,6 @@ object VbdsServer {
     * Starts the server (Assumes that the given ActorSystem is already configured correctly for the cluster)
     */
   def start(httpHost: String, httpPort: Int)(implicit system: ActorSystem): Future[Http.ServerBinding] = {
-    import system.dispatcher
     implicit val mat = ActorMaterializer()
 
     // Initialize the cluster for replicating the data

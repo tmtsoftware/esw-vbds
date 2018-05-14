@@ -43,11 +43,11 @@ class WebSocketActor(streamName: String, dir: File, queue: SourceQueueWithComple
   var os: FileOutputStream = _
   implicit val askTimeout  = Timeout(5.seconds)
 
-  log.info("Started WebSocketActor")
+  log.debug("Started WebSocketActor")
 
   def receive: Receive = {
     case StreamInitialized ⇒
-      log.info(s"Initialized stream for $streamName")
+      log.debug(s"Initialized stream for $streamName")
       count = 0
       newFile()
       sender() ! Ack
@@ -55,7 +55,7 @@ class WebSocketActor(streamName: String, dir: File, queue: SourceQueueWithComple
     case msg: Message ⇒
       msg match {
         case bm: BinaryMessage =>
-          log.info(s"Received binary message for stream $streamName")
+          log.debug(s"Received binary message for stream $streamName")
           val replyTo = sender()
           bm.dataStream.mapAsync(1)(bs => (self ? bs).mapTo[Ack.type]).runWith(Sink.ignore).onComplete {
             case Success(_) =>
@@ -70,17 +70,16 @@ class WebSocketActor(streamName: String, dir: File, queue: SourceQueueWithComple
     case bs: ByteString ⇒
       if (bs.size == 1 && bs.utf8String == "\n") {
         os.close()
-        log.info(s"Wrote $file")
+        log.debug(s"Wrote $file")
         queue.offer(ReceivedFile(streamName, count, file.toPath))
         newFile()
       } else {
-        log.info(s"XXX writing ${bs.size} bytes to $streamName")
         os.write(bs.toArray)
       }
       sender() ! Ack // ack to allow the stream to proceed sending more elements
 
     case StreamCompleted ⇒
-      log.info("Stream completed")
+      log.debug("Stream completed")
 
     case StreamFailure(ex) ⇒
       log.error(ex, "Stream failed!")

@@ -3,7 +3,7 @@ package vbds.server.models
 import vbds.server.marshalling.VbdsSerializable
 
 /**
-  * Represents an image stream
+  * Represents a data stream
  *
   * @param name name of the stream
   */

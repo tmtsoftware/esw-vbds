@@ -4,30 +4,21 @@ import java.io.{BufferedOutputStream, File, FileOutputStream}
 
 import akka.remote.testkit.MultiNodeConfig
 import vbds.client.VbdsClient
-import vbds.server.app.{VbdsServer, VbdsServerApp}
+import vbds.server.app.VbdsServerApp
 
-import scala.concurrent.duration.DurationLong
+import scala.concurrent.duration.{DurationLong, FiniteDuration}
 import scala.concurrent.{Await, Future, Promise}
 import akka.remote.testkit.MultiNodeSpec
 import akka.testkit.ImplicitSender
-import TestFutureExtension._
-import akka.actor.ActorSystem
+import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.StatusCodes
 import akka.stream.{ActorMaterializer, Materializer, OverflowStrategy}
 import akka.stream.scaladsl.{Sink, Source, SourceQueueWithComplete}
 import org.apache.commons.io.FileUtils
+import org.scalatest.BeforeAndAfterAll
 import vbds.client.WebSocketActor.ReceivedFile
 
-object TestFutureExtension {
-
-  implicit class RichFuture[T](val f: Future[T]) extends AnyVal {
-    def await: T = Await.result(f, 20.seconds)
-
-    def done: Future[T] = Await.ready(f, 20.seconds)
-  }
-
-}
-
+// Tests with multiple servers, publishers and subscribers
 object VbdsServerTestConfig extends MultiNodeConfig {
   val server1     = role("server1")
   val server2     = role("server2")
@@ -49,10 +40,13 @@ object VbdsServerTest {
   val seedPort          = 8888
   val server1HttpPort   = 7777
   val server2HttpPort   = server1HttpPort + 1
-  val streamName        = "MyStream"
+  val streamName        = "WFS1RAW"
   val testFileName      = "vbdsTestFile"
-  val testFileSizeBytes = 16 * 1024 * 1024
+  val testFileSizeMb    = 100
+  val testFileSizeBytes = testFileSizeMb * 1000000
   val numFilesToPublish = 20
+  val shortTimeout      = 10 seconds
+  val longTimeout       = 10 hours // in case you want to test with lots of files...
 
   val testFile = makeFile(testFileSizeBytes, testFileName)
   testFile.deleteOnExit()
@@ -63,13 +57,13 @@ object VbdsServerTest {
     dir
   }
 
-  // Returns a queue for receiving files via websocket.
-  // The given function will be called for each received file.
-  def makeQueue(name: String, promise: Promise[ReceivedFile])(implicit system: ActorSystem,
-                                                              mat: Materializer): SourceQueueWithComplete[ReceivedFile] = {
+  // Returns a queue that receives the files via websocket and verifies that the data is correct.
+  def makeQueue(name: String, promise: Promise[ReceivedFile], log: LoggingAdapter)(
+      implicit mat: Materializer
+  ): SourceQueueWithComplete[ReceivedFile] = {
     Source
       .queue[ReceivedFile](3, OverflowStrategy.backpressure)
-      .buffer(2, OverflowStrategy.backpressure)
+      .buffer(10, OverflowStrategy.backpressure)
       .map { r =>
         println(s"$name: Received file ${r.count}: ${r.path} for stream ${r.streamName}")
         if (FileUtils.contentEquals(r.path.toFile, testFile)) {
@@ -93,12 +87,31 @@ object VbdsServerTest {
     os.close()
     file
   }
+
+  implicit class RichFuture[T](val f: Future[T]) extends AnyVal {
+    def await(timeout: FiniteDuration): T = Await.result(f, timeout)
+  }
 }
 
-class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNodeSpec with ImplicitSender {
+class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNodeSpec with ImplicitSender with BeforeAndAfterAll {
 
   import VbdsServerTestConfig._
   import VbdsServerTest._
+
+  var startTime: Long = _
+
+  override def afterAll(): Unit = {
+    super.afterAll()
+    val testSecs    = (System.currentTimeMillis() - startTime) / 1000.0
+    val secsPerFile = testSecs / numFilesToPublish
+    println(s"""
+         |
+         |===================================================
+         |* Transferred $numFilesToPublish $testFileSizeMb MB files to 2 subscribers in $testSecs seconds ($secsPerFile secs per file)
+         |===================================================
+         """.stripMargin)
+
+  }
 
   def initialParticipants = roles.size
 
@@ -110,7 +123,6 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
 
     "Allow creating a stream, subscribing and publishing to a stream" in {
       runOn(server1) {
-//        VbdsServer.start(host, server1HttpPort).await
         VbdsServerApp.main(Array("--http-port", s"$server1HttpPort", "--akka-port", s"$seedPort", "-s", s"$host:$seedPort"))
         expectNoMessage(2.seconds)
         enterBarrier("deployed")
@@ -120,7 +132,6 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
       }
 
       runOn(server2) {
-//        VbdsServer.start(host, server2HttpPort).await
         VbdsServerApp.main(Array("--http-port", s"$server2HttpPort", "-s", s"$host:$seedPort"))
         expectNoMessage(2.seconds)
         enterBarrier("deployed")
@@ -135,12 +146,12 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         val client = new VbdsClient(host, server1HttpPort)
         enterBarrier("streamCreated")
         val promise           = Promise[ReceivedFile]
-        val queue             = makeQueue("subscriber1", promise)
-        val subscribeResponse = client.subscribe(streamName, getTempDir("subscriber1"), queue).await
-//        assert(subscribeResponse.status == StatusCodes.OK)
-        println(s"subscriber1: Subscribe response = $subscribeResponse, content type: ${subscribeResponse.entity.contentType}")
+        val queue             = makeQueue("subscriber1", promise, log)
+        val subscribeResponse = client.subscribe(streamName, getTempDir("subscriber1"), queue).await(shortTimeout)
+        assert(subscribeResponse.status == StatusCodes.SwitchingProtocols)
+//        log.debug(s"subscriber1: Subscribe response = $subscribeResponse, content type: ${subscribeResponse.entity.contentType}")
         enterBarrier("subscribedToStream")
-        promise.future.await
+        promise.future.await(longTimeout)
         enterBarrier("receivedFiles")
       }
 
@@ -150,12 +161,12 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         val client = new VbdsClient(host, server2HttpPort)
         enterBarrier("streamCreated")
         val promise           = Promise[ReceivedFile]
-        val queue             = makeQueue("subscriber2", promise)
-        val subscribeResponse = client.subscribe(streamName, getTempDir("subscriber2"), queue).await
-//        assert(subscribeResponse.status == StatusCodes.OK)
-        println(s"subscriber2: Subscribe response = $subscribeResponse, content type: ${subscribeResponse.entity.contentType}")
+        val queue             = makeQueue("subscriber2", promise, log)
+        val subscribeResponse = client.subscribe(streamName, getTempDir("subscriber2"), queue).await(shortTimeout)
+        assert(subscribeResponse.status == StatusCodes.SwitchingProtocols)
+//        log.debug(s"subscriber2: Subscribe response = $subscribeResponse, content type: ${subscribeResponse.entity.contentType}")
         enterBarrier("subscribedToStream")
-        promise.future.await
+        promise.future.await(longTimeout)
         enterBarrier("receivedFiles")
       }
 
@@ -163,14 +174,14 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         implicit val materializer = ActorMaterializer()
         enterBarrier("deployed")
         val client         = new VbdsClient(host, server1HttpPort)
-        val createResponse = client.createStream(streamName).await
+        val createResponse = client.createStream(streamName).await(shortTimeout)
         assert(createResponse.status == StatusCodes.OK)
-        println(s"publisher1: Create response = $createResponse, content type: ${createResponse.entity.contentType}")
+//        log.debug(s"publisher1: Create response = $createResponse, content type: ${createResponse.entity.contentType}")
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
+        startTime = System.currentTimeMillis()
         (1 to numFilesToPublish).foreach { _ =>
-          client.publish(streamName, testFile).await
-//          Thread.sleep(100) // XXX TODO FIXME
+          client.publish(streamName, testFile).await(shortTimeout)
         }
         enterBarrier("receivedFiles")
       }

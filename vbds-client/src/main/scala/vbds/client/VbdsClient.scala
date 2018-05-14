@@ -5,8 +5,9 @@ import java.nio.file.Path
 
 import akka.Done
 import akka.actor.ActorSystem
+import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse, Uri}
+import akka.http.scaladsl.model._
 import akka.stream.Materializer
 import akka.stream.scaladsl.SourceQueueWithComplete
 import vbds.client.WebSocketActor.ReceivedFile
@@ -15,13 +16,23 @@ import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success, Try}
 
-class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem, implicit val mat: Materializer) {
+class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem,
+                                                                        implicit val mat: Materializer) {
 
   implicit val executionContext = system.dispatcher
   val adminRoute                = "/vbds/admin/streams"
   val accessRoute               = "/vbds/access/streams"
   val transferRoute             = "/vbds/transfer/streams"
   val maxFrameLengthBytes       = 1024 * 1024
+
+  implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
+    def genString(o: AnyRef): String = o.getClass.getName
+
+    override def getClazz(o: AnyRef): Class[_] = o.getClass
+  }
+
+  val log = Logging(system, this)
+
 
   def createStream(streamName: String): Future[HttpResponse] = {
     Http().singleRequest(HttpRequest(method = HttpMethods.POST, uri = s"http://$host:$port$adminRoute/$streamName"))
@@ -48,11 +59,11 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
 
     val handler: ((Try[HttpResponse], Path)) => Unit = {
       case (Success(response), path) =>
-        // TODO: also check for response status code
-        println(s"Result for file: $path was successful: $response")
+        if (response.status == StatusCodes.Accepted) log.debug(s"Result for file: $path was successful")
+        else log.error(s"Publish of $path returned unexpected status code: ${response.status}")
         response.discardEntityBytes() // don't forget this
       case (Failure(ex), path) =>
-        println(s"Uploading file $path failed with $ex")
+        log.error(s"Uploading file $path failed with $ex")
     }
 
     val uri = s"http://$host:$port$transferRoute/$streamName"
@@ -73,8 +84,8 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
   def comparePaths(p1: Path, p2: Path): Boolean = {
     val s1 = p1.getFileName.toString
     val s2 = p2.getFileName.toString
-    val a = fileNamePattern.findAllIn(s1).toList.headOption.getOrElse("")
-    val b = fileNamePattern.findAllIn(s2).toList.headOption.getOrElse("")
+    val a  = fileNamePattern.findAllIn(s1).toList.headOption.getOrElse("")
+    val b  = fileNamePattern.findAllIn(s2).toList.headOption.getOrElse("")
     if (a.nonEmpty && b.nonEmpty)
       a.toInt.compareTo(b.toInt) < 0
     else
@@ -82,8 +93,8 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
   }
 
   def subscribe(streamName: String, dir: String, queue: SourceQueueWithComplete[ReceivedFile]): Future[HttpResponse] = {
-    println(s"subscribe to $streamName")
-    val receiver = system.actorOf(WebSocketActor.props(streamName, new File(dir), queue))
+    log.debug(s"subscribe to $streamName")
+    val receiver   = system.actorOf(WebSocketActor.props(streamName, new File(dir), queue))
     val wsListener = new WebSocketListener
     wsListener.subscribe(Uri(s"ws://$host:$port$accessRoute/$streamName"), receiver)
   }

@@ -20,30 +20,36 @@ import akka.http.scaladsl.model.{ContentTypes, HttpRequest}
 
 import scala.util.{Failure, Success}
 
-object SharedDataActor {
+/**
+ * Defines messages handled by the actor
+ */
+private[server] object SharedDataActor {
 
-  case class AddStream(streamName: String)
+  sealed trait SharedDataActorMessages
 
-  case class DeleteStream(streamName: String)
+  case class AddStream(streamName: String) extends SharedDataActorMessages
 
-  case object ListStreams
+  case class DeleteStream(streamName: String) extends SharedDataActorMessages
 
-  // Sets the host and port that the http server is listening on
-  case class LocalAddress(a: InetSocketAddress)
+  case object ListStreams extends SharedDataActorMessages
 
-  case class AddSubscription(streamName: String, sink: Sink[ByteString, NotUsed])
+  // Tells the actor the host and port that the http server is listening on
+  case class LocalAddress(a: InetSocketAddress) extends SharedDataActorMessages
 
-  case class DeleteSubscription(info: AccessInfo)
+  case class AddSubscription(streamName: String, sink: Sink[ByteString, NotUsed]) extends SharedDataActorMessages
 
-  case object ListSubscriptions
+  case class DeleteSubscription(info: AccessInfo) extends SharedDataActorMessages
+
+  case object ListSubscriptions extends SharedDataActorMessages
 
   case class Publish(streamName: String, subscriberSet: Set[AccessInfo], source: Source[ByteString, Any], dist: Boolean)
+      extends SharedDataActorMessages
 
   def props(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem): Props =
     Props(new SharedDataActor(replicator))
 
   /**
-   * Represents a remote http server that receives images that it then distributes to its local subscribers
+   * Represents a remote http server that receives data files that it then distributes to its local subscribers
    *
    * @param streamName name of the stream
    * @param host       subscriber's http host
@@ -51,13 +57,18 @@ object SharedDataActor {
    */
   private case class RemoteAccessInfo(streamName: String, host: String, port: Int)
 
-  // Route used to distribute image to remote HTTP server
+  // Route used to distribute data to remote HTTP server
   val distRoute      = "/vbds/transfer/internal"
   val chunkSize: Int = 1024 * 1024 // XXX TODO FIXME
 }
 
-// XXX TODO: Split into separate actors
-class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem)
+/**
+ * A cluster actor that shares stream and subscription info via CRDT and implements
+ * the publish/subscribe features.
+ */
+private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster,
+                                                            mat: ActorMaterializer,
+                                                            system: ActorSystem)
     extends Actor
     with ActorLogging {
 
@@ -78,13 +89,13 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
       localAddress = a
 
     case AddStream(name) =>
-      log.info("Adding: {}", name)
+      log.debug("Adding: {}", name)
       val info = StreamInfo(name)
       replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(_ + info)
       sender() ! info
 
     case DeleteStream(name) =>
-      log.info("Removing: {}", name)
+      log.debug("Removing: {}", name)
       val info = StreamInfo(name)
       replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(_ - info)
       sender() ! info
@@ -106,17 +117,17 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
 
     case c @ Changed(`adminDataKey`) ⇒
       val data = c.get(adminDataKey)
-      log.info("Current streams: {}", data.elements)
+      log.debug("Current streams: {}", data.elements)
 
     case AddSubscription(name, sink) =>
-      log.info("Adding Subscription: {}", name)
+      log.debug("Adding Subscription: {}", name)
       val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, UUID.randomUUID().toString)
       replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ + info)
       localSubscribers = localSubscribers + (info -> sink)
       sender() ! info
 
     case DeleteSubscription(info) =>
-      log.info("Removing Subscription with id: {}", info)
+      log.debug("Removing Subscription with id: {}", info)
       replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ - info)
       sender() ! info
 
@@ -135,7 +146,7 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
 
     case c @ Changed(`accessDataKey`) ⇒
       val data = c.get(accessDataKey)
-      log.info("Current subscriptions: {}", data.elements)
+      log.debug("Current subscriptions: {}", data.elements)
 
     case Publish(streamName, subscriberSet, producer, dist) =>
       publish(streamName, subscriberSet, producer, sender(), dist)
@@ -163,18 +174,18 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
     if (dist) checkRemoteConnections(remoteHostSet)
 
     val numOut = localSet.size + remoteHostSet.size
-    log.info(
+    log.debug(
       s"Publish dist=$dist, subscribers: $numOut (${localSet.size} local, ${remoteSet.size} remote on ${remoteHostSet.size} hosts)"
     )
 
     val g = RunnableGraph.fromGraph(GraphDSL.create(Sink.ignore) { implicit builder => out =>
       import GraphDSL.Implicits._
 
-      val bcast                      = builder.add(Broadcast[ByteString](numOut))
-      val merge                      = builder.add(Merge[ByteString](numOut))
-      def websocketFlow(a: AccessInfo)   = Flow[ByteString].alsoTo(localSubscribers(a))
-      val localFlows                 = localSet.map(websocketFlow)
-      def requestFlow(h: ServerInfo) = Flow[ByteString].map(makeHttpRequest(streamName, h, _))
+      val bcast                        = builder.add(Broadcast[ByteString](numOut))
+      val merge                        = builder.add(Merge[ByteString](numOut))
+      def websocketFlow(a: AccessInfo) = Flow[ByteString].alsoTo(localSubscribers(a))
+      val localFlows                   = localSet.map(websocketFlow)
+      def requestFlow(h: ServerInfo)   = Flow[ByteString].map(makeHttpRequest(streamName, h, _))
       val remoteFlows =
         if (dist) remoteHostSet.map(h => requestFlow(h).via(remoteConnections(h)).map(_ => ByteString.empty)) else Set.empty
 
@@ -187,7 +198,7 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
 
     val f = g.run()
     f.onComplete {
-      case Success(_)  => log.info("Publish complete")
+      case Success(_)  => log.debug("Publish complete")
       case Failure(ex) => log.error(s"Publish failed with $ex")
     }
 
@@ -197,18 +208,18 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
   }
 
   /**
-    * Returns a pair of sets for the local and remote subscribers
-    * @param subscriberSet all subscribers for the stream
-    * @param dist true if published data should be distributed to remote subscribers
-    */
+   * Returns a pair of sets for the local and remote subscribers
+   * @param subscriberSet all subscribers for the stream
+   * @param dist true if published data should be distributed to remote subscribers
+   */
   private def getSubscribers(subscriberSet: Set[AccessInfo], dist: Boolean) = {
     val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains _)
     if (dist) (localSet, remoteSet) else (localSet, Set.empty[AccessInfo])
   }
 
   /**
-    * Makes the HTTP request for the transfer to remote servers with subscribers
-    */
+   * Makes the HTTP request for the transfer to remote servers with subscribers
+   */
   private def makeHttpRequest(streamName: String, serverInfo: ServerInfo, bs: ByteString): HttpRequest = {
     HttpRequest(
       HttpMethods.POST,
@@ -218,9 +229,9 @@ class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster, mat: Acto
   }
 
   /**
-    * Make sure the remote connections for any remote hosts with subscribers is defined.
-    * (XXX TODO: Handle connection timeouts!!!)
-    */
+   * Make sure the remote connections for any remote hosts with subscribers is defined.
+   * (XXX TODO: Handle connection timeouts!!!)
+   */
   private def checkRemoteConnections(remoteHostSet: Set[ServerInfo]): Unit = {
     remoteHostSet.foreach { h =>
       if (!remoteConnections.contains(h)) {

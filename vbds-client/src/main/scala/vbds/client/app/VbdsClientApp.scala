@@ -66,7 +66,7 @@ object VbdsClientApp extends App {
 
     opt[String]("dir") valueName "<path>" action { (x, c) =>
       c.copy(dir = Some(x))
-    } text "Directory to hold received image files (default: current directory)"
+    } text "Directory to hold received data files (default: current directory)"
 
     opt[String]('a', "action") valueName "<shell-command>" action { (x, c) =>
       c.copy(action = Some(x))
@@ -111,13 +111,13 @@ object VbdsClientApp extends App {
     implicit val materializer = ActorMaterializer()
 
     val client = new VbdsClient(options.host, options.port)
-    options.create.foreach(s => handleHttpResponse(client.createStream(s)))
-    options.delete.foreach(s => handleHttpResponse(client.deleteStream(s)))
-    if (options.list) handleHttpResponse(client.listStreams())
+    options.create.foreach(s => handleHttpResponse(s"create $s", client.createStream(s)))
+    options.delete.foreach(s => handleHttpResponse(s"delete $s", client.deleteStream(s)))
+    if (options.list) handleHttpResponse("list", client.listStreams())
 
     if (options.publish.isDefined && options.data.isDefined) {
       val delay = options.delay.map(Duration(_)).getOrElse(Duration.Zero)
-      options.publish.foreach(s => handleHttpResponse(client.publish(s, options.data.get, delay.asInstanceOf[FiniteDuration])))
+      options.publish.foreach(s => handleHttpResponse(s"publish $s", client.publish(s, options.data.get, delay.asInstanceOf[FiniteDuration])))
     }
 
     val queue = Source.queue[ReceivedFile](3, OverflowStrategy.backpressure)
@@ -137,7 +137,7 @@ object VbdsClientApp extends App {
   private def doAction(r: ReceivedFile, action: String): Unit = {
     import sys.process._
     try {
-      s"$action ${r.path}" !
+      s"$action ${r.path}".!
     } catch {
       case ex: Exception => println(s"Error: Action for file ${r.count} of stream ${r.streamName} failed: $ex")
     }
@@ -145,13 +145,13 @@ object VbdsClientApp extends App {
 
 
   // Prints the result of the HTTP request and exits
-  private def handleHttpResponse(resp: Future[Any])(implicit system: ActorSystem): Unit = {
+  private def handleHttpResponse(command: String, resp: Future[Any])(implicit system: ActorSystem): Unit = {
     import system.dispatcher
     resp.foreach {
-      case Success(res) =>
-        println(res)
+      case Success(_) =>
       case Failure(ex) =>
-        ex.printStackTrace()
+        println(s"$command failed: $ex")
+//        ex.printStackTrace()
     }
   }
 }
