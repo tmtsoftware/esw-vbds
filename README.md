@@ -24,10 +24,10 @@ Usage: vbds-server [options]
   --version                
 ```
 
-A `vdbs-client` application is provided, for convenience and for use in tests, but any HTTP client will also work, as long as
+A `vbds-client` application is provided, for convenience and for use in tests, but any HTTP client will also work, as long as
 it can handle the websocket responses for subscribers.
  
-The `vdbs-client` also demonstrates how you can access the vdbs-server from Scala or Java code using akka-http, streams and actors.
+The `vbds-client` also demonstrates how you can access the vbds-server from Scala or Java code using akka-http, streams and actors.
 
 Note that the data transfered via websocket to a subscriber is *chunked*: Multiple websocket messages are sent and the terminating 
 message for each file contains a single newline "\n" byte, which does not belong to the data file. 
@@ -38,7 +38,7 @@ Usage: vbds-client [options]
 
   -n, --name <name>        The name of the vbds-server server(default: vbds)
   -h, --host <host name>   The VBDS HTTP server host name (default: 127.0.0.1)
-  -p, --port <number>      The VDBS HTTP server port number (default: 80)
+  -p, --port <number>      The VBDS HTTP server port number (default: 80)
   --create <stream name>   Creates a new VBDS stream with the given name
   --delete <stream name>   Deletes the VBDS stream with the given name
   -l, --list               List the available streams
@@ -56,7 +56,7 @@ Usage: vbds-client [options]
   --version                
 ```
 
-## VBDS HTTP/REST API
+## VBDS REST API
 
 | Description                   | Verb      | URI                               | Response |
 | ----------------------------- |    -------|---------------------------------- |--------- |          
@@ -69,13 +69,13 @@ Usage: vbds-client [options]
 
 ## Running the Server
 
-You can test `vdbs-server` by first starting an instance as a seed node. For example:
+You can test `vbds-server` by first starting an instance as a seed node. For example:
 
-    vdbs-server --http-port 7777 --akka-port 8888 -s 127.0.0.1:8888
+    vbds-server --http-port 7777 --akka-port 8888 -s 127.0.0.1:8888
 
 and then starting one or more other instances (normally on other hosts) that can join the Akka cluster:
 
-    vdbs-server --http-port 7778 -s 127.0.0.1:8888
+    vbds-server --http-port 7778 -s 127.0.0.1:8888
 
 In the first case we specified an Akka port (8888) for the cluster seed node. In the second case, a random port was used,
 since no -akka-port option was specified. 

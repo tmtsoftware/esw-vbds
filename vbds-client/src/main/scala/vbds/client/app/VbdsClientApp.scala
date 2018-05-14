@@ -46,7 +46,7 @@ object VbdsClientApp extends App {
 
     opt[Int]('p', "port") valueName "<number>" action { (x, c) =>
       c.copy(port = x)
-    } text "The VDBS HTTP server port number (default: 80)"
+    } text "The VBDS HTTP server port number (default: 80)"
 
     opt[String]("create") valueName "<stream name>" action { (x, c) =>
       c.copy(create = Some(x))
@@ -70,7 +70,7 @@ object VbdsClientApp extends App {
 
     opt[String]('a', "action") valueName "<shell-command>" action { (x, c) =>
       c.copy(action = Some(x))
-    } text "A shell command to execute when a new file is received (args: stream-name file-name)"
+    } text "A shell command to execute when a new file is received (args: file-name)"
 
     opt[String]("publish") valueName "<stream-name>" action { (x, c) =>
       c.copy(publish = Some(x))
@@ -137,7 +137,9 @@ object VbdsClientApp extends App {
   private def doAction(r: ReceivedFile, action: String): Unit = {
     import sys.process._
     try {
-      s"$action ${r.path}".!
+      println(s"XXX Calling action: $action ${r.path}")
+      val x = s"$action ${r.path}".!
+      println(s"XXX action command status: $x")
     } catch {
       case ex: Exception => println(s"Error: Action for file ${r.count} of stream ${r.streamName} failed: $ex")
     }

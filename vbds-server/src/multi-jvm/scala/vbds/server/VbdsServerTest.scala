@@ -40,13 +40,13 @@ object VbdsServerTest {
   val seedPort          = 8888
   val server1HttpPort   = 7777
   val server2HttpPort   = server1HttpPort + 1
-  val streamName        = "WFS1RAW"
+  val streamName        = "WFS1-RAW"
   val testFileName      = "vbdsTestFile"
-  val testFileSizeMb    = 100
+  val testFileSizeMb    = 300
   val testFileSizeBytes = testFileSizeMb * 1000000
   val numFilesToPublish = 20
-  val shortTimeout      = 10 seconds
-  val longTimeout       = 10 hours // in case you want to test with lots of files...
+  val shortTimeout      = 10.seconds
+  val longTimeout       = 10.hours // in case you want to test with lots of files...
 
   val testFile = makeFile(testFileSizeBytes, testFileName)
   testFile.deleteOnExit()
@@ -128,7 +128,9 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         enterBarrier("deployed")
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
-        enterBarrier("receivedFiles")
+        within(longTimeout) {
+          enterBarrier("receivedFiles")
+        }
       }
 
       runOn(server2) {
@@ -137,7 +139,9 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         enterBarrier("deployed")
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
-        enterBarrier("receivedFiles")
+        within(longTimeout) {
+          enterBarrier("receivedFiles")
+        }
       }
 
       runOn(subscriber1) {
@@ -152,7 +156,9 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
 //        log.debug(s"subscriber1: Subscribe response = $subscribeResponse, content type: ${subscribeResponse.entity.contentType}")
         enterBarrier("subscribedToStream")
         promise.future.await(longTimeout)
-        enterBarrier("receivedFiles")
+        within(longTimeout) {
+          enterBarrier("receivedFiles")
+        }
       }
 
       runOn(subscriber2) {
@@ -167,7 +173,9 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
 //        log.debug(s"subscriber2: Subscribe response = $subscribeResponse, content type: ${subscribeResponse.entity.contentType}")
         enterBarrier("subscribedToStream")
         promise.future.await(longTimeout)
-        enterBarrier("receivedFiles")
+        within(longTimeout) {
+          enterBarrier("receivedFiles")
+        }
       }
 
       runOn(publisher1) {
@@ -183,7 +191,9 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         (1 to numFilesToPublish).foreach { _ =>
           client.publish(streamName, testFile).await(shortTimeout)
         }
-        enterBarrier("receivedFiles")
+        within(longTimeout) {
+          enterBarrier("receivedFiles")
+        }
       }
 
 //      runOn(publisher2) {
