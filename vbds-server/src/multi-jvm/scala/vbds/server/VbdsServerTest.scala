@@ -53,6 +53,9 @@ object VbdsServerTest {
   val shortTimeout      = 10.seconds
   val longTimeout       = 10.hours // in case you want to test with lots of files...
 
+  // If true, compare files to make sure the file was transferred correctly
+  val doCompareFiles = false
+
   val testFile = makeFile(testFileSizeBytes, testFileName)
   testFile.deleteOnExit()
 
@@ -71,7 +74,7 @@ object VbdsServerTest {
       .buffer(10, OverflowStrategy.backpressure)
       .map { r =>
         println(s"$name: Received file ${r.count}: ${r.path} for stream ${r.streamName}")
-        if (FileUtils.contentEquals(r.path.toFile, testFile)) {
+        if (doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
           println(s"${r.path} and $testFile are equal")
           if (r.count >= numFilesToPublish) promise.success(r)
         } else {
@@ -104,7 +107,7 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
   import VbdsServerTestConfig._
   import VbdsServerTest._
 
-  var startTime: Long = _
+  val startTime: Long = System.currentTimeMillis()
 
   override def afterAll(): Unit = {
     super.afterAll()
@@ -193,7 +196,6 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
 //        log.debug(s"publisher1: Create response = $createResponse, content type: ${createResponse.entity.contentType}")
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
-        startTime = System.currentTimeMillis()
         (1 to numFilesToPublish).foreach { _ =>
           client.publish(streamName, testFile).await(shortTimeout)
         }
