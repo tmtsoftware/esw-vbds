@@ -20,7 +20,6 @@ class WebSocketListener(implicit val system: ActorSystem, implicit val materiali
   implicit val askTimeout = Timeout(5.seconds)
 
   def subscribe(uri: Uri, actorRef: ActorRef): Future[HttpResponse] = {
-    println(s"XXX subscribe to $uri")
 
     val sink: Sink[Message, NotUsed] = Sink.actorRefWithAck(
       actorRef,
@@ -34,15 +33,9 @@ class WebSocketListener(implicit val system: ActorSystem, implicit val materiali
     val flow: Flow[Message, Message, Promise[Option[Message]]] =
       Flow.fromSinkAndSourceMat(sink, Source.maybe[Message])(Keep.right)
 
-    //    val flow: Flow[Message, Message, Promise[Option[Message]]] = Flow.fromSinkAndSourceMat(
-    //      Sink.foreach[Message](actorRef ? _), // XXX TODO FIXME
-    //      Source.maybe[Message])(Keep.right)
-
     val (upgradeResponse, promise) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
 
-    val resp = upgradeResponse.map(_.response)
-    resp.foreach(r => println(s"XXX subscribe response = $r"))
-    resp
+    upgradeResponse.map(_.response)
 
     // at some later time we want to disconnect
     //    promise.success(None)
