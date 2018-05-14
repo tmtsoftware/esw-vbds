@@ -59,7 +59,7 @@ Usage: vbds-client [options]
 ## VBDS HTTP/REST API
 
 | Description                   | Verb      | URI                               | Response |
-| ------------- | ------------- |    -------|---------------------------------- |--------- |          
+| ----------------------------- |    -------|---------------------------------- |--------- |          
 | List all streams              | GET       | /vbds/admin/streams              | OK (200) – Stream names in JSON; empty document if no streams
 | Create a stream               | POST      | /vbds/admin/streams/{streamName} | OK (200) – New stream name in JSON; Conflict (409) if stream exists
 | Delete a stream               | DELETE    | /vbds/admin/streams/{streamName} | OK (200) – Deleted stream name in JSON; NotFound (404) if stream does not exist
