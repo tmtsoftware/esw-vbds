@@ -27,7 +27,7 @@ Usage: vbds-server [options]
 A `vdbs-client` application is provided, for convenience and for use in tests, but any HTTP client will also work, as long as
 it can handle the websocket responses for subscribers.
  
-The `vdbs-client` also demonstrates how you can access the vdbs-server from Scala or Java code using Akka Streams and actors.
+The `vdbs-client` also demonstrates how you can access the vdbs-server from Scala or Java code using akka-http, streams and actors.
 
 Note that the data transfered via websocket to a subscriber is *chunked*: Multiple websocket messages are sent and the terminating 
 message for each file contains a single newline "\n" byte, which does not belong to the data file. 
@@ -58,16 +58,16 @@ Usage: vbds-client [options]
 
 ## VBDS HTTP/REST API
 
-| Description  | Verb | URI | Response |
-| ------------- | ------------- |
-| List all streams  | GET  | /vbds/admin/streams | OK (200) – Stream names in JSON; empty document if no streams
-| Create a stream  | POST  | /vbds/admin/streams/{streamName} | OK (200) – New stream name in JSON; Conflict (409) if stream exists
-| Delete a stream  | DELETE  | /vbds/admin/streams/{streamName} | OK (200) – Deleted stream name in JSON; NotFound (404) if stream does not exist
-| Publish an image to a stream  | POST  | /vbds/transfer/streams/{streamName}/image | Accepted (204) – (no content); Bad Request (400) – for non-existent stream
-| Create a subscription  | POST  | /vbds/access/streams/{streamName} | SwitchingProtocols (101) – Creates a websocket connection for receiving the data
-| Delete a subscription  | Delete  | /vbds/access/streams/{streamName} | Accepted (204) – (no content); NotFound (404) if stream does not exist
+| Description                   | Verb      | URI                               | Response |
+| ------------- | ------------- |    -------|---------------------------------- |--------- |          
+| List all streams              | GET       | /vbds/admin/streams              | OK (200) – Stream names in JSON; empty document if no streams
+| Create a stream               | POST      | /vbds/admin/streams/{streamName} | OK (200) – New stream name in JSON; Conflict (409) if stream exists
+| Delete a stream               | DELETE    | /vbds/admin/streams/{streamName} | OK (200) – Deleted stream name in JSON; NotFound (404) if stream does not exist
+| Publish an image to a stream  | POST      | /vbds/transfer/streams/{streamName}/image | Accepted (204) – (no content); Bad Request (400) – for non-existent stream
+| Create a subscription         | POST      | /vbds/access/streams/{streamName} | SwitchingProtocols (101) – Creates a websocket connection for receiving the data
+| Delete a subscription         | Delete    | /vbds/access/streams/{streamName} | Accepted (204) – (no content); NotFound (404) if stream does not exist
 
-## Testing
+## Running the Server
 
 You can test `vdbs-server` by first starting an instance as a seed node. For example:
 
