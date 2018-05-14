@@ -27,12 +27,24 @@ object WebSocketActor {
 
   final case class ReceivedFile(streamName: String, count: Int, path: Path)
 
-  def props(streamName: String, dir: File, queue: SourceQueueWithComplete[ReceivedFile])(implicit system: ActorSystem, mat: Materializer): Props =
-    Props(new WebSocketActor(streamName, dir, queue))
+  /**
+   * Used to create the actor
+   * @param streamName the name of the stream we are subscribed to
+   * @param dir the directory in which to save the files received (if saveFiles is true)
+   * @param queue a queue to write messages to when a file is received
+   * @param saveFiles if true, save the files in the given dir (Set to false for throughput tests)
+   */
+  def props(streamName: String, dir: File, queue: SourceQueueWithComplete[ReceivedFile], saveFiles: Boolean)(
+      implicit system: ActorSystem,
+      mat: Materializer
+  ): Props =
+    Props(new WebSocketActor(streamName, dir, queue, saveFiles))
 }
 
-class WebSocketActor(streamName: String, dir: File, queue: SourceQueueWithComplete[ReceivedFile])(implicit val system: ActorSystem, implicit val mat: Materializer)
-    extends Actor
+class WebSocketActor(streamName: String, dir: File, queue: SourceQueueWithComplete[ReceivedFile], saveFiles: Boolean)(
+    implicit val system: ActorSystem,
+    implicit val mat: Materializer
+) extends Actor
     with ActorLogging {
 
   import WebSocketActor._
@@ -69,12 +81,12 @@ class WebSocketActor(streamName: String, dir: File, queue: SourceQueueWithComple
 
     case bs: ByteString ⇒
       if (bs.size == 1 && bs.utf8String == "\n") {
-        os.close()
+        if (saveFiles) os.close()
         log.debug(s"Wrote $file")
         queue.offer(ReceivedFile(streamName, count, file.toPath))
         newFile()
       } else {
-        os.write(bs.toArray)
+        if (saveFiles) os.write(bs.toArray)
       }
       sender() ! Ack // ack to allow the stream to proceed sending more elements
 
@@ -88,7 +100,7 @@ class WebSocketActor(streamName: String, dir: File, queue: SourceQueueWithComple
   private def newFile(): Unit = {
     count = count + 1
     file = new File(dir, s"$streamName-$count")
-    os = new FileOutputStream(file)
+    if (saveFiles) os = new FileOutputStream(file)
   }
 
 }

@@ -92,9 +92,9 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
       s1.compareTo(s2) < 0
   }
 
-  def subscribe(streamName: String, dir: String, queue: SourceQueueWithComplete[ReceivedFile]): Future[HttpResponse] = {
+  def subscribe(streamName: String, dir: String, queue: SourceQueueWithComplete[ReceivedFile], saveFiles: Boolean): Future[HttpResponse] = {
     log.debug(s"subscribe to $streamName")
-    val receiver   = system.actorOf(WebSocketActor.props(streamName, new File(dir), queue))
+    val receiver   = system.actorOf(WebSocketActor.props(streamName, new File(dir), queue, saveFiles))
     val wsListener = new WebSocketListener
     wsListener.subscribe(Uri(s"ws://$host:$port$accessRoute/$streamName"), receiver)
   }

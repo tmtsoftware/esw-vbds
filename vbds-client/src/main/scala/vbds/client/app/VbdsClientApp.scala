@@ -130,7 +130,7 @@ object VbdsClientApp extends App {
       .run()
 
 
-    options.subscribe.foreach(s => client.subscribe(s, options.dir.getOrElse("."), queue))
+    options.subscribe.foreach(s => client.subscribe(s, options.dir.getOrElse("."), queue, saveFiles = true))
   }
 
   // XXX TODO: Change to actor or callback
