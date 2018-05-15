@@ -134,14 +134,11 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     // --- End of ListStreams responses ---
 
-
     case _: UpdateResponse[_] ⇒ // ignore
 
     case c @ Changed(`adminDataKey`) ⇒
       val data = c.get(adminDataKey)
       log.debug("Current streams: {}", data.elements)
-
-
 
     case AddSubscription(name, sink) =>
       log.debug("Adding Subscription: {}", name)
@@ -154,7 +151,6 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       log.debug("Removing Subscription with id: {}", info)
       replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ - info)
       sender() ! info
-
 
     // --- Sends a request to get the list of subscriptions (See the following cases for the response) ---
     case ListSubscriptions =>
@@ -175,11 +171,9 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     // --- End of ListSubscriptions responses ---
 
-
     case c @ Changed(`accessDataKey`) ⇒
       val data = c.get(accessDataKey)
       log.debug("Current subscriptions: {}", data.elements)
-
 
     case Publish(streamName, subscriberSet, producer, dist) =>
       publish(streamName, subscriberSet, producer, sender(), dist)
@@ -189,9 +183,9 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
    * Publishes the contents of the given data source to the given set of subscribers and sends a Done message to
    * the given actor when done.
    *
-   * @param streamName name of the stream to publish on
+   * @param streamName    name of the stream to publish on
    * @param subscriberSet set of subscriber info from shared data for the given stream
-   * @param source      source of the data (reusable via BroadcastHub)
+   * @param source        source of the data being published
    * @param replyTo       the actor to notify when done
    * @param dist          if true, also distribute the data to the HTTP servers corresponding to any remote subscribers
    */
@@ -206,22 +200,34 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
     val remoteHostSet         = remoteSet.map(a => ServerInfo(a.host, a.port))
     if (dist) checkRemoteConnections(remoteHostSet)
 
+    // Number of broadcast outputs
     val numOut = localSet.size + remoteHostSet.size
     log.debug(
       s"Publish dist=$dist, subscribers: $numOut (${localSet.size} local, ${remoteSet.size} remote on ${remoteHostSet.size} hosts)"
     )
 
+    // Construct a runnable graph that broadcasts the published data to all of the subscribers
     val g = RunnableGraph.fromGraph(GraphDSL.create(Sink.ignore) { implicit builder => out =>
       import GraphDSL.Implicits._
 
-      val bcast                        = builder.add(Broadcast[ByteString](numOut))
-      val merge                        = builder.add(Merge[ByteString](numOut))
+      // Broadcast with an output for each subscriber
+      val bcast = builder.add(Broadcast[ByteString](numOut))
+
+      // Merge afterwards to get a single output
+      val merge = builder.add(Merge[ByteString](numOut))
+
+      // Send data for each local subscribers to its websocket
       def websocketFlow(a: AccessInfo) = Flow[ByteString].alsoTo(localSubscribers(a))
-      val localFlows                   = localSet.map(websocketFlow)
-      def requestFlow(h: ServerInfo)   = Flow[ByteString].map(makeHttpRequest(streamName, h, _))
+
+      val localFlows = localSet.map(websocketFlow)
+
+      // If dist is true, send data for each remote subscriber as HTTP POST to the server hosting its websocket
+      def requestFlow(h: ServerInfo) = Flow[ByteString].map(makeHttpRequest(streamName, h, _))
+
       val remoteFlows =
         if (dist) remoteHostSet.map(h => requestFlow(h).via(remoteConnections(h)).map(_ => ByteString.empty)) else Set.empty
 
+      // Create the graph
       source ~> bcast
       localFlows.foreach(bcast ~> _ ~> merge)
       if (dist) remoteFlows.foreach(bcast ~> _ ~> merge)
@@ -242,8 +248,9 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
   /**
    * Returns a pair of sets for the local and remote subscribers
+   *
    * @param subscriberSet all subscribers for the stream
-   * @param dist true if published data should be distributed to remote subscribers
+   * @param dist          true if published data should be distributed to remote subscribers
    */
   private def getSubscribers(subscriberSet: Set[AccessInfo], dist: Boolean): (Set[AccessInfo], Set[AccessInfo]) = {
     val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains _)
