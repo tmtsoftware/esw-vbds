@@ -217,12 +217,12 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       val merge = builder.add(Merge[ByteString](numOut))
 
       // Send data for each local subscribers to its websocket
-      def websocketFlow(a: AccessInfo) = Flow[ByteString].alsoTo(localSubscribers(a))
+      def websocketFlow(a: AccessInfo): Flow[ByteString, ByteString, NotUsed] = Flow[ByteString].alsoTo(localSubscribers(a))
 
       val localFlows = localSet.map(websocketFlow)
 
       // If dist is true, send data for each remote subscriber as HTTP POST to the server hosting its websocket
-      def requestFlow(h: ServerInfo) = Flow[ByteString].map(makeHttpRequest(streamName, h, _))
+      def requestFlow(h: ServerInfo): Flow[ByteString, HttpRequest, NotUsed] = Flow[ByteString].map(makeHttpRequest(streamName, h, _))
 
       val remoteFlows =
         if (dist) remoteHostSet.map(h => requestFlow(h).via(remoteConnections(h)).map(_ => ByteString.empty)) else Set.empty
@@ -243,7 +243,6 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     // Send Done to the replyTo actor when done
     pipe(f) to replyTo
-
   }
 
   /**
