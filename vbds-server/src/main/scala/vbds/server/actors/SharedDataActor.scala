@@ -134,11 +134,14 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     // --- End of ListStreams responses ---
 
+
     case _: UpdateResponse[_] ⇒ // ignore
 
     case c @ Changed(`adminDataKey`) ⇒
       val data = c.get(adminDataKey)
       log.debug("Current streams: {}", data.elements)
+
+
 
     case AddSubscription(name, sink) =>
       log.debug("Adding Subscription: {}", name)
@@ -151,6 +154,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       log.debug("Removing Subscription with id: {}", info)
       replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ - info)
       sender() ! info
+
 
     // --- Sends a request to get the list of subscriptions (See the following cases for the response) ---
     case ListSubscriptions =>
@@ -171,9 +175,11 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     // --- End of ListSubscriptions responses ---
 
+
     case c @ Changed(`accessDataKey`) ⇒
       val data = c.get(accessDataKey)
       log.debug("Current subscriptions: {}", data.elements)
+
 
     case Publish(streamName, subscriberSet, producer, dist) =>
       publish(streamName, subscriberSet, producer, sender(), dist)
@@ -183,7 +189,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
    * Publishes the contents of the given data source to the given set of subscribers and sends a Done message to
    * the given actor when done.
    *
-   * @param streamName    name of the stream to publish on
+   * @param streamName name of the stream to publish on
    * @param subscriberSet set of subscriber info from shared data for the given stream
    * @param source        source of the data being published
    * @param replyTo       the actor to notify when done
@@ -211,15 +217,15 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       import GraphDSL.Implicits._
 
       // Broadcast with an output for each subscriber
-      val bcast = builder.add(Broadcast[ByteString](numOut))
+      val bcast                        = builder.add(Broadcast[ByteString](numOut))
 
       // Merge afterwards to get a single output
-      val merge = builder.add(Merge[ByteString](numOut))
+      val merge                        = builder.add(Merge[ByteString](numOut))
 
       // Send data for each local subscribers to its websocket
       def websocketFlow(a: AccessInfo): Flow[ByteString, ByteString, NotUsed] = Flow[ByteString].alsoTo(localSubscribers(a))
 
-      val localFlows = localSet.map(websocketFlow)
+      val localFlows                   = localSet.map(websocketFlow)
 
       // If dist is true, send data for each remote subscriber as HTTP POST to the server hosting its websocket
       def requestFlow(h: ServerInfo): Flow[ByteString, HttpRequest, NotUsed] = Flow[ByteString].map(makeHttpRequest(streamName, h, _))
@@ -243,13 +249,14 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     // Send Done to the replyTo actor when done
     pipe(f) to replyTo
+
   }
 
   /**
    * Returns a pair of sets for the local and remote subscribers
    *
    * @param subscriberSet all subscribers for the stream
-   * @param dist          true if published data should be distributed to remote subscribers
+   * @param dist true if published data should be distributed to remote subscribers
    */
   private def getSubscribers(subscriberSet: Set[AccessInfo], dist: Boolean): (Set[AccessInfo], Set[AccessInfo]) = {
     val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains _)

@@ -41,13 +41,13 @@ class VbdsServerSpecMultiJvmPublisher1 extends VbdsServerTest
 //class VbdsServerSpecMultiJvmPublisher2 extends VbdsServerTest
 
 object VbdsServerTest {
-  val host              = "127.0.0.1"
-  val seedPort          = 8888
-  val server1HttpPort   = 7777
-  val server2HttpPort   = server1HttpPort + 1
-  val streamName        = "WFS1-RAW"
-  val testFileName      = "vbdsTestFile"
-//  val testFileSizeKb    = 300000
+  val host            = "127.0.0.1"
+  val seedPort        = 8888
+  val server1HttpPort = 7777
+  val server2HttpPort = server1HttpPort + 1
+  val streamName      = "WFS1-RAW"
+  val testFileName    = "vbdsTestFile"
+  //  val testFileSizeKb    = 300000
   val testFileSizeKb    = 8
   val testFileSizeBytes = testFileSizeKb * 1000
   val numFilesToPublish = 2000
@@ -66,7 +66,33 @@ object VbdsServerTest {
     dir
   }
 
-  // Returns a queue that receives the files via websocket and verifies that the data is correct.
+  // Called when a file is received
+  private def receiveFile(name: String, r: ReceivedFile, promise: Promise[ReceivedFile], startTime: Long): Unit = {
+    println(s"$name: Received file ${r.count}: ${r.path} for stream ${r.streamName}")
+    if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
+      println(s"${r.path} and $testFile are equal")
+      if (r.count >= numFilesToPublish) {
+        val testSecs    = (System.currentTimeMillis() - startTime) / 1000.0
+        val secsPerFile = testSecs / numFilesToPublish
+        val mbPerSec    = (testFileSizeKb / 1000.0 * numFilesToPublish) / testSecs
+        val hz          = 1.0 / secsPerFile
+        println(f"""
+             |
+             |===================================================
+             |* $name: Received $numFilesToPublish $testFileSizeKb kb files in $testSecs seconds ($secsPerFile%1.3f secs per file, $hz%1.3f hz, $mbPerSec%1.3f mb/sec)
+             |===================================================
+         """.stripMargin)
+        promise.success(r)
+      }
+    } else {
+      println(s"${r.path} and $testFile differ")
+      promise.failure(new RuntimeException(s"${r.path} and $testFile differ"))
+    }
+    r.path.toFile.delete()
+
+  }
+
+  // Returns a queue that receives the files via websocket and verifies that the data is correct (if doCompareFiles is true).
   def makeQueue(name: String, promise: Promise[ReceivedFile], log: LoggingAdapter)(
       implicit mat: Materializer
   ): SourceQueueWithComplete[ReceivedFile] = {
@@ -74,30 +100,7 @@ object VbdsServerTest {
     Source
       .queue[ReceivedFile](3, OverflowStrategy.backpressure)
       .buffer(10, OverflowStrategy.backpressure)
-      .map { r =>
-        println(s"$name: Received file ${r.count}: ${r.path} for stream ${r.streamName}")
-        if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
-          println(s"${r.path} and $testFile are equal")
-          if (r.count >= numFilesToPublish) {
-            val testSecs    = (System.currentTimeMillis() - startTime) / 1000.0
-            val secsPerFile = testSecs / numFilesToPublish
-            val mbPerSec = (testFileSizeKb/1000.0 * numFilesToPublish) / testSecs
-            val hz = 1.0/secsPerFile
-            //f"$pi%1.5f"
-            println(f"""
-                 |
-                 |===================================================
-                 |* $name: Received $numFilesToPublish $testFileSizeKb kb files in $testSecs seconds ($secsPerFile%1.3f secs per file, $hz%1.3f hz, $mbPerSec%1.3f mb/sec)
-                 |===================================================
-         """.stripMargin)
-            promise.success(r)
-          }
-        } else {
-          println(s"${r.path} and $testFile differ")
-          promise.failure(new RuntimeException(s"${r.path} and $testFile differ"))
-        }
-        r.path.toFile.delete()
-      }
+      .map(receiveFile(name, _, promise, startTime))
       .to(Sink.ignore)
       .run()
   }
