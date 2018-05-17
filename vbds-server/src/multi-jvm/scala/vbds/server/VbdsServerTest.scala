@@ -1,7 +1,6 @@
 package vbds.server
 
 import java.io.{BufferedOutputStream, File, FileOutputStream}
-import java.net.InetAddress
 
 import akka.remote.testkit.MultiNodeConfig
 import vbds.client.VbdsClient
