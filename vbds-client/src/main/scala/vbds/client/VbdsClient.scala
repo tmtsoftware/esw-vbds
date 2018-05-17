@@ -16,6 +16,15 @@ import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success, Try}
 
+/**
+  * An akka-http based command line client for the vbds-server.
+  *
+  * @param host the HTTP host where the vbds-server is running
+  * @param port the HTTP port number to use to access the vbds-server
+  * @param chunkSize optional chunk size for exchanging image data
+  * @param system akka actor system
+  * @param mat akka actor materializer
+  */
 class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem,
                                                                         implicit val mat: Materializer) {
 

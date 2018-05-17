@@ -1,6 +1,7 @@
 package vbds.server
 
 import java.io.{BufferedOutputStream, File, FileOutputStream}
+import java.net.InetAddress
 
 import akka.remote.testkit.MultiNodeConfig
 import vbds.client.VbdsClient
@@ -19,6 +20,13 @@ import org.scalatest.BeforeAndAfterAll
 import vbds.client.WebSocketActor.ReceivedFile
 
 // Tests with multiple servers, publishers and subscribers
+
+// Note: To test with remote hosts, set multiNodeHosts environment variable to comma separated list of hosts.
+// For example: setenv multiNodeHosts "192.168.178.77,abrighton@192.168.178.36"
+// and run: sbt multiNodeTest
+//
+// To test locally on different JVMs, run: sbt multi-jvm:test
+
 object VbdsServerTestConfig extends MultiNodeConfig {
   val server1     = role("server1")
   val server2     = role("server2")
@@ -41,7 +49,6 @@ class VbdsServerSpecMultiJvmPublisher1 extends VbdsServerTest
 //class VbdsServerSpecMultiJvmPublisher2 extends VbdsServerTest
 
 object VbdsServerTest {
-  val host            = "127.0.0.1"
   val seedPort        = 8888
   val server1HttpPort = 7777
   val server2HttpPort = server1HttpPort + 1
@@ -70,7 +77,6 @@ object VbdsServerTest {
   private def receiveFile(name: String, r: ReceivedFile, promise: Promise[ReceivedFile], startTime: Long): Unit = {
     println(s"$name: Received file ${r.count}: ${r.path} for stream ${r.streamName}")
     if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
-      println(s"${r.path} and $testFile are equal")
       if (r.count >= numFilesToPublish) {
         val testSecs    = (System.currentTimeMillis() - startTime) / 1000.0
         val secsPerFile = testSecs / numFilesToPublish
@@ -135,7 +141,22 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
 
     "Allow creating a stream, subscribing and publishing to a stream" in {
       runOn(server1) {
-        VbdsServerApp.main(Array("--http-port", s"$server1HttpPort", "--akka-port", s"$seedPort", "-s", s"$host:$seedPort"))
+        val host = system.settings.config.getString("multinode.host")
+        println(s"server1 (seed node) is running on $host")
+
+        // Start the first server (the seed node)
+        VbdsServerApp.main(
+          Array("--http-host",
+                host,
+                "--http-port",
+                s"$server1HttpPort",
+                "--akka-host",
+                host,
+                "--akka-port",
+                s"$seedPort",
+                "-s",
+                s"$host:$seedPort")
+        )
         expectNoMessage(2.seconds)
         enterBarrier("deployed")
         enterBarrier("streamCreated")
@@ -146,7 +167,14 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
       }
 
       runOn(server2) {
-        VbdsServerApp.main(Array("--http-port", s"$server2HttpPort", "-s", s"$host:$seedPort"))
+        val host = system.settings.config.getString("multinode.host")
+        val serverHost = system.settings.config.getString("multinode.server-host")
+        println(s"server2 is running on $host (seed node is $serverHost)")
+
+        // Start a second server
+        VbdsServerApp.main(
+          Array("--http-host", host, "--http-port", s"$server2HttpPort", "--akka-host", host, "-s", s"$serverHost:$seedPort")
+        )
         expectNoMessage(2.seconds)
         enterBarrier("deployed")
         enterBarrier("streamCreated")
@@ -157,6 +185,8 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
       }
 
       runOn(subscriber1) {
+        val host = system.settings.config.getString("multinode.host")
+        println(s"subscriber1 is running on $host")
         implicit val materializer = ActorMaterializer()
         enterBarrier("deployed")
         val client = new VbdsClient(host, server1HttpPort)
@@ -165,7 +195,6 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         val queue             = makeQueue("subscriber1", promise, log)
         val subscribeResponse = client.subscribe(streamName, getTempDir("subscriber1"), queue, doCompareFiles).await(shortTimeout)
         assert(subscribeResponse.status == StatusCodes.SwitchingProtocols)
-        //        log.debug(s"subscriber1: Subscribe response = $subscribeResponse, content type: ${subscribeResponse.entity.contentType}")
         enterBarrier("subscribedToStream")
         promise.future.await(longTimeout)
         within(longTimeout) {
@@ -174,6 +203,8 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
       }
 
       runOn(subscriber2) {
+        val host = system.settings.config.getString("multinode.host")
+        println(s"subscriber2 is running on $host")
         implicit val materializer = ActorMaterializer()
         enterBarrier("deployed")
         val client = new VbdsClient(host, server2HttpPort)
@@ -182,7 +213,6 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         val queue             = makeQueue("subscriber2", promise, log)
         val subscribeResponse = client.subscribe(streamName, getTempDir("subscriber2"), queue, doCompareFiles).await(shortTimeout)
         assert(subscribeResponse.status == StatusCodes.SwitchingProtocols)
-        //        log.debug(s"subscriber2: Subscribe response = $subscribeResponse, content type: ${subscribeResponse.entity.contentType}")
         enterBarrier("subscribedToStream")
         promise.future.await(longTimeout)
         within(longTimeout) {
@@ -191,12 +221,13 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
       }
 
       runOn(publisher1) {
+        val host = system.settings.config.getString("multinode.host")
+        println(s"publisher1 is running on $host")
         implicit val materializer = ActorMaterializer()
         enterBarrier("deployed")
         val client         = new VbdsClient(host, server1HttpPort)
         val createResponse = client.createStream(streamName).await(shortTimeout)
         assert(createResponse.status == StatusCodes.OK)
-        //        log.debug(s"publisher1: Create response = $createResponse, content type: ${createResponse.entity.contentType}")
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
         (1 to numFilesToPublish).foreach { _ =>
