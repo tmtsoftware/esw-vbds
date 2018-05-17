@@ -55,7 +55,7 @@ object VbdsServerTest {
   val longTimeout       = 10.hours // in case you want to test with lots of files...
 
   // If true, compare files to make sure the file was transferred correctly
-  val doCompareFiles = true
+  val doCompareFiles = false
 
   val testFile = makeFile(testFileSizeBytes, testFileName)
   testFile.deleteOnExit()
