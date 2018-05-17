@@ -191,7 +191,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
    *
    * @param streamName name of the stream to publish on
    * @param subscriberSet set of subscriber info from shared data for the given stream
-   * @param source      source of the data (reusable via BroadcastHub)
+   * @param source        source of the data being published
    * @param replyTo       the actor to notify when done
    * @param dist          if true, also distribute the data to the HTTP servers corresponding to any remote subscribers
    */
@@ -206,22 +206,34 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
     val remoteHostSet         = remoteSet.map(a => ServerInfo(a.host, a.port))
     if (dist) checkRemoteConnections(remoteHostSet)
 
+    // Number of broadcast outputs
     val numOut = localSet.size + remoteHostSet.size
     log.debug(
       s"Publish dist=$dist, subscribers: $numOut (${localSet.size} local, ${remoteSet.size} remote on ${remoteHostSet.size} hosts)"
     )
 
+    // Construct a runnable graph that broadcasts the published data to all of the subscribers
     val g = RunnableGraph.fromGraph(GraphDSL.create(Sink.ignore) { implicit builder => out =>
       import GraphDSL.Implicits._
 
+      // Broadcast with an output for each subscriber
       val bcast                        = builder.add(Broadcast[ByteString](numOut))
+
+      // Merge afterwards to get a single output
       val merge                        = builder.add(Merge[ByteString](numOut))
-      def websocketFlow(a: AccessInfo) = Flow[ByteString].alsoTo(localSubscribers(a))
+
+      // Send data for each local subscribers to its websocket
+      def websocketFlow(a: AccessInfo): Flow[ByteString, ByteString, NotUsed] = Flow[ByteString].alsoTo(localSubscribers(a))
+
       val localFlows                   = localSet.map(websocketFlow)
-      def requestFlow(h: ServerInfo)   = Flow[ByteString].map(makeHttpRequest(streamName, h, _))
+
+      // If dist is true, send data for each remote subscriber as HTTP POST to the server hosting its websocket
+      def requestFlow(h: ServerInfo): Flow[ByteString, HttpRequest, NotUsed] = Flow[ByteString].map(makeHttpRequest(streamName, h, _))
+
       val remoteFlows =
         if (dist) remoteHostSet.map(h => requestFlow(h).via(remoteConnections(h)).map(_ => ByteString.empty)) else Set.empty
 
+      // Create the graph
       source ~> bcast
       localFlows.foreach(bcast ~> _ ~> merge)
       if (dist) remoteFlows.foreach(bcast ~> _ ~> merge)
@@ -242,6 +254,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
   /**
    * Returns a pair of sets for the local and remote subscribers
+   *
    * @param subscriberSet all subscribers for the stream
    * @param dist true if published data should be distributed to remote subscribers
    */
