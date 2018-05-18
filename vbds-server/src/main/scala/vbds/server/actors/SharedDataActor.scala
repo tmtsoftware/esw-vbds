@@ -134,14 +134,11 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     // --- End of ListStreams responses ---
 
-
     case _: UpdateResponse[_] ⇒ // ignore
 
     case c @ Changed(`adminDataKey`) ⇒
       val data = c.get(adminDataKey)
       log.debug("Current streams: {}", data.elements)
-
-
 
     case AddSubscription(name, sink) =>
       log.debug("Adding Subscription: {}", name)
@@ -154,7 +151,6 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       log.debug("Removing Subscription with id: {}", info)
       replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ - info)
       sender() ! info
-
 
     // --- Sends a request to get the list of subscriptions (See the following cases for the response) ---
     case ListSubscriptions =>
@@ -175,11 +171,9 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     // --- End of ListSubscriptions responses ---
 
-
     case c @ Changed(`accessDataKey`) ⇒
       val data = c.get(accessDataKey)
       log.debug("Current subscriptions: {}", data.elements)
-
 
     case Publish(streamName, subscriberSet, producer, dist) =>
       publish(streamName, subscriberSet, producer, sender(), dist)
@@ -217,18 +211,20 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       import GraphDSL.Implicits._
 
       // Broadcast with an output for each subscriber
-      val bcast                        = builder.add(Broadcast[ByteString](numOut))
+      val bcast = builder.add(Broadcast[ByteString](numOut))
 
       // Merge afterwards to get a single output
-      val merge                        = builder.add(Merge[ByteString](numOut))
+      val merge = builder.add(Merge[ByteString](numOut))
 
       // Send data for each local subscribers to its websocket
-      def websocketFlow(a: AccessInfo): Flow[ByteString, ByteString, NotUsed] = Flow[ByteString].alsoTo(localSubscribers(a))
+      def websocketFlow(a: AccessInfo): Flow[ByteString, ByteString, NotUsed] =
+        Flow[ByteString].alsoTo(localSubscribers(a)).map(_ => ByteString.empty)
 
-      val localFlows                   = localSet.map(websocketFlow)
+      val localFlows = localSet.map(websocketFlow)
 
       // If dist is true, send data for each remote subscriber as HTTP POST to the server hosting its websocket
-      def requestFlow(h: ServerInfo): Flow[ByteString, HttpRequest, NotUsed] = Flow[ByteString].map(makeHttpRequest(streamName, h, _))
+      def requestFlow(h: ServerInfo): Flow[ByteString, HttpRequest, NotUsed] =
+        Flow[ByteString].map(makeHttpRequest(streamName, h, _))
 
       val remoteFlows =
         if (dist) remoteHostSet.map(h => requestFlow(h).via(remoteConnections(h)).map(_ => ByteString.empty)) else Set.empty

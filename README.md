@@ -100,3 +100,24 @@ Publish some data (Replace MyFile with the file name):
     curl --request POST -F data=@MyFile http://127.0.0.1:7777/vbds/transfer/streams/WFS1-RAW
 
 The data should be displayed in the stdout of the wscat application.
+
+
+## Multi-jvm and Multi-Node Tests
+
+The multi-jvm directory contains a test that uses multiple servers, publishers and subscribers.
+
+To test locally on different JVMs, run: 
+
+    sbt multi-jvm:test
+
+To test with remote hosts, set the `multiNodeHosts` environment variable to a comma separated list of hosts and 
+then run `sbt multiNodeTest`. For example: 
+
+    export multiNodeHosts="192.168.178.77,username@192.168.178.36"
+    sbt multiNodeTest
+
+This copies the necessary jars to the `~/multi-node-test` dir on each host and runs a part of the test there.
+There are other settings that might be of interest. 
+See [Multi Node Testing](https://doc.akka.io/docs/akka/current/multi-node-testing.html).
+
+

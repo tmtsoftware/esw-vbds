@@ -52,7 +52,10 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
                 }
             }
           } else {
-            complete(BadRequest -> s"The stream $streamName does not exists")
+            extractRequest { r =>
+              r.discardEntityBytes()
+              complete(BadRequest -> s"The stream $streamName does not exists")
+            }
           }
         }
       }

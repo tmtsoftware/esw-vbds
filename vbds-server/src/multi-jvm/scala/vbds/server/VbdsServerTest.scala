@@ -21,7 +21,7 @@ import vbds.client.WebSocketActor.ReceivedFile
 // Tests with multiple servers, publishers and subscribers
 
 // Note: To test with remote hosts, set multiNodeHosts environment variable to comma separated list of hosts.
-// For example: setenv multiNodeHosts "192.168.178.77,abrighton@192.168.178.36"
+// For example: setenv multiNodeHosts "192.168.178.77,username@192.168.178.36"
 // and run: sbt multiNodeTest
 //
 // To test locally on different JVMs, run: sbt multi-jvm:test
@@ -53,15 +53,15 @@ object VbdsServerTest {
   val server2HttpPort = server1HttpPort + 1
   val streamName      = "WFS1-RAW"
   val testFileName    = "vbdsTestFile"
-  //  val testFileSizeKb    = 300000
-  val testFileSizeKb    = 8
+    val testFileSizeKb    = 30000
+//  val testFileSizeKb    = 8
   val testFileSizeBytes = testFileSizeKb * 1000
-  val numFilesToPublish = 2000
+  val numFilesToPublish = 200
   val shortTimeout      = 10.seconds
   val longTimeout       = 10.hours // in case you want to test with lots of files...
 
   // If true, compare files to make sure the file was transferred correctly
-  val doCompareFiles = false
+  val doCompareFiles = true
 
   val testFile = makeFile(testFileSizeBytes, testFileName)
   testFile.deleteOnExit()
@@ -102,6 +102,7 @@ object VbdsServerTest {
       implicit mat: Materializer
   ): SourceQueueWithComplete[ReceivedFile] = {
     val startTime: Long = System.currentTimeMillis()
+    println(s"$name: Started timing")
     Source
       .queue[ReceivedFile](3, OverflowStrategy.backpressure)
       .buffer(10, OverflowStrategy.backpressure)
