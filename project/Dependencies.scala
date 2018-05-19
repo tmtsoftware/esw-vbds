@@ -14,6 +14,7 @@ object Dependencies {
     Libs.`scopt`,
     Libs.`boopickle`,
     Chill.`chill-akka`,
+    Libs.`logback-classic`,
 
     Libs.`commons-io` % Test,
     Libs.`scalatest` % Test,
@@ -23,8 +24,10 @@ object Dependencies {
 
   val vbdsClient = Seq(
     Akka.`akka-stream`,
+    Akka.`akka-slf4j`,
     AkkaHttp.`akka-http`,
     Libs.`scopt`,
+    Libs.`logback-classic`,
 
     Libs.`scalatest` % Test,
     AkkaHttp.`akka-http-testkit` % Test

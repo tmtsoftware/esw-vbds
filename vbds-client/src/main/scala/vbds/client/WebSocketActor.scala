@@ -7,7 +7,7 @@ import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message}
 import akka.util.{ByteString, Timeout}
 import akka.pattern.ask
-import akka.stream.Materializer
+import akka.stream.{Materializer, QueueOfferResult}
 import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.scaladsl.Sink
 import vbds.client.WebSocketActor._
@@ -17,13 +17,15 @@ import scala.util._
 
 object WebSocketActor {
 
-  case object Ack
+  sealed trait WebSocketActorMessage
 
-  case object StreamInitialized
+  case object Ack extends WebSocketActorMessage
 
-  case object StreamCompleted
+  case object StreamInitialized extends WebSocketActorMessage
 
-  final case class StreamFailure(ex: Throwable)
+  case object StreamCompleted extends WebSocketActorMessage
+
+  final case class StreamFailure(ex: Throwable) extends WebSocketActorMessage
 
   final case class ReceivedFile(streamName: String, count: Int, path: Path)
 
@@ -33,15 +35,24 @@ object WebSocketActor {
    * @param dir the directory in which to save the files received (if saveFiles is true)
    * @param queue a queue to write messages to when a file is received
    * @param saveFiles if true, save the files in the given dir (Set to false for throughput tests)
+   * @param delay optional delay to simulate a slow subscriber
    */
-  def props(streamName: String, dir: File, queue: SourceQueueWithComplete[ReceivedFile], saveFiles: Boolean)(
+  def props(streamName: String,
+            dir: File,
+            queue: SourceQueueWithComplete[ReceivedFile],
+            saveFiles: Boolean,
+            delay: FiniteDuration = Duration.Zero)(
       implicit system: ActorSystem,
       mat: Materializer
   ): Props =
-    Props(new WebSocketActor(streamName, dir, queue, saveFiles))
+    Props(new WebSocketActor(streamName, dir, queue, saveFiles, delay))
 }
 
-class WebSocketActor(streamName: String, dir: File, queue: SourceQueueWithComplete[ReceivedFile], saveFiles: Boolean)(
+class WebSocketActor(streamName: String,
+                     dir: File,
+                     queue: SourceQueueWithComplete[ReceivedFile],
+                     saveFiles: Boolean,
+                     delay: FiniteDuration)(
     implicit val system: ActorSystem,
     implicit val mat: Materializer
 ) extends Actor
@@ -53,7 +64,7 @@ class WebSocketActor(streamName: String, dir: File, queue: SourceQueueWithComple
   var count                = 0
   var file: File           = _
   var os: FileOutputStream = _
-  implicit val askTimeout  = Timeout(5.seconds)
+  implicit val askTimeout  = Timeout(6.seconds)
 
   log.debug("Started WebSocketActor")
 
@@ -69,10 +80,13 @@ class WebSocketActor(streamName: String, dir: File, queue: SourceQueueWithComple
         case bm: BinaryMessage =>
           log.debug(s"Received binary message for stream $streamName")
           val replyTo = sender()
+          if (delay != Duration.Zero) Thread.sleep(delay.toMillis) // similate a slow subscriber
           bm.dataStream.mapAsync(1)(bs => (self ? bs).mapTo[Ack.type]).runWith(Sink.ignore).onComplete {
             case Success(_) =>
               replyTo ! Ack // ack to allow the stream to proceed sending more elements
-            case Failure(ex) => log.error(ex, "Failed to handle BinaryMessage")
+            case Failure(ex) =>
+              log.error(ex, s"Failed to handle BinaryMessage")
+              replyTo ! Ack
           }
 
         case x =>
@@ -80,15 +94,35 @@ class WebSocketActor(streamName: String, dir: File, queue: SourceQueueWithComple
       }
 
     case bs: ByteString ⇒
+      val replyTo = sender()
       if (bs.size == 1 && bs.utf8String == "\n") {
-        if (saveFiles) os.close()
-        log.debug(s"Wrote $file")
-        queue.offer(ReceivedFile(streamName, count, file.toPath))
+        if (saveFiles) {
+          os.close()
+          log.debug(s"Wrote $file")
+        }
+        log.debug(s"Queue offer file $count on stream $streamName")
+        queue.offer(ReceivedFile(streamName, count, file.toPath)).onComplete {
+          case Success(queueOfferResult) =>
+            queueOfferResult match {
+              case QueueOfferResult.Enqueued =>
+                log.debug(s"Enqueued $file")
+              case QueueOfferResult.Dropped =>
+                log.warning(s"Dropped $file")
+              case QueueOfferResult.Failure(ex) =>
+                log.error(ex, s"Failed to queue $file")
+              case QueueOfferResult.QueueClosed =>
+                log.warning(s"Closed queue on $file")
+            }
+            replyTo ! Ack
+          case Failure(ex) =>
+            log.error(ex, s"Failed to enqueue $file")
+            replyTo ! Ack
+        }
         newFile()
       } else {
         if (saveFiles) os.write(bs.toArray)
+        replyTo ! Ack // ack to allow the stream to proceed sending more elements
       }
-      sender() ! Ack // ack to allow the stream to proceed sending more elements
 
     case StreamCompleted ⇒
       log.debug("Stream completed")

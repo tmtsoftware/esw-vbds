@@ -13,8 +13,8 @@ import scala.concurrent.duration._
 import vbds.client.WebSocketActor._
 
 /**
-  * A VIZ Bulk Data System HTTP client command line application.
-  */
+ * A VIZ Bulk Data System HTTP client command line application.
+ */
 object VbdsClientApp extends App {
 
   // Command line options
@@ -107,7 +107,7 @@ object VbdsClientApp extends App {
 
   // Run the application
   private def run(options: Options): Unit = {
-    implicit val system = ActorSystem()
+    implicit val system       = ActorSystem()
     implicit val materializer = ActorMaterializer()
 
     val client = new VbdsClient(options.host, options.port)
@@ -115,13 +115,14 @@ object VbdsClientApp extends App {
     options.delete.foreach(s => handleHttpResponse(s"delete $s", client.deleteStream(s)))
     if (options.list) handleHttpResponse("list", client.listStreams())
 
+    val delay = options.delay.map(Duration(_).asInstanceOf[FiniteDuration]).getOrElse(Duration.Zero)
     if (options.publish.isDefined && options.data.isDefined) {
-      val delay = options.delay.map(Duration(_)).getOrElse(Duration.Zero)
-      options.publish.foreach(s => handleHttpResponse(s"publish $s", client.publish(s, options.data.get, delay.asInstanceOf[FiniteDuration])))
+      options.publish.foreach(s => handleHttpResponse(s"publish $s", client.publish(s, options.data.get, delay)))
     }
 
-    val queue = Source.queue[ReceivedFile](3, OverflowStrategy.backpressure)
-      .buffer(2, OverflowStrategy.backpressure)
+    val queue = Source
+      .queue[ReceivedFile](3, OverflowStrategy.dropHead)
+//      .buffer(2, OverflowStrategy.dropHead)
       .map { r =>
         println(s"Received file ${r.count} for stream ${r.streamName}")
         options.action.foreach(doAction(r, _))
@@ -129,8 +130,9 @@ object VbdsClientApp extends App {
       .to(Sink.ignore)
       .run()
 
-
-    options.subscribe.foreach(s => client.subscribe(s, options.dir.getOrElse("."), queue, saveFiles = true))
+    options.subscribe.foreach(
+      s => client.subscribe(s, new File(options.dir.getOrElse(".")), queue, saveFiles = true, delay = delay)
+    )
   }
 
   // XXX TODO: Change to actor or callback
@@ -144,7 +146,6 @@ object VbdsClientApp extends App {
       case ex: Exception => println(s"Error: Action for file ${r.count} of stream ${r.streamName} failed: $ex")
     }
   }
-
 
   // Prints the result of the HTTP request and exits
   private def handleHttpResponse(command: String, resp: Future[Any])(implicit system: ActorSystem): Unit = {

@@ -17,7 +17,7 @@ class WebSocketListener(implicit val system: ActorSystem, implicit val materiali
 
   import system.dispatcher
 
-  implicit val askTimeout = Timeout(5.seconds)
+//  implicit val askTimeout = Timeout(5.seconds)
 
   def subscribe(uri: Uri, actorRef: ActorRef): Future[HttpResponse] = {
 

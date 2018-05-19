@@ -47,7 +47,7 @@ class FileUploader(chunkSize: Int = 1024 * 1024)(implicit val system: ActorSyste
                   delay: FiniteDuration,
                   handler: ((Try[HttpResponse], Path)) => Unit): Future[Done] = {
     Source(files)
-      .delay(delay, DelayOverflowStrategy.backpressure)
+      .delay(delay, DelayOverflowStrategy.dropHead)
       .mapAsync(1)(path => createUploadRequest(streamName, uri, path))
       .via(poolClientFlow(uri))
       .runForeach(handler)

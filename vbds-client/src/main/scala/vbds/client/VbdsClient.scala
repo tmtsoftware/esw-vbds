@@ -17,14 +17,14 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success, Try}
 
 /**
-  * An akka-http based command line client for the vbds-server.
-  *
-  * @param host the HTTP host where the vbds-server is running
-  * @param port the HTTP port number to use to access the vbds-server
-  * @param chunkSize optional chunk size for exchanging image data
-  * @param system akka actor system
-  * @param mat akka actor materializer
-  */
+ * An akka-http based command line client for the vbds-server.
+ *
+ * @param host the HTTP host where the vbds-server is running
+ * @param port the HTTP port number to use to access the vbds-server
+ * @param chunkSize optional chunk size for exchanging image data
+ * @param system akka actor system
+ * @param mat akka actor materializer
+ */
 class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem,
                                                                         implicit val mat: Materializer) {
 
@@ -42,15 +42,23 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
 
   val log = Logging(system, this)
 
-
+  /**
+    * Creates a stream with the given name
+    */
   def createStream(streamName: String): Future[HttpResponse] = {
     Http().singleRequest(HttpRequest(method = HttpMethods.POST, uri = s"http://$host:$port$adminRoute/$streamName"))
   }
 
+  /**
+    * List the current streams (XXX TODO: Unpack the HTTP response JSON and return a List[String])
+    */
   def listStreams(): Future[HttpResponse] = {
     Http().singleRequest(HttpRequest(uri = s"http://$host:$port$adminRoute"))
   }
 
+  /**
+    * Deletes the stream with the given name
+    */
   def deleteStream(streamName: String): Future[HttpResponse] = {
     Http().singleRequest(HttpRequest(method = HttpMethods.DELETE, uri = s"http://$host:$port$adminRoute/$streamName"))
   }
@@ -77,9 +85,9 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
 
     val uri = s"http://$host:$port$transferRoute/$streamName"
     val paths = if (file.isDirectory) {
+      // Sort files (XXX FIXME: Not needed: Added this to test with extracted video images...)
       file.listFiles().map(_.toPath).toList.sortWith {
         case (p1, p2) => comparePaths(p1, p2)
-
       }
     } else {
       List(file.toPath)
@@ -88,9 +96,10 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
     uploader.uploadFiles(streamName, uri, paths, delay, handler)
   }
 
+  // --- XXX FIXME: Not needed: Added this to test with extracted video images...) ---
   val fileNamePattern = """\d+""".r
 
-  def comparePaths(p1: Path, p2: Path): Boolean = {
+  private def comparePaths(p1: Path, p2: Path): Boolean = {
     val s1 = p1.getFileName.toString
     val s2 = p2.getFileName.toString
     val a  = fileNamePattern.findAllIn(s1).toList.headOption.getOrElse("")
@@ -100,10 +109,26 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
     else
       s1.compareTo(s2) < 0
   }
+  // ---
 
-  def subscribe(streamName: String, dir: String, queue: SourceQueueWithComplete[ReceivedFile], saveFiles: Boolean): Future[HttpResponse] = {
+  /**
+    * Subscribes to the given stream
+    *
+    * @param streamName the name of the stream we are subscribed to
+    * @param dir the directory in which to save the files received (if saveFiles is true)
+    * @param queue a queue to write messages to when a file is received
+    * @param saveFiles if true, save the files in the given dir (Set to false for throughput tests)
+    * @param delay optional delay to simulate a slow subscriber
+
+    * @return the HTTP response
+    */
+  def subscribe(streamName: String,
+                dir: File,
+                queue: SourceQueueWithComplete[ReceivedFile],
+                saveFiles: Boolean,
+                delay: FiniteDuration = Duration.Zero): Future[HttpResponse] = {
     log.debug(s"subscribe to $streamName")
-    val receiver   = system.actorOf(WebSocketActor.props(streamName, new File(dir), queue, saveFiles))
+    val receiver   = system.actorOf(WebSocketActor.props(streamName, dir, queue, saveFiles, delay))
     val wsListener = new WebSocketListener
     wsListener.subscribe(Uri(s"ws://$host:$port$accessRoute/$streamName"), receiver)
   }
