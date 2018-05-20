@@ -1,9 +1,11 @@
 package vbds.server.routes
 
+import java.util.UUID
+
 import akka.actor.ActorSystem
 import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.BinaryMessage
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message}
 import akka.http.scaladsl.server.Directives
 import akka.stream._
 import akka.stream.scaladsl.{MergeHub, Sink}
@@ -45,10 +47,17 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
               // We need a Source for writing to the websocket, but we want a Sink:
               // This provides a Sink that feeds the Source.
               val (sink, source) = MergeHub.source[ByteString].preMaterialize()
+              val id = UUID.randomUUID().toString
 
-              onSuccess(accessData.addSubscription(name, sink)) { _ =>
+              // Remove any subscriber that disconnects
+              val inSink = Sink.onComplete[Message] { _ =>
+                log.info(s"Deleting subscription with id $id after client closed websocket connection")
+                accessData.deleteSubscription(id)
+              }
+
+              onSuccess(accessData.addSubscription(name, id, sink)) { _ =>
                 extractUpgradeToWebSocket { upgrade =>
-                  complete(upgrade.handleMessagesWithSinkSource(Sink.ignore, source.map(BinaryMessage(_))))
+                  complete(upgrade.handleMessagesWithSinkSource(inSink, source.map(BinaryMessage(_))))
                 }
               }
             } else {

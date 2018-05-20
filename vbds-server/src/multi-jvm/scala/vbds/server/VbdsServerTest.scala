@@ -56,29 +56,28 @@ class VbdsServerSpecMultiJvmPublisher1 extends VbdsServerTest
 //class VbdsServerSpecMultiJvmPublisher2 extends VbdsServerTest
 
 object VbdsServerTest {
-  val seedPort         = 8888
-  val server1HttpPort  = 7777
-  val server2HttpPort  = server1HttpPort + 1
+  val seedPort        = 8888
+  val server1HttpPort = 7777
+  val server2HttpPort = server1HttpPort + 1
 
-  val streamName       = "WFS1-RAW"
+  val streamName = "WFS1-RAW"
 
-  val testFileName     = "vbdsTestFile"
+  val testFileName = "vbdsTestFile"
 //    val testFileSizeKb    = 300000
   val testFileSizeKb    = 1000
   val testFileSizeBytes = testFileSizeKb * 1000
   val numFilesToPublish = 1000
 
-  val shortTimeout      = 60.seconds
-  val longTimeout       = 10.hours // in case you want to test with lots of files...
+  val shortTimeout = 60.seconds
+  val longTimeout  = 10.hours // in case you want to test with lots of files...
 
   // Simulate a slow publisher/subscriber (XXX Not sure simulated slow subscriber is working correctly)
 //  val publisherDelay = 100.millis
 //  val subscriber1Delay = 50.millis
 //  val subscriber2Delay = 35.millis
-  val publisherDelay = Duration.Zero
+  val publisherDelay   = Duration.Zero
   val subscriber1Delay = Duration.Zero
-  val subscriber2Delay = Duration.Zero
-
+  val subscriber2Delay = 100.millis
 
   // If true, compare files to make sure the file was transferred correctly
   val doCompareFiles = true
@@ -92,8 +91,13 @@ object VbdsServerTest {
     dir
   }
 
-  // Called when a file is received
-  private def receiveFile(name: String, r: ReceivedFile, promise: Promise[ReceivedFile], startTime: Long): Unit = {
+  // Called when a file is received. Checks the file contents (if doCompareFiles is true) and
+  // prints statistics when done. Received (temp) files are deleted.
+  private def receiveFile(name: String,
+                          r: ReceivedFile,
+                          promise: Promise[ReceivedFile],
+                          startTime: Long,
+                          delay: FiniteDuration = Duration.Zero): Unit = {
     println(s"$name: Received file ${r.path}")
     if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
       if (r.count >= numFilesToPublish) {
@@ -109,6 +113,7 @@ object VbdsServerTest {
          """.stripMargin)
         promise.success(r)
       }
+      if (delay != Duration.Zero) Thread.sleep(delay.toMillis)
     } else {
       println(s"${r.path} and $testFile differ")
       promise.failure(new RuntimeException(s"${r.path} and $testFile differ"))
@@ -118,7 +123,7 @@ object VbdsServerTest {
   }
 
   // Returns a queue that receives the files via websocket and verifies that the data is correct (if doCompareFiles is true).
-  def makeQueue(name: String, promise: Promise[ReceivedFile], log: LoggingAdapter)(
+  def makeQueue(name: String, promise: Promise[ReceivedFile], log: LoggingAdapter, delay: FiniteDuration = Duration.Zero)(
       implicit mat: Materializer
   ): SourceQueueWithComplete[ReceivedFile] = {
     val startTime: Long = System.currentTimeMillis()
@@ -126,7 +131,7 @@ object VbdsServerTest {
     Source
       .queue[ReceivedFile](3, OverflowStrategy.dropHead)
 //      .buffer(10, OverflowStrategy.dropHead)
-      .map(receiveFile(name, _, promise, startTime))
+      .map(receiveFile(name, _, promise, startTime, delay))
       .to(Sink.ignore)
       .run()
   }
@@ -212,9 +217,9 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         val client = new VbdsClient(host, server1HttpPort)
         enterBarrier("streamCreated")
         val promise = Promise[ReceivedFile]
-        val queue   = makeQueue("subscriber1", promise, log)
+        val queue   = makeQueue("subscriber1", promise, log, subscriber1Delay)
         val subscribeResponse =
-          client.subscribe(streamName, getTempDir("subscriber1"), queue, doCompareFiles, subscriber1Delay).await(shortTimeout)
+          client.subscribe(streamName, getTempDir("subscriber1"), queue, doCompareFiles).await(shortTimeout)
         assert(subscribeResponse.status == StatusCodes.SwitchingProtocols)
         enterBarrier("subscribedToStream")
         promise.future.await(longTimeout)
@@ -231,9 +236,9 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         val client = new VbdsClient(host, server2HttpPort)
         enterBarrier("streamCreated")
         val promise = Promise[ReceivedFile]
-        val queue   = makeQueue("subscriber2", promise, log)
+        val queue   = makeQueue("subscriber2", promise, log, subscriber2Delay)
         val subscribeResponse =
-          client.subscribe(streamName, getTempDir("subscriber2"), queue, doCompareFiles, subscriber2Delay).await(shortTimeout)
+          client.subscribe(streamName, getTempDir("subscriber2"), queue, doCompareFiles).await(shortTimeout)
         assert(subscribeResponse.status == StatusCodes.SwitchingProtocols)
         enterBarrier("subscribedToStream")
         promise.future.await(longTimeout)
@@ -252,9 +257,12 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         assert(createResponse.status == StatusCodes.OK)
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
-        (1 to numFilesToPublish).foreach { _ =>
+        Source(1 to numFilesToPublish).runForeach { _ =>
           client.publish(streamName, testFile, publisherDelay).await(shortTimeout)
         }
+//        (1 to numFilesToPublish).foreach { _ =>
+//          client.publish(streamName, testFile, publisherDelay).await(shortTimeout)
+//        }
         within(longTimeout) {
           enterBarrier("receivedFiles")
         }

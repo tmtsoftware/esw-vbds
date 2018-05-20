@@ -15,13 +15,13 @@ import scala.concurrent.duration._
  * Internal API to manage VBDS subscriptions
  */
 trait AccessApi {
-  def addSubscription(streamName: String, sink: Sink[ByteString, NotUsed]): Future[AccessInfo]
+  def addSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed]): Future[AccessInfo]
 
   def listSubscriptions(): Future[Set[AccessInfo]]
 
   def subscriptionExists(id: String): Future[Boolean]
 
-  def deleteSubscription(streamName: String): Future[Unit]
+  def deleteSubscription(id: String): Future[Unit]
 }
 
 /**
@@ -32,8 +32,8 @@ class AccessApiImpl(sharedDataActor: ActorRef)(implicit system: ActorSystem, tim
   import SharedDataActor._
   import system.dispatcher
 
-  def addSubscription(streamName: String, sink: Sink[ByteString, NotUsed]): Future[AccessInfo] = {
-    (sharedDataActor ? AddSubscription(streamName, sink)).mapTo[AccessInfo]
+  def addSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed]): Future[AccessInfo] = {
+    (sharedDataActor ? AddSubscription(streamName, id, sink)).mapTo[AccessInfo]
   }
 
   def listSubscriptions(): Future[Set[AccessInfo]] = {
@@ -45,10 +45,6 @@ class AccessApiImpl(sharedDataActor: ActorRef)(implicit system: ActorSystem, tim
   }
 
   def deleteSubscription(id: String): Future[Unit] = {
-    listSubscriptions().map(s => s.find(_.id == id)).map { maybeInfo =>
-      maybeInfo.foreach { info =>
-        (sharedDataActor ? DeleteSubscription(info)).mapTo[AccessInfo]
-      }
-    }
+    (sharedDataActor ? DeleteSubscription(id)).map(_ => ())
   }
 }

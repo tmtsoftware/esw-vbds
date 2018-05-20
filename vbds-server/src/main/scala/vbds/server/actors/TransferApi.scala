@@ -23,16 +23,7 @@ class TransferApiImpl(sharedDataActor: ActorRef, accessApi: AccessApi)(implicit 
                                                                        implicit val timeout: Timeout = 5.minutes)
     extends TransferApi {
 
-  import system.dispatcher
-
   def publish(streamName: String, source: Source[ByteString, Any], dist: Boolean): Future[Done] = {
-    accessApi.listSubscriptions().flatMap { subscriptions =>
-      val subscribers = subscriptions.filter(_.streamName == streamName)
-      if (subscribers.nonEmpty) {
-        (sharedDataActor ? Publish(streamName, subscribers, source, dist)).mapTo[Done]
-      } else {
-        Future.successful(Done)
-      }
-    }
+    (sharedDataActor ? Publish(streamName, source, dist)).mapTo[Done]
   }
 }

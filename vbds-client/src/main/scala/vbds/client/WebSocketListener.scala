@@ -9,15 +9,10 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 
 import scala.concurrent.{Future, Promise}
-import akka.util.Timeout
-
-import scala.concurrent.duration._
 
 class WebSocketListener(implicit val system: ActorSystem, implicit val materializer: Materializer) {
 
   import system.dispatcher
-
-//  implicit val askTimeout = Timeout(5.seconds)
 
   def subscribe(uri: Uri, actorRef: ActorRef): Future[HttpResponse] = {
 

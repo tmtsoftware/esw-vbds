@@ -1,9 +1,8 @@
 package vbds.server.actors
 
 import java.net.InetSocketAddress
-import java.util.UUID
 
-import akka.NotUsed
+import akka.{Done, NotUsed}
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.cluster.Cluster
 import akka.cluster.ddata.{ORSet, ORSetKey}
@@ -18,6 +17,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.{ContentTypes, HttpRequest}
 
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 /**
@@ -36,14 +36,13 @@ private[server] object SharedDataActor {
   // Tells the actor the host and port that the http server is listening on
   case class LocalAddress(a: InetSocketAddress) extends SharedDataActorMessages
 
-  case class AddSubscription(streamName: String, sink: Sink[ByteString, NotUsed]) extends SharedDataActorMessages
+  case class AddSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed]) extends SharedDataActorMessages
 
-  case class DeleteSubscription(info: AccessInfo) extends SharedDataActorMessages
+  case class DeleteSubscription(id: String) extends SharedDataActorMessages
 
   case object ListSubscriptions extends SharedDataActorMessages
 
-  case class Publish(streamName: String, subscriberSet: Set[AccessInfo], source: Source[ByteString, Any], dist: Boolean)
-      extends SharedDataActorMessages
+  case class Publish(streamName: String, source: Source[ByteString, Any], dist: Boolean) extends SharedDataActorMessages
 
   // Used to create the actor
   def props(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem): Props =
@@ -60,7 +59,6 @@ private[server] object SharedDataActor {
 
   // Route used to distribute data to remote HTTP server
   val distRoute      = "/vbds/transfer/internal"
-  val chunkSize: Int = 1024 * 1024 // XXX TODO FIXME
 }
 
 /**
@@ -79,6 +77,12 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
   // The local IP address, set at runtime via a message from the code that starts the HTTP server.
   // This is used to determine which HTTP server has the websocket connection to a client.
   var localAddress: InetSocketAddress = _
+
+  // Cache of shared subscription info
+  var subscriptions = Set[AccessInfo]()
+
+  // Cache of shared stream info
+  var streams = Set[StreamInfo]()
 
   // A map with information about subscribers that subscribed via this server.
   // The key is from shared cluster data (CRDT) and the value is a Sink that writes to the subscriber's websocket
@@ -117,66 +121,50 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     // --- Sends a request to get the list of streams (See the following cases for the response) ---
     case ListStreams =>
-      replicator ! Get(adminDataKey, ReadLocal, request = Some(sender()))
-
-    // Respond to the ListStreams message with a set of StreamInfo
-    case g @ GetSuccess(`adminDataKey`, Some(replyTo: ActorRef)) ⇒
-      val value = g.get(adminDataKey).elements
-      replyTo ! value
-
-    // Failed ListStreams response
-    case GetFailure(`adminDataKey`, Some(replyTo: ActorRef)) ⇒
-      replyTo ! Set.empty
-
-    // Response to ListStreams when there are no streams defined
-    case NotFound(`adminDataKey`, Some(replyTo: ActorRef)) ⇒
-      replyTo ! Set.empty
-
-    // --- End of ListStreams responses ---
+      sender ! streams
 
     case _: UpdateResponse[_] ⇒ // ignore
 
     case c @ Changed(`adminDataKey`) ⇒
       val data = c.get(adminDataKey)
-      log.debug("Current streams: {}", data.elements)
+      streams = data.elements
+      log.debug("Current streams: {}", streams)
 
-    case AddSubscription(name, sink) =>
-      log.debug("Adding Subscription: {}", name)
-      val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, UUID.randomUUID().toString)
+    case AddSubscription(name, id, sink) =>
+      log.debug(s"Adding Subscription to stream $name with id $id")
+      val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, id)
       replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ + info)
       localSubscribers = localSubscribers + (info -> sink)
       sender() ! info
 
-    case DeleteSubscription(info) =>
-      log.debug("Removing Subscription with id: {}", info)
-      replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ - info)
-      sender() ! info
+    case DeleteSubscription(id) =>
+      val s = subscriptions.find(_.id == id)
+      s.foreach { info =>
+        log.debug("Removing Subscription with id: {}", info)
+        replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ - info)
+      }
+      sender() ! id
+
 
     // --- Sends a request to get the list of subscriptions (See the following cases for the response) ---
     case ListSubscriptions =>
-      replicator ! Get(accessDataKey, ReadLocal, request = Some(sender()))
-
-    // Respond to the ListSubscriptions message with a set of AccessInfo
-    case g @ GetSuccess(`accessDataKey`, Some(replyTo: ActorRef)) ⇒
-      val value = g.get(accessDataKey).elements
-      replyTo ! value
-
-    // Failed ListSubscriptions response
-    case GetFailure(`accessDataKey`, Some(replyTo: ActorRef)) ⇒
-      replyTo ! Set.empty
-
-    // Response to ListSubscriptions when there are no streams defined
-    case NotFound(`accessDataKey`, Some(replyTo: ActorRef)) ⇒
-      replyTo ! Set.empty
-
-    // --- End of ListSubscriptions responses ---
+      sender() ! subscriptions
 
     case c @ Changed(`accessDataKey`) ⇒
       val data = c.get(accessDataKey)
-      log.debug("Current subscriptions: {}", data.elements)
+      subscriptions = data.elements
+      log.debug("Current subscriptions: {}", subscriptions)
 
-    case Publish(streamName, subscriberSet, producer, dist) =>
-      publish(streamName, subscriberSet, producer, sender(), dist)
+    case Publish(streamName, source, dist) =>
+      val subscriberSet = subscriptions.filter(_.streamName == streamName)
+      val f =
+        if (subscriberSet.nonEmpty)
+          publish(streamName, subscriberSet, source, dist)
+        else Future.successful(Done)
+
+      // Send Done to the replyTo actor when done
+      pipe(f) to sender()
+
   }
 
   /**
@@ -184,16 +172,14 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
    * the given actor when done.
    *
    * @param streamName name of the stream to publish on
-   * @param subscriberSet set of subscriber info from shared data for the given stream
+   * @param subscriberSet the set of subscribers for the stream
    * @param source        source of the data being published
-   * @param replyTo       the actor to notify when done
    * @param dist          if true, also distribute the data to the HTTP servers corresponding to any remote subscribers
    */
   private def publish(streamName: String,
                       subscriberSet: Set[AccessInfo],
                       source: Source[ByteString, Any],
-                      replyTo: ActorRef,
-                      dist: Boolean): Unit = {
+                      dist: Boolean): Future[Done] = {
 
     // Split subscribers into local and remote
     val (localSet, remoteSet) = getSubscribers(subscriberSet, dist)
@@ -242,10 +228,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       case Success(_)  => log.debug("Publish complete")
       case Failure(ex) => log.error(s"Publish failed with $ex")
     }
-
-    // Send Done to the replyTo actor when done
-    pipe(f) to replyTo
-
+    f
   }
 
   /**
@@ -272,7 +255,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
   /**
    * Make sure the remote connections for any remote hosts with subscribers is defined.
-   * (XXX TODO: Handle connection timeouts!!!)
+   * (XXX TODO: Handle connection timeouts?)
    */
   private def checkRemoteConnections(remoteHostSet: Set[ServerInfo]): Unit = {
     remoteHostSet.foreach { h =>
