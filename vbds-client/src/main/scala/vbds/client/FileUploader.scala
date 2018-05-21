@@ -2,13 +2,13 @@ package vbds.client
 
 import java.nio.file.Path
 
-import akka.Done
+import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.Multipart.FormData
 import akka.http.scaladsl.model._
-import akka.stream.{DelayOverflowStrategy, Materializer}
+import akka.stream.{Materializer, ThrottleMode}
 import akka.stream.scaladsl._
 
 import scala.concurrent.Future
@@ -19,7 +19,7 @@ class FileUploader(chunkSize: Int = 1024 * 1024)(implicit val system: ActorSyste
 
   import system.dispatcher
 
-  // XXX TODO FIXME: Errors on exit
+  // XXX TODO FIXME: Errors on exit?
   private def poolClientFlow(uri: Uri) = {
     Http().cachedHostConnectionPool[Path](uri.authority.host.address(), uri.authority.port)
   }
@@ -46,10 +46,15 @@ class FileUploader(chunkSize: Int = 1024 * 1024)(implicit val system: ActorSyste
                   files: List[Path],
                   delay: FiniteDuration,
                   handler: ((Try[HttpResponse], Path)) => Unit): Future[Done] = {
-    Source(files)
-      .delay(delay, DelayOverflowStrategy.dropHead)
-      .mapAsync(1)(path => createUploadRequest(streamName, uri, path))
-      .via(poolClientFlow(uri))
-      .runForeach(handler)
+    def upload(source: Source[Path, NotUsed]): Future[Done] = {
+      source
+        .mapAsync(1)(path => createUploadRequest(streamName, uri, path))
+        .via(poolClientFlow(uri))
+        .runForeach(handler)
+    }
+    val source = Source(files)
+    if (delay != Duration.Zero)
+      upload(source.throttle(1, delay, 1, ThrottleMode.shaping))
+    else upload(source)
   }
 }

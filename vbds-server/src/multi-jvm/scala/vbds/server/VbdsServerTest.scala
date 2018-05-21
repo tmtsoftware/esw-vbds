@@ -36,8 +36,7 @@ object VbdsServerTestConfig extends MultiNodeConfig {
   //  val publisher2 = role("publisher2")
 
   commonConfig(ConfigFactory.parseString("""
-    akka.loglevel = INFO
-    akka.actor.provider = "akka.cluster.ClusterActorRefProvider"
+    akka.loglevel = DEBUG
     akka.log-dead-letters-during-shutdown = off
     """))
 
@@ -97,7 +96,7 @@ object VbdsServerTest {
                           r: ReceivedFile,
                           promise: Promise[ReceivedFile],
                           startTime: Long,
-                          delay: FiniteDuration = Duration.Zero): Unit = {
+                          delay: FiniteDuration): Unit = {
     println(s"$name: Received file ${r.path}")
     if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
       if (r.count >= numFilesToPublish) {
@@ -123,14 +122,13 @@ object VbdsServerTest {
   }
 
   // Returns a queue that receives the files via websocket and verifies that the data is correct (if doCompareFiles is true).
-  def makeQueue(name: String, promise: Promise[ReceivedFile], log: LoggingAdapter, delay: FiniteDuration = Duration.Zero)(
+  def makeQueue(name: String, promise: Promise[ReceivedFile], log: LoggingAdapter, delay: FiniteDuration)(
       implicit mat: Materializer
   ): SourceQueueWithComplete[ReceivedFile] = {
     val startTime: Long = System.currentTimeMillis()
     println(s"$name: Started timing")
     Source
-      .queue[ReceivedFile](3, OverflowStrategy.dropHead)
-//      .buffer(10, OverflowStrategy.dropHead)
+      .queue[ReceivedFile](1, OverflowStrategy.dropHead)
       .map(receiveFile(name, _, promise, startTime, delay))
       .to(Sink.ignore)
       .run()
@@ -214,7 +212,7 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         println(s"subscriber1 is running on $host")
         implicit val materializer = ActorMaterializer()
         enterBarrier("deployed")
-        val client = new VbdsClient(host, server1HttpPort)
+        val client = new VbdsClient("subscriber1", host, server1HttpPort)
         enterBarrier("streamCreated")
         val promise = Promise[ReceivedFile]
         val queue   = makeQueue("subscriber1", promise, log, subscriber1Delay)
@@ -233,7 +231,7 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         println(s"subscriber2 is running on $host")
         implicit val materializer = ActorMaterializer()
         enterBarrier("deployed")
-        val client = new VbdsClient(host, server2HttpPort)
+        val client = new VbdsClient("subscriber2", host, server2HttpPort)
         enterBarrier("streamCreated")
         val promise = Promise[ReceivedFile]
         val queue   = makeQueue("subscriber2", promise, log, subscriber2Delay)
@@ -252,7 +250,7 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         println(s"publisher1 is running on $host")
         implicit val materializer = ActorMaterializer()
         enterBarrier("deployed")
-        val client         = new VbdsClient(host, server1HttpPort)
+        val client         = new VbdsClient("publisher1", host, server1HttpPort)
         val createResponse = client.createStream(streamName).await(shortTimeout)
         assert(createResponse.status == StatusCodes.OK)
         enterBarrier("streamCreated")

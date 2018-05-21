@@ -19,14 +19,15 @@ import scala.util.{Failure, Success, Try}
 /**
  * An akka-http based command line client for the vbds-server.
  *
+ * @param name the name of this client, for logging
  * @param host the HTTP host where the vbds-server is running
  * @param port the HTTP port number to use to access the vbds-server
  * @param chunkSize optional chunk size for exchanging image data
  * @param system akka actor system
  * @param mat akka actor materializer
  */
-class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem,
-                                                                        implicit val mat: Materializer) {
+class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem,
+                                                                                      implicit val mat: Materializer) {
 
   implicit val executionContext = system.dispatcher
   val adminRoute                = "/vbds/admin/streams"
@@ -43,22 +44,22 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
   val log = Logging(system, this)
 
   /**
-    * Creates a stream with the given name
-    */
+   * Creates a stream with the given name
+   */
   def createStream(streamName: String): Future[HttpResponse] = {
     Http().singleRequest(HttpRequest(method = HttpMethods.POST, uri = s"http://$host:$port$adminRoute/$streamName"))
   }
 
   /**
-    * List the current streams (XXX TODO: Unpack the HTTP response JSON and return a List[String])
-    */
+   * List the current streams (XXX TODO: Unpack the HTTP response JSON and return a List[String])
+   */
   def listStreams(): Future[HttpResponse] = {
     Http().singleRequest(HttpRequest(uri = s"http://$host:$port$adminRoute"))
   }
 
   /**
-    * Deletes the stream with the given name
-    */
+   * Deletes the stream with the given name
+   */
   def deleteStream(streamName: String): Future[HttpResponse] = {
     Http().singleRequest(HttpRequest(method = HttpMethods.DELETE, uri = s"http://$host:$port$adminRoute/$streamName"))
   }
@@ -72,7 +73,6 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
    * @return future indicating when done
    */
   def publish(streamName: String, file: File, delay: FiniteDuration = Duration.Zero): Future[Done] = {
-    // XXX TODO: Change to only accept single file and return HttpResponse?
 
     val handler: ((Try[HttpResponse], Path)) => Unit = {
       case (Success(response), path) =>
@@ -85,18 +85,18 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
 
     val uri = s"http://$host:$port$transferRoute/$streamName"
     val paths = if (file.isDirectory) {
-      // Sort files (XXX FIXME: Not needed: Added this to test with extracted video images...)
+      // Sort files: Note: Added this to test with extracted video images so they are posted in the correct order
       file.listFiles().map(_.toPath).toList.sortWith {
         case (p1, p2) => comparePaths(p1, p2)
       }
     } else {
       List(file.toPath)
     }
+    println(s"Publishing ${paths.size} files with delay of $delay")
     val uploader = new FileUploader(chunkSize)
     uploader.uploadFiles(streamName, uri, paths, delay, handler)
   }
 
-  // --- XXX FIXME: Not needed: Added this to test with extracted video images...) ---
   val fileNamePattern = """\d+""".r
 
   private def comparePaths(p1: Path, p2: Path): Boolean = {
@@ -109,26 +109,23 @@ class VbdsClient(host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit
     else
       s1.compareTo(s2) < 0
   }
-  // ---
 
   /**
-    * Subscribes to the given stream
-    *
-    * @param streamName the name of the stream we are subscribed to
-    * @param dir the directory in which to save the files received (if saveFiles is true)
-    * @param queue a queue to write messages to when a file is received
-    * @param saveFiles if true, save the files in the given dir (Set to false for throughput tests)
-    * @param delay optional delay to simulate a slow subscriber
+   * Subscribes to the given stream
+   *
+   * @param streamName the name of the stream we are subscribed to
+   * @param dir the directory in which to save the files received (if saveFiles is true)
+   * @param queue a queue to write messages to when a file is received
+   * @param saveFiles if true, save the files in the given dir (Set to false for throughput tests)
 
-    * @return the HTTP response
-    */
+   * @return the HTTP response
+   */
   def subscribe(streamName: String,
                 dir: File,
                 queue: SourceQueueWithComplete[ReceivedFile],
-                saveFiles: Boolean,
-                delay: FiniteDuration = Duration.Zero): Future[HttpResponse] = {
+                saveFiles: Boolean): Future[HttpResponse] = {
     log.debug(s"subscribe to $streamName")
-    val receiver   = system.actorOf(WebSocketActor.props(streamName, dir, queue, saveFiles, delay))
+    val receiver   = system.actorOf(WebSocketActor.props(name, streamName, dir, queue, saveFiles))
     val wsListener = new WebSocketListener
     wsListener.subscribe(Uri(s"ws://$host:$port$accessRoute/$streamName"), receiver)
   }

@@ -157,12 +157,14 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     case Publish(streamName, source, dist) =>
       val subscriberSet = subscriptions.filter(_.streamName == streamName)
-      val f =
-        if (subscriberSet.nonEmpty)
-          publish(streamName, subscriberSet, source, dist)
-        else Future.successful(Done)
-
-      // Send Done to the replyTo actor when done
+      val f = if (subscriberSet.isEmpty) {
+        // No subscribers, so just ignore
+        source.runWith(Sink.ignore)
+      } else {
+        // Publish to subscribers and
+        publish(streamName, subscriberSet, source, dist)
+      }
+      // reply with Done when done
       pipe(f) to sender()
 
   }

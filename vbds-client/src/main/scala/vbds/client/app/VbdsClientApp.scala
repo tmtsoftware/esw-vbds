@@ -2,7 +2,9 @@ package vbds.client.app
 
 import java.io.File
 
+import akka.Done
 import akka.actor.ActorSystem
+import akka.http.scaladsl.model.HttpResponse
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Sink, Source}
 import vbds.client.VbdsClient
@@ -110,28 +112,28 @@ object VbdsClientApp extends App {
     implicit val system       = ActorSystem()
     implicit val materializer = ActorMaterializer()
 
-    val client = new VbdsClient(options.host, options.port)
+    val client = new VbdsClient(options.name, options.host, options.port)
     options.create.foreach(s => handleHttpResponse(s"create $s", client.createStream(s)))
     options.delete.foreach(s => handleHttpResponse(s"delete $s", client.deleteStream(s)))
     if (options.list) handleHttpResponse("list", client.listStreams())
 
     val delay = options.delay.map(Duration(_).asInstanceOf[FiniteDuration]).getOrElse(Duration.Zero)
     if (options.publish.isDefined && options.data.isDefined) {
-      options.publish.foreach(s => handleHttpResponse(s"publish $s", client.publish(s, options.data.get, delay)))
+      options.publish.foreach(s => handlePublishResponse(s"publish $s", client.publish(s, options.data.get, delay)))
     }
 
     val queue = Source
-      .queue[ReceivedFile](3, OverflowStrategy.dropHead)
-//      .buffer(2, OverflowStrategy.dropHead)
+      .queue[ReceivedFile](1, OverflowStrategy.backpressure)
       .map { r =>
         println(s"Received file ${r.count} for stream ${r.streamName}")
         options.action.foreach(doAction(r, _))
+        r.path.toFile.delete()
       }
       .to(Sink.ignore)
       .run()
 
     options.subscribe.foreach(
-      s => client.subscribe(s, new File(options.dir.getOrElse(".")), queue, saveFiles = true, delay = delay)
+      s => client.subscribe(s, new File(options.dir.getOrElse(".")), queue, saveFiles = true)
     )
   }
 
@@ -139,22 +141,30 @@ object VbdsClientApp extends App {
   private def doAction(r: ReceivedFile, action: String): Unit = {
     import sys.process._
     try {
-      println(s"XXX Calling action: $action ${r.path}")
       val x = s"$action ${r.path}".!
-      println(s"XXX action command status: $x")
     } catch {
       case ex: Exception => println(s"Error: Action for file ${r.count} of stream ${r.streamName} failed: $ex")
     }
   }
 
   // Prints the result of the HTTP request and exits
-  private def handleHttpResponse(command: String, resp: Future[Any])(implicit system: ActorSystem): Unit = {
+  private def handleHttpResponse(command: String, resp: Future[HttpResponse])(implicit system: ActorSystem): Unit = {
     import system.dispatcher
-    resp.foreach {
+    resp.onComplete {
       case Success(_) =>
       case Failure(ex) =>
         println(s"$command failed: $ex")
-//        ex.printStackTrace()
+        ex.printStackTrace()
+    }
+  }
+
+  private def handlePublishResponse(command: String, resp: Future[Done])(implicit system: ActorSystem): Unit = {
+    import system.dispatcher
+    resp.onComplete {
+      case Success(_) =>
+      case Failure(ex) =>
+        println(s"$command failed: $ex")
+        ex.printStackTrace()
     }
   }
 }

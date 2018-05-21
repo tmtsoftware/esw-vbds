@@ -45,7 +45,7 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
           if (exists) {
             fileUpload("data") {
               case (_, source) =>
-                // Add a single newline to mark the end of the stream for one data file
+                // Add a ByteString containing a single newline to mark the end of the stream for one data file
                 val terminatedSource = source.concat(Source.single(ByteString("\n")))
                 onSuccess(transferApi.publish(streamName, terminatedSource, dist = true)) { _ =>
                   complete(Accepted)
