@@ -76,7 +76,7 @@ object VbdsServerTest {
 //  val subscriber2Delay = 35.millis
   val publisherDelay   = Duration.Zero
   val subscriber1Delay = Duration.Zero
-  val subscriber2Delay = 100.millis
+  val subscriber2Delay = Duration.Zero
 
   // If true, compare files to make sure the file was transferred correctly
   val doCompareFiles = true
