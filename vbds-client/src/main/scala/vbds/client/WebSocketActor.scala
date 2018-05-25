@@ -83,7 +83,6 @@ class WebSocketActor(name: String,
           log.error(ex, s"$name: Failed to handle BinaryMessage")
           replyTo ! Ack
       }
-//      Await.ready(f, 3.seconds) // XXX TODO FIXME
 
     case tm: TextMessage =>
       log.error(s"$name: Wrong message type: $tm")

@@ -97,7 +97,7 @@ object VbdsServerTest {
                           promise: Promise[ReceivedFile],
                           startTime: Long,
                           delay: FiniteDuration): Unit = {
-    println(s"$name: Received file ${r.path}")
+    println(s"$name: Received file ${r.count}: ${r.path}")
     if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
       if (r.count >= numFilesToPublish) {
         val testSecs    = (System.currentTimeMillis() - startTime) / 1000.0
