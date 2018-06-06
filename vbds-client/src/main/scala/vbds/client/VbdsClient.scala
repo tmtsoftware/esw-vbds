@@ -92,7 +92,7 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
     } else {
       List(file.toPath)
     }
-    println(s"Publishing ${paths.size} files with delay of $delay")
+//    println(s"Publishing ${paths.size} files with delay of $delay")
     val uploader = new FileUploader(chunkSize)
     uploader.uploadFiles(streamName, uri, paths, delay, handler)
   }
