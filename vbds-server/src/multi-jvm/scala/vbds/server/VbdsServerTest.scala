@@ -79,7 +79,7 @@ object VbdsServerTest {
   val subscriber2Delay = Duration.Zero
 
   // If true, compare files to make sure the file was transferred correctly
-  val doCompareFiles = true
+  val doCompareFiles = false
 
   val testFile = makeFile(testFileSizeBytes, testFileName)
   testFile.deleteOnExit()
@@ -258,24 +258,10 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
         Source(1 to numFilesToPublish).runForeach { _ =>
           client.publish(streamName, testFile, publisherDelay).await(shortTimeout)
         }
-//        (1 to numFilesToPublish).foreach { _ =>
-//          client.publish(streamName, testFile, publisherDelay).await(shortTimeout)
-//        }
         within(longTimeout) {
           enterBarrier("receivedFiles")
         }
       }
-
-      //      runOn(publisher2) {
-      //        implicit val materializer = ActorMaterializer()
-      //        enterBarrier("deployed")
-      //        val client = new VbdsClient(host, server1HttpPort)
-      //        enterBarrier("streamCreated")
-      //        enterBarrier("subscribedToStream")
-      //        within(longTimeout) {
-      //          enterBarrier("receivedFiles")
-      //        }
-      //      }
 
       enterBarrier("finished")
     }

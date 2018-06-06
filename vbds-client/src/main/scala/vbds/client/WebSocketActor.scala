@@ -4,15 +4,13 @@ import java.io.{File, FileOutputStream}
 import java.nio.file.Path
 
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
+import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
 import akka.util.{ByteString, Timeout}
-import akka.pattern.ask
 import akka.stream.{Materializer, QueueOfferResult}
 import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.scaladsl.Sink
 import vbds.client.WebSocketActor._
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util._
 
