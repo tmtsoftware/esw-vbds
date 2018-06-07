@@ -155,8 +155,8 @@ object VbdsServerTest {
     val host = InetAddress.getLocalHost.getHostAddress
     println(s"\nXXXXXXXXXXXX\nhost = $host\n\n")
     val cfg = ConfigFactory.parseString(s"""
-            akka.remote.netty.tcp.bind-hostname=$host
-            akka.remote.artery.canonical.bind-hostname=$host
+            |akka.remote.netty.tcp.bind-hostname=$host
+            |akka.remote.artery.canonical.bind-hostname=$host
             """).withFallback(config)
     try {
         ActorSystem(name, cfg)
