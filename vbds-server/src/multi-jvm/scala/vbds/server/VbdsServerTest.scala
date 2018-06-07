@@ -40,8 +40,8 @@ object VbdsServerTestConfig extends MultiNodeConfig {
   //  val publisher2 = role("publisher2")
 
   commonConfig(ConfigFactory.parseString("""
-    |akka.loglevel = INFO
-    |akka.log-dead-letters-during-shutdown = off
+    | akka.loglevel = INFO
+    | akka.log-dead-letters-during-shutdown = off
     """))
 
 }
@@ -110,9 +110,9 @@ object VbdsServerTest {
         val hz          = 1.0 / secsPerFile
         println(f"""
              |
-             |===================================================
-             |* $name: Received $numFilesToPublish $testFileSizeKb kb files in $testSecs seconds ($secsPerFile%1.3f secs per file, $hz%1.3f hz, $mbPerSec%1.3f mb/sec)
-             |===================================================
+             | ===================================================
+             | * $name: Received $numFilesToPublish $testFileSizeKb kb files in $testSecs seconds ($secsPerFile%1.3f secs per file, $hz%1.3f hz, $mbPerSec%1.3f mb/sec)
+             | ===================================================
          """.stripMargin)
         promise.success(r)
       }
@@ -153,11 +153,12 @@ object VbdsServerTest {
 
   def actorSystemCreator(name: String)(config: Config): ActorSystem = {
     val host = InetAddress.getLocalHost.getHostAddress
-    println(s"\nXXXXXXXXXXXX\nhost = $host\n\n")
     val cfg = ConfigFactory.parseString(s"""
-            |akka.remote.netty.tcp.bind-hostname=$host
-            |akka.remote.artery.canonical.bind-hostname=$host
+            | akka.remote.netty.tcp.bind-hostname=$host
+            | akka.remote.artery.canonical.bind-hostname=$host
             """).withFallback(config)
+
+    println(s"\nXXXXXXXXXXXX\nhost = ${cfg.getString("akka.remote.netty.tcp.hostname")}, bind-host = ${cfg.getString("akka.remote.netty.tcp.bind-hostname")}\n\n")
     try {
         ActorSystem(name, cfg)
       } catch {
