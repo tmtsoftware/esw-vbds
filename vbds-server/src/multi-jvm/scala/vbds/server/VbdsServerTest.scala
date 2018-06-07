@@ -36,8 +36,8 @@ object VbdsServerTestConfig extends MultiNodeConfig {
   //  val publisher2 = role("publisher2")
 
   commonConfig(ConfigFactory.parseString("""
-    akka.loglevel = INFO
-    akka.log-dead-letters-during-shutdown = off
+    |akka.loglevel = INFO
+    |akka.log-dead-letters-during-shutdown = off
     """))
 
 }
