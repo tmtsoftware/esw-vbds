@@ -155,8 +155,8 @@ object VbdsServerTest {
     val host = InetAddress.getLocalHost.getHostAddress
     println(s"\nXXXXXXXXXXXX\nhost = $host\n\n")
     val cfg = ConfigFactory.parseString(s"""
-            akka.remote.netty.tcp.hostname=$host
-            akka.remote.artery.canonical.hostname=$host
+            akka.remote.netty.tcp.bind-hostname=$host
+            akka.remote.artery.canonical.bind-hostname=$host
             """).withFallback(config)
     try {
         ActorSystem(name, cfg)
@@ -188,14 +188,17 @@ class VbdsServerTest(name: String) extends MultiNodeSpec(VbdsServerTestConfig, V
     "Allow creating a stream, subscribing and publishing to a stream" in {
       runOn(server1) {
         val host = system.settings.config.getString("multinode.host")
+        val bindHost = InetAddress.getLocalHost.getHostAddress
         println(s"server1 (seed node) is running on $host")
 
         // Start the first server (the seed node)
         VbdsServerApp.main(
           Array(
-//                "--http-host", host,
+                "--http-host", host,
+                "--http-bind-host", bindHost,
                 "--http-port", s"$server1HttpPort",
-//                "--akka-host", host,
+                "--akka-host", host,
+                "--akka-bind-host", bindHost,
                 "--akka-port", s"$seedPort",
                 "-s", s"$host:$seedPort")
         )
@@ -210,15 +213,18 @@ class VbdsServerTest(name: String) extends MultiNodeSpec(VbdsServerTestConfig, V
 
       runOn(server2) {
         val host       = system.settings.config.getString("multinode.host")
+        val bindHost = InetAddress.getLocalHost.getHostAddress
         val serverHost = system.settings.config.getString("multinode.server-host")
         println(s"server2 is running on $host (seed node is $serverHost)")
 
         // Start a second server
         VbdsServerApp.main(
           Array(
-//            "--http-host", host,
+            "--http-host", host,
+            "--http-bind-host", bindHost,
             "--http-port", s"$server2HttpPort",
-//            "--akka-host", host,
+            "--akka-host", host,
+            "--akka-bind-host", bindHost,
             "-s", s"$serverHost:$seedPort")
         )
         expectNoMessage(2.seconds)
