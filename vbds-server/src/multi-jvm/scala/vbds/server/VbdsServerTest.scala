@@ -154,11 +154,11 @@ object VbdsServerTest {
   def actorSystemCreator(name: String)(config: Config): ActorSystem = {
     val host = InetAddress.getLocalHost.getHostAddress
     val cfg = ConfigFactory.parseString(s"""
-            | akka.remote.netty.tcp.bind-hostname=$host
-            | akka.remote.artery.canonical.bind-hostname=$host
+            | akka.remote.netty.tcp.bind-hostname = \"$host\"
+            | akka.remote.artery.canonical.bind-hostname = \"$host\"
             """).withFallback(config)
 
-    println(s"\nXXXXXXXXXXXX\nhost = ${cfg.getString("akka.remote.netty.tcp.hostname")}, bind-host = ${cfg.getString("akka.remote.netty.tcp.bind-hostname")}\n\n")
+    println(s"\nXXXXXXXXXXXX h=$host: \nhost = ${cfg.getString("akka.remote.netty.tcp.hostname")}, bind-host = ${cfg.getString("akka.remote.netty.tcp.bind-hostname")}\n\n")
     try {
         ActorSystem(name, cfg)
       } catch {
