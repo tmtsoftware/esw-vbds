@@ -166,12 +166,18 @@ object VbdsServerTest {
         // Retry creating the system once as when using port = 0 two systems may try and use the same one.
         // RTE is for aeron, CE for netty
         case ex: RemoteTransportException ⇒
+          println(s"XXXX $ex")
           ex.printStackTrace()
           ActorSystem(name, config)
         case ex: ChannelException         ⇒
+          println(s"XXXX $ex")
           ex.printStackTrace()
           ActorSystem(name, config)
-      }
+        case ex: Exception =>
+          println(s"XXXX $ex")
+          ex.printStackTrace()
+          ActorSystem(name, config)
+    }
   }
 
 }
