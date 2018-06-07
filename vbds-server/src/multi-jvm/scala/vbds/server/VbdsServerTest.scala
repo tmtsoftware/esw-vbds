@@ -159,7 +159,7 @@ object VbdsServerTest {
 //            """).withFallback(config)
     val cfg = ConfigFactory.parseString(s"akka.remote.netty.tcp.bind-hostname=$host").withFallback(config)
 
-    println(s"\nXXXXXXXXXXXX h=$host: \nhost = ${cfg.getString("akka.remote.netty.tcp.hostname")}, bind-host = ${cfg.getString("akka.remote.netty.tcp.bind-hostname")}\n\n")
+    println(s"\nXXXXXXXXXXXX $name: \nhost = ${cfg.getString("akka.remote.netty.tcp.hostname")}, bind-host = ${cfg.getString("akka.remote.netty.tcp.bind-hostname")}\n\n")
     ActorSystem(name, cfg)
   }
 
