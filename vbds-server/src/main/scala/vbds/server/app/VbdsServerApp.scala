@@ -17,7 +17,7 @@ object VbdsServerApp extends App {
                              httpHost: String = "127.0.0.1",
                              httpPort: Int = 0,
                              akkaHost: String = "127.0.0.1",
-                             akkaPort: Int = 0,
+                             akkaPort: Int = 9876,
                              clusterSeeds: String = "")
 
   // Parser for the command line options
