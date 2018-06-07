@@ -100,13 +100,13 @@ object VbdsServerApp extends App {
 
     // Generate the akka config for the akka and http ports as well as the cluster seed nodes
     val config = ConfigFactory.parseString(s"""
-            akka.remote.netty.tcp.hostname=${options.akkaHost}
-            akka.remote.netty.tcp.bind-hostname=${options.akkaBindHost}
-            akka.remote.netty.tcp.port=${options.akkaPort}
-            akka.remote.artery.canonical.hostname=${options.akkaHost}
-            akka.remote.artery.canonical.bind-hostname=${options.akkaBindHost}
-            akka.remote.artery.canonical.port=${options.akkaPort}
-            $seedNodes
+            | akka.remote.netty.tcp.hostname=${options.akkaHost}
+            | akka.remote.netty.tcp.bind-hostname=${options.akkaBindHost}
+            | akka.remote.netty.tcp.port=${options.akkaPort}
+            | akka.remote.artery.canonical.hostname=${options.akkaHost}
+            | akka.remote.artery.canonical.bind-hostname=${options.akkaBindHost}
+            | akka.remote.artery.canonical.port=${options.akkaPort}
+            | $seedNodes
             """).withFallback(ConfigFactory.load())
 
     implicit val system = ActorSystem(systemName, config)
