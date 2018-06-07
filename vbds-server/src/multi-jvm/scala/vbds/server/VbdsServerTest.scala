@@ -1,7 +1,9 @@
 package vbds.server
 
 import java.io.{BufferedOutputStream, File, FileOutputStream}
+import java.net.InetAddress
 
+import akka.actor.ActorSystem
 import akka.remote.testkit.MultiNodeConfig
 import vbds.client.VbdsClient
 import vbds.server.app.VbdsServerApp
@@ -12,10 +14,12 @@ import akka.remote.testkit.MultiNodeSpec
 import akka.testkit.ImplicitSender
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.StatusCodes
+import akka.remote.RemoteTransportException
 import akka.stream.{ActorMaterializer, Materializer, OverflowStrategy}
 import akka.stream.scaladsl.{Sink, Source, SourceQueueWithComplete}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.commons.io.FileUtils
+import org.jboss.netty.channel.ChannelException
 import org.scalatest.BeforeAndAfterAll
 import vbds.client.WebSocketActor.ReceivedFile
 
@@ -42,15 +46,15 @@ object VbdsServerTestConfig extends MultiNodeConfig {
 
 }
 
-class VbdsServerSpecMultiJvmServer1 extends VbdsServerTest
+class VbdsServerSpecMultiJvmServer1 extends VbdsServerTest("server1")
 
-class VbdsServerSpecMultiJvmServer2 extends VbdsServerTest
+class VbdsServerSpecMultiJvmServer2 extends VbdsServerTest("server2")
 
-class VbdsServerSpecMultiJvmSubscriber1 extends VbdsServerTest
+class VbdsServerSpecMultiJvmSubscriber1 extends VbdsServerTest("subscriber1")
 
-class VbdsServerSpecMultiJvmSubscriber2 extends VbdsServerTest
+class VbdsServerSpecMultiJvmSubscriber2 extends VbdsServerTest("subscriber2")
 
-class VbdsServerSpecMultiJvmPublisher1 extends VbdsServerTest
+class VbdsServerSpecMultiJvmPublisher1 extends VbdsServerTest("publisher1")
 
 //class VbdsServerSpecMultiJvmPublisher2 extends VbdsServerTest
 
@@ -147,9 +151,27 @@ object VbdsServerTest {
     def await(timeout: FiniteDuration): T = Await.result(f, timeout)
   }
 
+  def actorSystemCreator(name: String)(config: Config): ActorSystem = {
+    val host = InetAddress.getLocalHost.getHostAddress
+    val cfg = ConfigFactory.parseString(s"""
+            akka.remote.netty.tcp.hostname=$host
+            akka.remote.artery.canonical.hostname=$host
+            """).withFallback(config)
+    try {
+        ActorSystem(name, cfg)
+      } catch {
+        // Retry creating the system once as when using port = 0 two systems may try and use the same one.
+        // RTE is for aeron, CE for netty
+        case _: RemoteTransportException ⇒ ActorSystem(name, config)
+        case _: ChannelException         ⇒ ActorSystem(name, config)
+      }
+  }
+
 }
 
-class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNodeSpec with ImplicitSender with BeforeAndAfterAll {
+
+class VbdsServerTest(name: String) extends MultiNodeSpec(VbdsServerTestConfig, VbdsServerTest.actorSystemCreator(name))
+  with STMultiNodeSpec with ImplicitSender with BeforeAndAfterAll {
 
   import VbdsServerTestConfig._
   import VbdsServerTest._
