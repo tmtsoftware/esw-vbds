@@ -112,7 +112,7 @@ object VbdsServerApp extends App {
     implicit val system = ActorSystem(systemName, config)
     import system.dispatcher
 
-    println(s"\nXXXXXXXXX\nakka hostname=${options.akkaHost}, akka bind-host=${options.akkaBindHost}\n")
+    println(s"\nXXXXXXXXX\nakka hostname=${options.akkaHost}=${config.getString("akka.remote.netty.tcp.hostname")}, akka bind-host=${options.akkaBindHost}=${config.getString("akka.remote.netty.tcp.bind-hostname")}\n")
 
     VbdsServer.start(options.httpHost, options.httpPort).onComplete {
         case Success(result) =>
