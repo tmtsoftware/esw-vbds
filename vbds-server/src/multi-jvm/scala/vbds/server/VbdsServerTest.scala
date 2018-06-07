@@ -169,16 +169,12 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
 
         // Start the first server (the seed node)
         VbdsServerApp.main(
-          Array("--http-host",
-                host,
-                "--http-port",
-                s"$server1HttpPort",
-                "--akka-host",
-                host,
-                "--akka-port",
-                s"$seedPort",
-                "-s",
-                s"$host:$seedPort")
+          Array(
+//                "--http-host", host,
+                "--http-port", s"$server1HttpPort",
+//                "--akka-host", host,
+                "--akka-port", s"$seedPort",
+                "-s", s"$host:$seedPort")
         )
         expectNoMessage(2.seconds)
         enterBarrier("deployed")
@@ -196,7 +192,11 @@ class VbdsServerTest extends MultiNodeSpec(VbdsServerTestConfig) with STMultiNod
 
         // Start a second server
         VbdsServerApp.main(
-          Array("--http-host", host, "--http-port", s"$server2HttpPort", "--akka-host", host, "-s", s"$serverHost:$seedPort")
+          Array(
+//            "--http-host", host,
+            "--http-port", s"$server2HttpPort",
+//            "--akka-host", host,
+            "-s", s"$serverHost:$seedPort")
         )
         expectNoMessage(2.seconds)
         enterBarrier("deployed")

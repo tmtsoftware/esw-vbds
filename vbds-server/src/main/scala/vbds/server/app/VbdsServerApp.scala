@@ -1,5 +1,7 @@
 package vbds.server.app
 
+import java.net.InetAddress
+
 import akka.actor.ActorSystem
 import com.typesafe.config.ConfigFactory
 
@@ -14,10 +16,10 @@ object VbdsServerApp extends App {
 
   // Command line options
   private case class Options(name: String = "vbds",
-                             httpHost: String = "127.0.0.1",
+                             httpHost: String = InetAddress.getLocalHost.getHostAddress,
                              httpPort: Int = 0,
-                             akkaHost: String = "127.0.0.1",
-                             akkaPort: Int = 9876,
+                             akkaHost: String = InetAddress.getLocalHost.getHostAddress,
+                             akkaPort: Int = 0,
                              clusterSeeds: String = "")
 
   // Parser for the command line options
@@ -30,7 +32,7 @@ object VbdsServerApp extends App {
 
     opt[String]("http-host") valueName "<hostname>" action { (x, c) =>
       c.copy(httpHost = x)
-    } text "The HTTP server host name (default: 127.0.0.1)"
+    } text "The HTTP server host name (default: the default IP address)"
 
     opt[Int]("http-port") valueName "<number>" action { (x, c) =>
       c.copy(httpPort = x)
@@ -38,7 +40,7 @@ object VbdsServerApp extends App {
 
     opt[String]("akka-host") valueName "<hostname>" action { (x, c) =>
       c.copy(akkaHost = x)
-    } text "The Akka system host name (default: 127.0.0.1)"
+    } text "The Akka system host name (default: the default IP address)"
 
     opt[Int]("akka-port") valueName "<number>" action { (x, c) =>
       c.copy(akkaPort = x)
@@ -97,6 +99,8 @@ object VbdsServerApp extends App {
 
     implicit val system = ActorSystem(systemName, config)
     import system.dispatcher
+
+    println(s"\nXXXXXXXXX\nakka hostname=${options.akkaHost}\n")
 
     VbdsServer.start(options.httpHost, options.httpPort).onComplete {
         case Success(result) =>
