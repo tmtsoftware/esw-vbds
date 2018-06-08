@@ -34,11 +34,11 @@ object VbdsServerApp extends App {
 
     opt[String]("http-host") valueName "<hostname>" action { (x, c) =>
       c.copy(httpHost = x)
-    } text "The HTTP server host name (default: the default IP address)"
+    } text "The HTTP server host name (default: 127.0.0.1)"
 
     opt[String]("http-bind-host") valueName "<hostname>" action { (x, c) =>
       c.copy(httpBindHost = Some(x))
-    } text "The HTTP server host name to bind to (default: the default IP address)"
+    } text "The HTTP server host name to bind to (default: same as --http-host)"
 
     opt[Int]("http-port") valueName "<number>" action { (x, c) =>
       c.copy(httpPort = x)
@@ -46,11 +46,11 @@ object VbdsServerApp extends App {
 
     opt[String]("akka-host") valueName "<hostname>" action { (x, c) =>
       c.copy(akkaHost = x)
-    } text "The Akka system host name (default: the default IP address)"
+    } text "The Akka system host name (default: 127.0.0.1)"
 
     opt[String]("akka-bind-host") valueName "<hostname>" action { (x, c) =>
       c.copy(akkaBindHost = Some(x))
-    } text "The Akka system host name to bind to (default: the default IP address)"
+    } text "The Akka system host name to bind to (default: same as --akka-host)"
 
     opt[Int]("akka-port") valueName "<number>" action { (x, c) =>
       c.copy(akkaPort = x)
