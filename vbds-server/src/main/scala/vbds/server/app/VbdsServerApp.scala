@@ -109,10 +109,11 @@ object VbdsServerApp extends App {
             | $seedNodes
             """).withFallback(ConfigFactory.load())
 
-    println(s"\nXXXXXXXXX\nakka hostname=${options.akkaHost}=${config.getString("akka.remote.netty.tcp.hostname")}, akka bind-host=${options.akkaBindHost}=${config.getString("akka.remote.netty.tcp.bind-hostname")}\n")
+    println(s"\nXXXXXXXXX\n${options.name} akka hostname=${options.akkaHost}=${config.getString("akka.remote.netty.tcp.hostname")}, akka bind-host=${options.akkaBindHost}=${config.getString("akka.remote.netty.tcp.bind-hostname")}\n")
 
     implicit val system = ActorSystem(systemName, config)
     import system.dispatcher
+    println(s"YYYYY ${options.name}: system = $system")
 
     VbdsServer.start(options.httpHost, options.httpPort).onComplete {
         case Success(result) =>
