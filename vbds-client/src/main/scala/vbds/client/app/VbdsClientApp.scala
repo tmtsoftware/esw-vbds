@@ -7,6 +7,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpResponse
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Sink, Source}
+import com.typesafe.config.ConfigFactory
 import vbds.client.VbdsClient
 
 import scala.concurrent.Future
@@ -15,8 +16,8 @@ import scala.concurrent.duration._
 import vbds.client.WebSocketActor._
 
 /**
- * A VIZ Bulk Data System HTTP client command line application.
- */
+  * A VIZ Bulk Data System HTTP client command line application.
+  */
 object VbdsClientApp extends App {
 
   // Command line options
@@ -107,9 +108,15 @@ object VbdsClientApp extends App {
     case None => System.exit(1)
   }
 
-  // Run the application
+  // Run the application (The actor system is only used locally, no need for remote)
   private def run(options: Options): Unit = {
-    implicit val system       = ActorSystem()
+    val config = ConfigFactory.parseString(
+      s"""
+         | akka.remote.netty.tcp.hostname=127.0.0.1
+         | akka.remote.artery.canonical.hostname=127.0.0.1
+            """).withFallback(ConfigFactory.load())
+
+    implicit val system = ActorSystem(options.name, config)
     implicit val materializer = ActorMaterializer()
 
     val client = new VbdsClient(options.name, options.host, options.port)
