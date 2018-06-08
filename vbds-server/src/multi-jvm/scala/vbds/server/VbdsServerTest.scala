@@ -85,6 +85,9 @@ object VbdsServerTest {
   // If true, compare files to make sure the file was transferred correctly
   val doCompareFiles = false
 
+  // If true, use the local host as the bind host (for docker/AWS?)
+  val useLocalBindHost = true
+
   val testFile = makeFile(testFileSizeBytes, testFileName)
   testFile.deleteOnExit()
 
@@ -152,21 +155,25 @@ object VbdsServerTest {
   }
 
   def actorSystemCreator(name: String)(config: Config): ActorSystem = {
-    val host = InetAddress.getLocalHost.getHostAddress
-    val cfg = ConfigFactory.parseString(
-      s"""
+    if (useLocalBindHost) {
+      val host = InetAddress.getLocalHost.getHostAddress
+      val cfg = ConfigFactory.parseString(
+        s"""
          akka.remote.netty.tcp.bind-hostname=$host
          akka.remote.netty.tcp.port=0
          akka.remote.artery.canonical.bind-hostname=$host
          akka.remote.artery.canonical.port=0
          """).withFallback(config)
 
-    //    val cfg = ConfigFactory.parseString(s"akka.remote.netty.tcp.bind-hostname=$host").withFallback(config)
+      //    val cfg = ConfigFactory.parseString(s"akka.remote.netty.tcp.bind-hostname=$host").withFallback(config)
 
-    println(s"\nXXXXXXXXXXXX $name: \nhost = ${cfg.getString("akka.remote.netty.tcp.hostname")}, bind-host = ${cfg.getString("akka.remote.netty.tcp.bind-hostname")}\n\n")
-    val system = ActorSystem(name, cfg)
-    println(s"XXX $name: system = $system")
-    system
+      println(s"\nXXXXXXXXXXXX $name: \nhost = ${cfg.getString("akka.remote.netty.tcp.hostname")}, bind-host = ${cfg.getString("akka.remote.netty.tcp.bind-hostname")}\n\n")
+      val system = ActorSystem(name, cfg)
+      println(s"XXX $name: system = $system")
+      system
+    } else {
+      ActorSystem(name, config)
+    }
   }
 
 }
@@ -189,7 +196,7 @@ class VbdsServerTest(name: String) extends MultiNodeSpec(VbdsServerTestConfig, V
     "Allow creating a stream, subscribing and publishing to a stream" in {
       runOn(server1) {
         val host = system.settings.config.getString("multinode.host")
-        val bindHost = InetAddress.getLocalHost.getHostAddress
+        val bindHost = if (useLocalBindHost) InetAddress.getLocalHost.getHostAddress else host
         println(s"server1 (seed node) is running on $host")
 
         // Start the first server (the seed node)
@@ -214,7 +221,7 @@ class VbdsServerTest(name: String) extends MultiNodeSpec(VbdsServerTestConfig, V
 
       runOn(server2) {
         val host       = system.settings.config.getString("multinode.host")
-        val bindHost = InetAddress.getLocalHost.getHostAddress
+        val bindHost = if (useLocalBindHost) InetAddress.getLocalHost.getHostAddress else host
         val serverHost = system.settings.config.getString("multinode.server-host")
         println(s"server2 is running on $host (seed node is $serverHost)")
 

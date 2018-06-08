@@ -241,7 +241,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
    */
   private def getSubscribers(subscriberSet: Set[AccessInfo], dist: Boolean): (Set[AccessInfo], Set[AccessInfo]) = {
     val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains _)
-    if (dist) (localSet, remoteSet) else (localSet, Set.empty[AccessInfo])
+    if (dist) (localSet, remoteSet) else (localSet  , Set.empty[AccessInfo])
   }
 
   /**
