@@ -113,10 +113,15 @@ object VbdsClientApp extends App {
     val config = ConfigFactory.parseString(
       s"""
          | akka.remote.netty.tcp.hostname=127.0.0.1
+         | akka.remote.netty.tcp.bind-hostname=127.0.0.1
          | akka.remote.artery.canonical.hostname=127.0.0.1
+         | akka.remote.artery.canonical.bind-hostname=127.0.0.1
             """).withFallback(ConfigFactory.load())
+    println(s"XXXX ${options.name}: host = ${config.getString("akka.remote.netty.tcp.hostname")}")
 
     implicit val system = ActorSystem(options.name, config)
+    println(s"XXXX ${options.name}: bind-host = ${config.getString("akka.remote.netty.tcp.bind-hostname")}")
+
     implicit val materializer = ActorMaterializer()
 
     val client = new VbdsClient(options.name, options.host, options.port)
