@@ -113,8 +113,10 @@ object VbdsClientApp extends App {
     val config = ConfigFactory.parseString(
       s"""
          | akka.remote.netty.tcp.hostname=127.0.0.1
+         | akka.remote.netty.tcp.port=0
          | akka.remote.netty.tcp.bind-hostname=127.0.0.1
          | akka.remote.artery.canonical.hostname=127.0.0.1
+         | akka.remote.artery.canonical.port=0
          | akka.remote.artery.canonical.bind-hostname=127.0.0.1
             """).withFallback(ConfigFactory.load())
     println(s"XXXX ${options.name}: host = ${config.getString("akka.remote.netty.tcp.hostname")}")
