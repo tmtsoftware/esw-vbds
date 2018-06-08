@@ -155,10 +155,10 @@ object VbdsServerTest {
     val host = InetAddress.getLocalHost.getHostAddress
     val cfg = ConfigFactory.parseString(
       s"""
-         |akka.remote.netty.tcp.bind-hostname=$host
-         |akka.remote.netty.tcp.port=0
-         |akka.remote.artery.canonical.bind-hostname=$host
-         |akka.remote.artery.canonical.port=0
+         akka.remote.netty.tcp.bind-hostname=$host
+         akka.remote.netty.tcp.port=0
+         akka.remote.artery.canonical.bind-hostname=$host
+         akka.remote.artery.canonical.port=0
          """).withFallback(config)
 
     //    val cfg = ConfigFactory.parseString(s"akka.remote.netty.tcp.bind-hostname=$host").withFallback(config)

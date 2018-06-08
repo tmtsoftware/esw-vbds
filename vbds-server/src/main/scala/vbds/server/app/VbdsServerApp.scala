@@ -99,15 +99,16 @@ object VbdsServerApp extends App {
     }
 
     // Generate the akka config for the akka and http ports as well as the cluster seed nodes
-    val config = ConfigFactory.parseString(s"""
-            |akka.remote.netty.tcp.hostname=${options.akkaHost}
-            |akka.remote.netty.tcp.bind-hostname=${options.akkaBindHost}
-            |akka.remote.netty.tcp.port=${options.akkaPort}
-            |akka.remote.artery.canonical.hostname=${options.akkaHost}
-            |akka.remote.artery.canonical.bind-hostname=${options.akkaBindHost}
-            |akka.remote.artery.canonical.port=${options.akkaPort}
-            |$seedNodes
-            """).withFallback(ConfigFactory.load())
+    val s = s"""
+               akka.remote.netty.tcp.hostname=${options.akkaHost}
+               akka.remote.netty.tcp.bind-hostname=${options.akkaBindHost}
+               akka.remote.netty.tcp.port=${options.akkaPort}
+               akka.remote.artery.canonical.hostname=${options.akkaHost}
+               akka.remote.artery.canonical.bind-hostname=${options.akkaBindHost}
+               akka.remote.artery.canonical.port=${options.akkaPort}
+               $seedNodes
+            """
+    val config = ConfigFactory.parseString(s).withFallback(ConfigFactory.load())
 
     println(s"\nXXXXXXXXX\n${options.name} akka hostname=${options.akkaHost}=${config.getString("akka.remote.netty.tcp.hostname")}, akka bind-host=${options.akkaBindHost}=${config.getString("akka.remote.netty.tcp.bind-hostname")}\n")
 
