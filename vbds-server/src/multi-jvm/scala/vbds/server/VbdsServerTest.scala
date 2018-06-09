@@ -156,6 +156,14 @@ object VbdsServerTest {
 
   def actorSystemCreator(name: String)(config: Config): ActorSystem = {
     if (useLocalBindHost) {
+      // XXXXXXXXXXXx
+      val multinodeHost       = config.getString("multinode.host")
+      val multinodeServerHost =  config.getString("multinode.server-host")
+      println(s"multinodeHost=$multinodeHost, multinodeServerHost=$multinodeServerHost")
+
+
+
+
       val host = InetAddress.getLocalHost.getHostAddress
       val cfg = ConfigFactory.parseString(
         s"""
