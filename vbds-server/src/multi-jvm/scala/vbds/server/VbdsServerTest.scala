@@ -167,6 +167,7 @@ object VbdsServerTest {
       val host = InetAddress.getLocalHost.getHostAddress
       val cfg = ConfigFactory.parseString(
         s"""
+         multinode.host=$host
          akka.remote.netty.tcp.bind-hostname=$host
          akka.remote.netty.tcp.port=0
          akka.remote.artery.canonical.bind-hostname=$host
