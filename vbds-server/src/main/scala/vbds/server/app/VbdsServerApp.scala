@@ -1,7 +1,5 @@
 package vbds.server.app
 
-import java.net.InetAddress
-
 import akka.actor.ActorSystem
 import com.typesafe.config.ConfigFactory
 
@@ -17,10 +15,8 @@ object VbdsServerApp extends App {
   // Command line options
   private case class Options(name: String = "vbds",
                              httpHost: String = "127.0.0.1",
-                             httpBindHost: Option[String] = None,
                              httpPort: Int = 0,
                              akkaHost: String = "127.0.0.1",
-                             akkaBindHost: Option[String] = None,
                              akkaPort: Int = 0,
                              clusterSeeds: String = "")
 
@@ -36,10 +32,6 @@ object VbdsServerApp extends App {
       c.copy(httpHost = x)
     } text "The HTTP server host name (default: 127.0.0.1)"
 
-    opt[String]("http-bind-host") valueName "<hostname>" action { (x, c) =>
-      c.copy(httpBindHost = Some(x))
-    } text "The HTTP server host name to bind to (default: same as --http-host)"
-
     opt[Int]("http-port") valueName "<number>" action { (x, c) =>
       c.copy(httpPort = x)
     } text "The HTTP server port number (default: 0)"
@@ -47,10 +39,6 @@ object VbdsServerApp extends App {
     opt[String]("akka-host") valueName "<hostname>" action { (x, c) =>
       c.copy(akkaHost = x)
     } text "The Akka system host name (default: 127.0.0.1)"
-
-    opt[String]("akka-bind-host") valueName "<hostname>" action { (x, c) =>
-      c.copy(akkaBindHost = Some(x))
-    } text "The Akka system host name to bind to (default: same as --akka-host)"
 
     opt[Int]("akka-port") valueName "<number>" action { (x, c) =>
       c.copy(akkaPort = x)
@@ -101,22 +89,17 @@ object VbdsServerApp extends App {
     // Generate the akka config for the akka and http ports as well as the cluster seed nodes
     val s = s"""
                akka.remote.netty.tcp.hostname=${options.akkaHost}
-               akka.remote.netty.tcp.bind-hostname=${options.akkaBindHost.getOrElse(options.akkaHost)}
                akka.remote.netty.tcp.port=${options.akkaPort}
                akka.remote.artery.canonical.hostname=${options.akkaHost}
-               akka.remote.artery.canonical.bind-hostname=${options.akkaBindHost.getOrElse(options.akkaHost)}
                akka.remote.artery.canonical.port=${options.akkaPort}
                $seedNodes
             """
     val config = ConfigFactory.parseString(s).withFallback(ConfigFactory.load())
 
-    println(s"\nXXXXXXXXX\n${options.name} akka hostname=${options.akkaHost}=${config.getString("akka.remote.netty.tcp.hostname")}, akka bind-host=${options.akkaBindHost}=${config.getString("akka.remote.netty.tcp.bind-hostname")}\n")
-
     implicit val system = ActorSystem(systemName, config)
     import system.dispatcher
-    println(s"YYYYY ${options.name}: system = $system")
 
-    VbdsServer.start(options.httpHost, options.httpBindHost.getOrElse(options.httpHost), options.httpPort).onComplete {
+    VbdsServer.start(options.httpHost, options.httpPort).onComplete {
         case Success(result) =>
           println(s"HTTP Server running on: http:/${result.localAddress}")
         case Failure(error) =>

@@ -110,20 +110,7 @@ object VbdsClientApp extends App {
 
   // Run the application (The actor system is only used locally, no need for remote)
   private def run(options: Options): Unit = {
-    val config = ConfigFactory.parseString(
-      s"""
-         akka.remote.netty.tcp.hostname=127.0.0.1
-         akka.remote.netty.tcp.port=0
-         akka.remote.netty.tcp.bind-hostname=127.0.0.1
-         akka.remote.artery.canonical.hostname=127.0.0.1
-         akka.remote.artery.canonical.port=0
-         akka.remote.artery.canonical.bind-hostname=127.0.0.1
-            """).withFallback(ConfigFactory.load())
-    println(s"XXXX ${options.name}: host = ${config.getString("akka.remote.netty.tcp.hostname")}")
-
-    implicit val system = ActorSystem(options.name, config)
-    println(s"XXXX ${options.name}: bind-host = ${config.getString("akka.remote.netty.tcp.bind-hostname")}")
-
+    implicit val system       = ActorSystem()
     implicit val materializer = ActorMaterializer()
 
     val client = new VbdsClient(options.name, options.host, options.port)

@@ -1,9 +1,7 @@
 package vbds.server
 
 import java.io.{BufferedOutputStream, File, FileOutputStream}
-import java.net.InetAddress
 
-import akka.actor.ActorSystem
 import akka.remote.testkit.MultiNodeConfig
 import vbds.client.VbdsClient
 import vbds.server.app.VbdsServerApp
@@ -14,12 +12,10 @@ import akka.remote.testkit.MultiNodeSpec
 import akka.testkit.ImplicitSender
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.StatusCodes
-import akka.remote.RemoteTransportException
 import akka.stream.{ActorMaterializer, Materializer, OverflowStrategy}
 import akka.stream.scaladsl.{Sink, Source, SourceQueueWithComplete}
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import org.apache.commons.io.FileUtils
-import org.jboss.netty.channel.ChannelException
 import org.scalatest.BeforeAndAfterAll
 import vbds.client.WebSocketActor.ReceivedFile
 
@@ -84,9 +80,6 @@ object VbdsServerTest {
 
   // If true, compare files to make sure the file was transferred correctly
   val doCompareFiles = false
-
-  // If true, use the local host as the bind host (for docker/AWS?)
-  val useLocalBindHost = true
 
   val testFile = makeFile(testFileSizeBytes, testFileName)
   testFile.deleteOnExit()
@@ -153,43 +146,10 @@ object VbdsServerTest {
   implicit class RichFuture[T](val f: Future[T]) extends AnyVal {
     def await(timeout: FiniteDuration): T = Await.result(f, timeout)
   }
-
-  def actorSystemCreator(name: String)(config: Config): ActorSystem = {
-    if (useLocalBindHost) {
-      // XXXXXXXXXXXx
-      val multinodeHost       = config.getString("multinode.host")
-      val multinodeServerHost =  config.getString("multinode.server-host")
-      println(s"XXX multinodeHost=$multinodeHost, multinodeServerHost=$multinodeServerHost")
-
-
-
-
-      val host = InetAddress.getLocalHost.getHostAddress
-      val cfg = ConfigFactory.parseString(
-        s"""
-         akka.remote.netty.tcp.bind-hostname=$host
-         akka.remote.netty.tcp.port=0
-         akka.remote.artery.canonical.bind-hostname=$host
-         akka.remote.artery.canonical.port=0
-         """).withFallback(config)
-
-      //    val cfg = ConfigFactory.parseString(s"akka.remote.netty.tcp.bind-hostname=$host").withFallback(config)
-
-      println(s"\nXXXXXXXXXXXX $name: \nhost = ${cfg.getString("akka.remote.netty.tcp.hostname")}, bind-host = ${cfg.getString("akka.remote.netty.tcp.bind-hostname")}\n\n")
-
-      val system = ActorSystem(name, cfg)
-
-      println(s"XXX $name: system = $system")
-      system
-    } else {
-      ActorSystem(name, config)
-    }
-  }
-
 }
 
 
-class VbdsServerTest(name: String) extends MultiNodeSpec(VbdsServerTestConfig, VbdsServerTest.actorSystemCreator(name))
+class VbdsServerTest(name: String) extends MultiNodeSpec(VbdsServerTestConfig)
   with STMultiNodeSpec with ImplicitSender with BeforeAndAfterAll {
 
   import VbdsServerTestConfig._
@@ -206,17 +166,14 @@ class VbdsServerTest(name: String) extends MultiNodeSpec(VbdsServerTestConfig, V
     "Allow creating a stream, subscribing and publishing to a stream" in {
       runOn(server1) {
         val host = system.settings.config.getString("multinode.host")
-        val bindHost = if (useLocalBindHost) InetAddress.getLocalHost.getHostAddress else host
         println(s"server1 (seed node) is running on $host")
 
         // Start the first server (the seed node)
         VbdsServerApp.main(
           Array(
                 "--http-host", host,
-                "--http-bind-host", bindHost,
                 "--http-port", s"$server1HttpPort",
                 "--akka-host", host,
-                "--akka-bind-host", bindHost,
                 "--akka-port", s"$seedPort",
                 "-s", s"$host:$seedPort")
         )
@@ -231,7 +188,6 @@ class VbdsServerTest(name: String) extends MultiNodeSpec(VbdsServerTestConfig, V
 
       runOn(server2) {
         val host       = system.settings.config.getString("multinode.host")
-        val bindHost = if (useLocalBindHost) InetAddress.getLocalHost.getHostAddress else host
         val serverHost = system.settings.config.getString("multinode.server-host")
         println(s"server2 is running on $host (seed node is $serverHost)")
 
@@ -239,10 +195,8 @@ class VbdsServerTest(name: String) extends MultiNodeSpec(VbdsServerTestConfig, V
         VbdsServerApp.main(
           Array(
             "--http-host", host,
-            "--http-bind-host", bindHost,
             "--http-port", s"$server2HttpPort",
             "--akka-host", host,
-            "--akka-bind-host", bindHost,
             "-s", s"$serverHost:$seedPort")
         )
         expectNoMessage(2.seconds)

@@ -18,14 +18,14 @@ object VbdsServer {
   /**
     * Starts the server (Assumes that the given ActorSystem is already configured correctly for the cluster)
     */
-  def start(httpHost: String, httpBindHost: String, httpPort: Int)(implicit system: ActorSystem): Future[Http.ServerBinding] = {
+  def start(httpHost: String, httpPort: Int)(implicit system: ActorSystem): Future[Http.ServerBinding] = {
     implicit val mat = ActorMaterializer()
 
     // Initialize the cluster for replicating the data
     val replicator      = DistributedData(system).replicator
     implicit val node   = Cluster(system)
     val sharedDataActor = system.actorOf(SharedDataActor.props(replicator))
-    new VbdsServer(sharedDataActor).start(httpHost, httpBindHost, httpPort)
+    new VbdsServer(sharedDataActor).start(httpHost, httpPort)
   }
 }
 
@@ -52,9 +52,8 @@ private class VbdsServer(sharedDataActor: ActorRef)(implicit system: ActorSystem
    *
    * @return the server binding
    */
-  def start(host: String, httpBindHost: String, port: Int): Future[Http.ServerBinding] = {
-    println(s"XXX Http().bindAndHandle($httpBindHost)")
-    val f = Http().bindAndHandle(route, httpBindHost, port)
+  def start(host: String, port: Int): Future[Http.ServerBinding] = {
+    val f = Http().bindAndHandle(route, host, port)
     val addr =
     // Need to know this http server's address when subscribing
     f.foreach(binding => sharedDataActor ! LocalAddress(new InetSocketAddress(host, binding.localAddress.getPort)))
