@@ -159,7 +159,7 @@ object VbdsServerTest {
       // XXXXXXXXXXXx
       val multinodeHost       = config.getString("multinode.host")
       val multinodeServerHost =  config.getString("multinode.server-host")
-      println(s"multinodeHost=$multinodeHost, multinodeServerHost=$multinodeServerHost")
+      println(s"XXX multinodeHost=$multinodeHost, multinodeServerHost=$multinodeServerHost")
 
 
 
@@ -167,7 +167,6 @@ object VbdsServerTest {
       val host = InetAddress.getLocalHost.getHostAddress
       val cfg = ConfigFactory.parseString(
         s"""
-         multinode.host=$host
          akka.remote.netty.tcp.bind-hostname=$host
          akka.remote.netty.tcp.port=0
          akka.remote.artery.canonical.bind-hostname=$host
@@ -177,7 +176,9 @@ object VbdsServerTest {
       //    val cfg = ConfigFactory.parseString(s"akka.remote.netty.tcp.bind-hostname=$host").withFallback(config)
 
       println(s"\nXXXXXXXXXXXX $name: \nhost = ${cfg.getString("akka.remote.netty.tcp.hostname")}, bind-host = ${cfg.getString("akka.remote.netty.tcp.bind-hostname")}\n\n")
+
       val system = ActorSystem(name, cfg)
+
       println(s"XXX $name: system = $system")
       system
     } else {
