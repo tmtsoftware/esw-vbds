@@ -54,7 +54,6 @@ private class VbdsServer(sharedDataActor: ActorRef)(implicit system: ActorSystem
    */
   def start(host: String, port: Int): Future[Http.ServerBinding] = {
     val f = Http().bindAndHandle(route, host, port)
-    val addr =
     // Need to know this http server's address when subscribing
     f.foreach(binding => sharedDataActor ! LocalAddress(new InetSocketAddress(host, binding.localAddress.getPort)))
     f
