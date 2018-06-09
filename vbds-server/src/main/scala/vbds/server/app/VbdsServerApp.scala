@@ -116,7 +116,7 @@ object VbdsServerApp extends App {
     import system.dispatcher
     println(s"YYYYY ${options.name}: system = $system")
 
-    VbdsServer.start(options.httpHost, options.httpPort).onComplete {
+    VbdsServer.start(options.httpHost, options.akkaBindHost.getOrElse(options.akkaHost), options.httpPort).onComplete {
         case Success(result) =>
           println(s"HTTP Server running on: http:/${result.localAddress}")
         case Failure(error) =>
