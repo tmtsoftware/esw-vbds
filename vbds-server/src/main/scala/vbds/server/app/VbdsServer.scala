@@ -53,6 +53,7 @@ private class VbdsServer(sharedDataActor: ActorRef)(implicit system: ActorSystem
    * @return the server binding
    */
   def start(host: String, httpBindHost: String, port: Int): Future[Http.ServerBinding] = {
+    println(s"XXX Http().bindAndHandle($httpBindHost)")
     val f = Http().bindAndHandle(route, httpBindHost, port)
     val addr =
     // Need to know this http server's address when subscribing
