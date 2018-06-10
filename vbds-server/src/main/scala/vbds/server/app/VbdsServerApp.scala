@@ -1,16 +1,13 @@
 package vbds.server.app
 
-import akka.actor.ActorSystem
-import com.typesafe.config.ConfigFactory
-
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
 /**
-  * VIZ Bulk Data System HTTP server and Akka cluster.
-  * This is the command line app used to start the server.
-  */
+ * VIZ Bulk Data System HTTP server and Akka cluster.
+ * This is the command line app used to start the server.
+ */
 object VbdsServerApp extends App {
-  val systemName = "vbds-system"
 
   // Command line options
   private case class Options(name: String = "vbds",
@@ -44,9 +41,8 @@ object VbdsServerApp extends App {
       c.copy(akkaPort = x)
     } text "The Akka system port number (default: 0)"
 
-    opt[String]('s', "seeds") valueName "<host>:<port>,<host>:<port>,..." action {
-      (x, c) =>
-        c.copy(clusterSeeds = x)
+    opt[String]('s', "seeds") valueName "<host>:<port>,<host>:<port>,..." action { (x, c) =>
+      c.copy(clusterSeeds = x)
     } text "Optional list of cluster seeds in the form host:port,host:port,..."
 
     help("help")
@@ -66,45 +62,22 @@ object VbdsServerApp extends App {
     case None => System.exit(1)
   }
 
-  // Gets the akka seed nodes config line
-  private def getSeedNodes(options: Options): String = {
-    if (options.clusterSeeds.nonEmpty) {
-      val seeds = options.clusterSeeds
-        .split(",")
-        .map(s => s""""akka.tcp://$systemName@$s"""")
-        .mkString(",")
-      s"akka.cluster.seed-nodes=[$seeds]"
-    } else ""
-  }
-
   // Run the application
   private def run(options: Options): Unit = {
-    val seedNodes = getSeedNodes(options)
-    if (seedNodes.isEmpty) {
-      println(
-        "Please specify one or more seed nodes via the -s (or --seeds) option.")
+    import options._
+
+    if (clusterSeeds.isEmpty) {
+      println("Please specify one or more seed nodes via the -s (or --seeds) option.")
       System.exit(1)
     }
 
-    // Generate the akka config for the akka and http ports as well as the cluster seed nodes
-    val s = s"""
-               akka.remote.netty.tcp.hostname=${options.akkaHost}
-               akka.remote.netty.tcp.port=${options.akkaPort}
-               akka.remote.artery.canonical.hostname=${options.akkaHost}
-               akka.remote.artery.canonical.port=${options.akkaPort}
-               $seedNodes
-            """
-    val config = ConfigFactory.parseString(s).withFallback(ConfigFactory.load())
-
-    implicit val system = ActorSystem(systemName, config)
-    import system.dispatcher
-
-    VbdsServer.start(options.httpHost, options.httpPort).onComplete {
-        case Success(result) =>
-          println(s"HTTP Server running on: http:/${result.localAddress}")
-        case Failure(error) =>
-          println(error)
-          System.exit(1)
-      }
+    val (server, bindingF) = VbdsServer.start(httpHost, httpPort, akkaHost, akkaPort, clusterSeeds)
+    bindingF.onComplete {
+      case Success(binding) =>
+        println(s"HTTP Server running on: http:/${binding.localAddress}")
+      case Failure(error) =>
+        println(error)
+        System.exit(1)
+    }
   }
 }

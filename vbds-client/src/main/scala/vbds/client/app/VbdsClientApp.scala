@@ -7,7 +7,6 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.HttpResponse
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Sink, Source}
-import com.typesafe.config.ConfigFactory
 import vbds.client.VbdsClient
 
 import scala.concurrent.Future
@@ -142,7 +141,7 @@ object VbdsClientApp extends App {
   private def doAction(r: ReceivedFile, action: String): Unit = {
     import sys.process._
     try {
-      val x = s"$action ${r.path}".!
+      s"$action ${r.path}".!
     } catch {
       case ex: Exception => println(s"Error: Action for file ${r.count} of stream ${r.streamName} failed: $ex")
     }

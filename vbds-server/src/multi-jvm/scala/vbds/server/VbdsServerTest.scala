@@ -4,7 +4,7 @@ import java.io.{BufferedOutputStream, File, FileOutputStream}
 
 import akka.remote.testkit.MultiNodeConfig
 import vbds.client.VbdsClient
-import vbds.server.app.VbdsServerApp
+import vbds.server.app.VbdsServer
 
 import scala.concurrent.duration.{Duration, DurationLong, FiniteDuration}
 import scala.concurrent.{Await, Future, Promise}
@@ -66,7 +66,7 @@ object VbdsServerTest {
   val testFileSizeKb    = 1000
   val testFileSizeBytes = testFileSizeKb * 1000
   val numFilesToPublish = 100000
-  val printInterval = numFilesToPublish/100
+  val printInterval     = 100
 
   val shortTimeout = 60.seconds
   val longTimeout  = 10.hours // in case you want to test with lots of files...
@@ -149,9 +149,11 @@ object VbdsServerTest {
   }
 }
 
-
-class VbdsServerTest(name: String) extends MultiNodeSpec(VbdsServerTestConfig)
-  with STMultiNodeSpec with ImplicitSender with BeforeAndAfterAll {
+class VbdsServerTest(name: String)
+    extends MultiNodeSpec(VbdsServerTestConfig)
+    with STMultiNodeSpec
+    with ImplicitSender
+    with BeforeAndAfterAll {
 
   import VbdsServerTestConfig._
   import VbdsServerTest._
@@ -166,17 +168,17 @@ class VbdsServerTest(name: String) extends MultiNodeSpec(VbdsServerTestConfig)
 
     "Allow creating a stream, subscribing and publishing to a stream" in {
       runOn(server1) {
+        import system.dispatcher
         val host = system.settings.config.getString("multinode.host")
         println(s"server1 (seed node) is running on $host")
 
         // Start the first server (the seed node)
-        VbdsServerApp.main(
-          Array(
-                "--http-host", host,
-                "--http-port", s"$server1HttpPort",
-                "--akka-host", host,
-                "--akka-port", s"$seedPort",
-                "-s", s"$host:$seedPort")
+        val (server, bindingF) = VbdsServer.start(
+          host,
+          server1HttpPort,
+          host,
+          seedPort,
+          s"$host:$seedPort"
         )
         expectNoMessage(2.seconds)
         enterBarrier("deployed")
@@ -184,28 +186,32 @@ class VbdsServerTest(name: String) extends MultiNodeSpec(VbdsServerTestConfig)
         enterBarrier("subscribedToStream")
         within(longTimeout) {
           enterBarrier("receivedFiles")
+          bindingF.foreach(server.stop)
         }
       }
 
       runOn(server2) {
+        import system.dispatcher
         val host       = system.settings.config.getString("multinode.host")
         val serverHost = system.settings.config.getString("multinode.server-host")
         println(s"server2 is running on $host (seed node is $serverHost)")
 
         // Start a second server
-        VbdsServerApp.main(
-          Array(
-            "--http-host", host,
-            "--http-port", s"$server2HttpPort",
-            "--akka-host", host,
-            "-s", s"$serverHost:$seedPort")
+        val (server, bindingF) = VbdsServer.start(
+          host,
+          server2HttpPort,
+          host,
+          0,
+          s"$serverHost:$seedPort"
         )
+
         expectNoMessage(2.seconds)
         enterBarrier("deployed")
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
         within(longTimeout) {
           enterBarrier("receivedFiles")
+          bindingF.foreach(server.stop)
         }
       }
 
