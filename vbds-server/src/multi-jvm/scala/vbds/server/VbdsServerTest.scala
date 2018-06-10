@@ -36,8 +36,8 @@ object VbdsServerTestConfig extends MultiNodeConfig {
   //  val publisher2 = role("publisher2")
 
   commonConfig(ConfigFactory.parseString("""
-    | akka.loglevel = INFO
-    | akka.log-dead-letters-during-shutdown = off
+      | akka.loglevel = INFO
+      | akka.log-dead-letters-during-shutdown = off
     """))
 
 }
@@ -62,19 +62,19 @@ object VbdsServerTest {
   val streamName = "WFS1-RAW"
 
   val testFileName = "vbdsTestFile"
-//    val testFileSizeKb    = 300000
+  //    val testFileSizeKb    = 300000
   val testFileSizeKb    = 1000
   val testFileSizeBytes = testFileSizeKb * 1000
-  val numFilesToPublish = 100000
+  val numFilesToPublish = 1000
   val printInterval     = 100
 
   val shortTimeout = 60.seconds
   val longTimeout  = 10.hours // in case you want to test with lots of files...
 
   // Simulate a slow publisher/subscriber (XXX Not sure simulated slow subscriber is working correctly)
-//  val publisherDelay = 100.millis
-//  val subscriber1Delay = 50.millis
-//  val subscriber2Delay = 35.millis
+  //  val publisherDelay = 100.millis
+  //  val subscriber1Delay = 50.millis
+  //  val subscriber2Delay = 35.millis
   val publisherDelay   = Duration.Zero
   val subscriber1Delay = Duration.Zero
   val subscriber2Delay = Duration.Zero
@@ -98,28 +98,30 @@ object VbdsServerTest {
                           promise: Promise[ReceivedFile],
                           startTime: Long,
                           delay: FiniteDuration): Unit = {
-    if (r.count % printInterval == 0) println(s"$name: Received ${r.count} files")
+
+    def printStats() = {
+      val testSecs    = (System.currentTimeMillis() - startTime) / 1000.0
+      val secsPerFile = testSecs / r.count
+      val mbPerSec    = (testFileSizeKb / 1000.0 * r.count) / testSecs
+      val hz          = 1.0 / secsPerFile
+      println(
+        f"$name: Received ${r.count} $testFileSizeKb kb files in $testSecs seconds ($secsPerFile%1.3f secs per file, $hz%1.3f hz, $mbPerSec%1.3f mb/sec)"
+      )
+    }
+
     if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
       if (r.count >= numFilesToPublish) {
-        val testSecs    = (System.currentTimeMillis() - startTime) / 1000.0
-        val secsPerFile = testSecs / numFilesToPublish
-        val mbPerSec    = (testFileSizeKb / 1000.0 * numFilesToPublish) / testSecs
-        val hz          = 1.0 / secsPerFile
-        println(f"""
-             |
-             | ===================================================
-             | * $name: Received $numFilesToPublish $testFileSizeKb kb files in $testSecs seconds ($secsPerFile%1.3f secs per file, $hz%1.3f hz, $mbPerSec%1.3f mb/sec)
-             | ===================================================
-         """.stripMargin)
+        printStats()
         promise.success(r)
+      } else {
+        if (r.count % printInterval == 0) printStats()
+        if (delay != Duration.Zero) Thread.sleep(delay.toMillis)
       }
-      if (delay != Duration.Zero) Thread.sleep(delay.toMillis)
     } else {
       println(s"${r.path} and $testFile differ")
       promise.failure(new RuntimeException(s"${r.path} and $testFile differ"))
     }
     r.path.toFile.delete()
-
   }
 
   // Returns a queue that receives the files via websocket and verifies that the data is correct (if doCompareFiles is true).
