@@ -110,7 +110,7 @@ object VbdsClientApp extends App {
 
   // Run the application (The actor system is only used locally, no need for remote)
   private def run(options: Options): Unit = {
-    implicit val system       = ActorSystem()
+    implicit val system = ActorSystem()
     implicit val materializer = ActorMaterializer()
 
     val client = new VbdsClient(options.name, options.host, options.port)
@@ -126,7 +126,7 @@ object VbdsClientApp extends App {
     val queue = Source
       .queue[ReceivedFile](1, OverflowStrategy.dropHead)
       .map { r =>
-        println(s"Received file ${r.count} for stream ${r.streamName}")
+        if (r.count % 100 == 0) println(s"Received ${r.count} files for stream ${r.streamName}")
         options.action.foreach(doAction(r, _))
         r.path.toFile.delete()
       }

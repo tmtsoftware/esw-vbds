@@ -65,7 +65,8 @@ object VbdsServerTest {
 //    val testFileSizeKb    = 300000
   val testFileSizeKb    = 1000
   val testFileSizeBytes = testFileSizeKb * 1000
-  val numFilesToPublish = 1000
+  val numFilesToPublish = 100000
+  val printInterval = numFilesToPublish/100
 
   val shortTimeout = 60.seconds
   val longTimeout  = 10.hours // in case you want to test with lots of files...
@@ -97,7 +98,7 @@ object VbdsServerTest {
                           promise: Promise[ReceivedFile],
                           startTime: Long,
                           delay: FiniteDuration): Unit = {
-    println(s"$name: Received file ${r.count}: ${r.path}")
+    if (r.count % printInterval == 0) println(s"$name: Received ${r.count} files")
     if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
       if (r.count >= numFilesToPublish) {
         val testSecs    = (System.currentTimeMillis() - startTime) / 1000.0
