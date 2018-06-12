@@ -86,7 +86,7 @@ class WebSocketActor(name: String,
       log.error(s"$name: Wrong message type: $tm")
 
     case StreamCompleted ⇒
-      log.debug(s"$name: Stream completed")
+      log.info(s"$name: Stream completed")
 
     case StreamFailure(ex) ⇒
       log.error(ex, s"$name: Stream failed!")

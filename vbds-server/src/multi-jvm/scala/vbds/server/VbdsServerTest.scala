@@ -135,7 +135,7 @@ object VbdsServerTest {
     lazy val startTime: Long = System.currentTimeMillis()
     println(s"$name: Started timing")
     Source
-      .queue[ReceivedFile](1, OverflowStrategy.backpressure)
+      .queue[ReceivedFile](20, OverflowStrategy.backpressure)
       .map(receiveFile(name, _, promise, startTime, delay))
       .keepAlive(shortTimeout,  timedOutMessage _)
       .to(Sink.ignore)
