@@ -62,11 +62,10 @@ object VbdsServerTest {
   val streamName = "WFS1-RAW"
 
   val testFileName = "vbdsTestFile"
-  //    val testFileSizeKb    = 300000
-  val testFileSizeKb    = 1000
+  val testFileSizeKb    = 1000 * 100
   val testFileSizeBytes = testFileSizeKb * 1000
   val numFilesToPublish = 1000
-  val printInterval     = 100
+  val printInterval     = 10
 
   val shortTimeout = 10.seconds
   val longTimeout  = 10.hours // in case you want to test with lots of files...
@@ -115,7 +114,7 @@ object VbdsServerTest {
         printStats()
         promise.success(r)
       } else {
-        if (true || r.count % printInterval == 0) printStats()
+        if (r.count % printInterval == 0) printStats()
         if (delay != Duration.Zero) Thread.sleep(delay.toMillis)
       }
     } else {
