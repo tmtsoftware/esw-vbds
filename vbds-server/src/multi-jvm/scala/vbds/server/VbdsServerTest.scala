@@ -114,7 +114,7 @@ object VbdsServerTest {
         printStats()
         promise.success(r)
       } else {
-        if (r.count % printInterval == 0) printStats()
+        if (true ||   r.count % printInterval == 0) printStats()
         if (delay != Duration.Zero) Thread.sleep(delay.toMillis)
       }
     } else {
@@ -131,7 +131,7 @@ object VbdsServerTest {
     lazy val startTime: Long = System.currentTimeMillis()
     println(s"$name: Started timing")
     Source
-      .queue[ReceivedFile](1, OverflowStrategy.dropHead)
+      .queue[ReceivedFile](1, OverflowStrategy.backpressure)
       .map(receiveFile(name, _, promise, startTime, delay))
       .to(Sink.ignore)
       .run()
@@ -188,6 +188,7 @@ class VbdsServerTest(name: String)
         enterBarrier("subscribedToStream")
         within(longTimeout) {
           enterBarrier("receivedFiles")
+          println(s"XXX server1 enterBarrier receivedFiles")
           bindingF.foreach(server.stop)
         }
       }
@@ -213,6 +214,7 @@ class VbdsServerTest(name: String)
         enterBarrier("subscribedToStream")
         within(longTimeout) {
           enterBarrier("receivedFiles")
+          println(s"XXX server2 enterBarrier receivedFiles")
           bindingF.foreach(server.stop)
         }
       }
@@ -233,6 +235,7 @@ class VbdsServerTest(name: String)
         promise.future.await(longTimeout)
         within(longTimeout) {
           enterBarrier("receivedFiles")
+          println(s"XXX subscriber1 enterBarrier receivedFiles")
         }
       }
 
@@ -252,6 +255,7 @@ class VbdsServerTest(name: String)
         promise.future.await(longTimeout)
         within(longTimeout) {
           enterBarrier("receivedFiles")
+          println(s"XXX subscriber2 enterBarrier receivedFiles")
         }
       }
 
@@ -270,6 +274,7 @@ class VbdsServerTest(name: String)
         }
         within(longTimeout) {
           enterBarrier("receivedFiles")
+          println(s"XXX publisher1 enterBarrier receivedFiles")
         }
       }
 
