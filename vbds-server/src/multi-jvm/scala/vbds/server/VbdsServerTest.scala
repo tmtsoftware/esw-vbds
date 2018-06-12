@@ -114,7 +114,7 @@ object VbdsServerTest {
         printStats()
         promise.success(r)
       } else {
-        if (true ||   r.count % printInterval == 0) printStats()
+        if (r.count % printInterval == 0) printStats()
         if (delay != Duration.Zero) Thread.sleep(delay.toMillis)
       }
     } else {
