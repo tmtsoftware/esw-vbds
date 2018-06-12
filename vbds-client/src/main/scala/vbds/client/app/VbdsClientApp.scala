@@ -42,7 +42,7 @@ object VbdsClientApp extends App {
       c.copy(name = x)
     } text "The name of the vbds-server server(default: vbds)" // XXX TODO: Implement location service lookup via name
 
-    opt[String]('h', "host") valueName "<host name>" action { (x, c) =>
+    opt[String]("host") valueName "<host name>" action { (x, c) =>
       c.copy(host = x)
     } text "The VBDS HTTP server host name (default: 127.0.0.1)"
 
@@ -123,7 +123,7 @@ object VbdsClientApp extends App {
     }
 
     val queue = Source
-      .queue[ReceivedFile](1, OverflowStrategy.backpressure)
+      .queue[ReceivedFile](1, OverflowStrategy.dropHead)
       .map { r =>
         if (r.count % 100 == 0) println(s"Received ${r.count} files for stream ${r.streamName}")
         options.action.foreach(doAction(r, _))
