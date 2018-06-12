@@ -128,7 +128,7 @@ object VbdsServerTest {
   def makeQueue(name: String, promise: Promise[ReceivedFile], log: LoggingAdapter, delay: FiniteDuration)(
       implicit mat: Materializer
   ): SourceQueueWithComplete[ReceivedFile] = {
-    val startTime: Long = System.currentTimeMillis()
+    lazy val startTime: Long = System.currentTimeMillis()
     println(s"$name: Started timing")
     Source
       .queue[ReceivedFile](1, OverflowStrategy.dropHead)
