@@ -10,11 +10,19 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.stream.Materializer
 import akka.stream.scaladsl.SourceQueueWithComplete
+import vbds.client.VbdsClient.Subscription
 import vbds.client.WebSocketActor.ReceivedFile
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Failure, Success, Try}
+
+object VbdsClient {
+  trait Subscription {
+    def unsubscribe(): Unit
+    val httpResponse: Future[HttpResponse]
+  }
+}
 
 /**
  * An akka-http based command line client for the vbds-server.
@@ -123,7 +131,7 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
   def subscribe(streamName: String,
                 dir: File,
                 queue: SourceQueueWithComplete[ReceivedFile],
-                saveFiles: Boolean): Future[HttpResponse] = {
+                saveFiles: Boolean): Subscription = {
     log.debug(s"subscribe to $streamName")
     val receiver   = system.actorOf(WebSocketActor.props(name, streamName, dir, queue, saveFiles))
     val wsListener = new WebSocketListener

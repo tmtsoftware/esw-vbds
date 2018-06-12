@@ -68,7 +68,7 @@ object VbdsServerTest {
   val numFilesToPublish = 1000
   val printInterval     = 100
 
-  val shortTimeout = 60.seconds
+  val shortTimeout = 10.seconds
   val longTimeout  = 10.hours // in case you want to test with lots of files...
 
   // Simulate a slow publisher/subscriber (XXX Not sure simulated slow subscriber is working correctly)
@@ -91,8 +91,11 @@ object VbdsServerTest {
     dir
   }
 
-  // Called when a file is received. Checks the file contents (if doCompareFiles is true) and
-  // prints statistics when done. Received (temp) files are deleted.
+  private val timedOutMessage = ReceivedFile("", -1, null)
+
+  // Called when a file is received by the named subscriber.
+  // Checks the file contents (if doCompareFiles is true) and prints statistics when done.
+  // Received (temp) files are deleted.
   private def receiveFile(name: String,
                           r: ReceivedFile,
                           promise: Promise[ReceivedFile],
@@ -110,7 +113,7 @@ object VbdsServerTest {
     }
 
     if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
-      if (r.count >= numFilesToPublish) {
+      if (r.count >= numFilesToPublish || r == timedOutMessage) {
         printStats()
         promise.success(r)
       } else {
@@ -124,15 +127,17 @@ object VbdsServerTest {
     r.path.toFile.delete()
   }
 
-  // Returns a queue that receives the files via websocket and verifies that the data is correct (if doCompareFiles is true).
+  // Returns a queue for the named subscriber that receives the files via websocket and verifies
+  // that the data is correct (if doCompareFiles is true).
   def makeQueue(name: String, promise: Promise[ReceivedFile], log: LoggingAdapter, delay: FiniteDuration)(
       implicit mat: Materializer
   ): SourceQueueWithComplete[ReceivedFile] = {
     lazy val startTime: Long = System.currentTimeMillis()
     println(s"$name: Started timing")
     Source
-      .queue[ReceivedFile](100, OverflowStrategy.backpressure)
+      .queue[ReceivedFile](1, OverflowStrategy.backpressure)
       .map(receiveFile(name, _, promise, startTime, delay))
+      .keepAlive(shortTimeout,  timedOutMessage _)
       .to(Sink.ignore)
       .run()
   }
@@ -228,14 +233,15 @@ class VbdsServerTest(name: String)
         enterBarrier("streamCreated")
         val promise = Promise[ReceivedFile]
         val queue   = makeQueue("subscriber1", promise, log, subscriber1Delay)
-        val subscribeResponse =
-          client.subscribe(streamName, getTempDir("subscriber1"), queue, doCompareFiles).await(shortTimeout)
-        assert(subscribeResponse.status == StatusCodes.SwitchingProtocols)
+        val subscription = client.subscribe(streamName, getTempDir("subscriber1"), queue, doCompareFiles)
+        val httpResponse = subscription.httpResponse.await(shortTimeout)
+        assert(httpResponse.status == StatusCodes.SwitchingProtocols)
         enterBarrier("subscribedToStream")
         promise.future.await(longTimeout)
         within(longTimeout) {
           enterBarrier("receivedFiles")
           println(s"XXX subscriber1 enterBarrier receivedFiles")
+          subscription.unsubscribe()
         }
       }
 
@@ -248,14 +254,15 @@ class VbdsServerTest(name: String)
         enterBarrier("streamCreated")
         val promise = Promise[ReceivedFile]
         val queue   = makeQueue("subscriber2", promise, log, subscriber2Delay)
-        val subscribeResponse =
-          client.subscribe(streamName, getTempDir("subscriber2"), queue, doCompareFiles).await(shortTimeout)
-        assert(subscribeResponse.status == StatusCodes.SwitchingProtocols)
+        val subscription = client.subscribe(streamName, getTempDir("subscriber2"), queue, doCompareFiles)
+        val httpResponse = subscription.httpResponse.await(shortTimeout)
+        assert(httpResponse.status == StatusCodes.SwitchingProtocols)
         enterBarrier("subscribedToStream")
         promise.future.await(longTimeout)
         within(longTimeout) {
           enterBarrier("receivedFiles")
           println(s"XXX subscriber2 enterBarrier receivedFiles")
+          subscription.unsubscribe()
         }
       }
 
