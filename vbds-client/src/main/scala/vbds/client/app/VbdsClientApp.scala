@@ -123,7 +123,7 @@ object VbdsClientApp extends App {
     }
 
     val queue = Source
-      .queue[ReceivedFile](1, OverflowStrategy.dropHead)
+      .queue[ReceivedFile](1, OverflowStrategy.backpressure)
       .map { r =>
         if (r.count % 100 == 0) println(s"Received ${r.count} files for stream ${r.streamName}")
         options.action.foreach(doAction(r, _))
