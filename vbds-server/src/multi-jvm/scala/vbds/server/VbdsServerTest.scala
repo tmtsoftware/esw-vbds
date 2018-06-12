@@ -91,8 +91,6 @@ object VbdsServerTest {
     dir
   }
 
-  private val timedOutMessage = ReceivedFile("", -1, null)
-
   // Called when a file is received by the named subscriber.
   // Checks the file contents (if doCompareFiles is true) and prints statistics when done.
   // Received (temp) files are deleted.
@@ -113,7 +111,7 @@ object VbdsServerTest {
     }
 
     if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
-      if (r.count >= numFilesToPublish || r == timedOutMessage) {
+      if (r.count >= numFilesToPublish) {
         printStats()
         promise.success(r)
       } else {
@@ -137,7 +135,6 @@ object VbdsServerTest {
     Source
       .queue[ReceivedFile](20, OverflowStrategy.backpressure)
       .map(receiveFile(name, _, promise, startTime, delay))
-      .keepAlive(shortTimeout,  timedOutMessage _)
       .to(Sink.ignore)
       .run()
   }
@@ -194,7 +191,7 @@ class VbdsServerTest(name: String)
         within(longTimeout) {
           enterBarrier("receivedFiles")
           println(s"XXX server1 enterBarrier receivedFiles")
-          bindingF.foreach(server.stop)
+//          bindingF.foreach(server.stop)
         }
       }
 
@@ -220,7 +217,7 @@ class VbdsServerTest(name: String)
         within(longTimeout) {
           enterBarrier("receivedFiles")
           println(s"XXX server2 enterBarrier receivedFiles")
-          bindingF.foreach(server.stop)
+//          bindingF.foreach(server.stop)
         }
       }
 
@@ -238,10 +235,10 @@ class VbdsServerTest(name: String)
         assert(httpResponse.status == StatusCodes.SwitchingProtocols)
         enterBarrier("subscribedToStream")
         promise.future.await(longTimeout)
+//        subscription.unsubscribe()
         within(longTimeout) {
           enterBarrier("receivedFiles")
           println(s"XXX subscriber1 enterBarrier receivedFiles")
-          subscription.unsubscribe()
         }
       }
 
@@ -259,10 +256,10 @@ class VbdsServerTest(name: String)
         assert(httpResponse.status == StatusCodes.SwitchingProtocols)
         enterBarrier("subscribedToStream")
         promise.future.await(longTimeout)
+//        subscription.unsubscribe()
         within(longTimeout) {
           enterBarrier("receivedFiles")
           println(s"XXX subscriber2 enterBarrier receivedFiles")
-          subscription.unsubscribe()
         }
       }
 
@@ -276,7 +273,7 @@ class VbdsServerTest(name: String)
         assert(createResponse.status == StatusCodes.OK)
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
-        Source(1 to numFilesToPublish).runForeach { _ =>
+        Source(1 to numFilesToPublish+20).runForeach { _ =>
           client.publish(streamName, testFile, publisherDelay).await(shortTimeout)
         }
         within(longTimeout) {
