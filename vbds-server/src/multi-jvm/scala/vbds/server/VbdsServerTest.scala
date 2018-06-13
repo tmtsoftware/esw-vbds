@@ -62,8 +62,8 @@ object VbdsServerTest {
   val streamName = "WFS1-RAW"
 
   val testFileName = "vbdsTestFile"
-  val testFileSizeKb    = 1000 * 100
-  val numFilesToPublish = 100
+  val testFileSizeKb    = 1000 * 500
+  val numFilesToPublish = 20
   val printInterval     = 10
 
   val testFileSizeBytes = testFileSizeKb * 1000
@@ -80,7 +80,7 @@ object VbdsServerTest {
   val subscriber2Delay = Duration.Zero
 
   // If true, compare files to make sure the file was transferred correctly
-  val doCompareFiles = false
+  val doCompareFiles = true
 
   val testFile = makeFile(testFileSizeBytes, testFileName)
   testFile.deleteOnExit()

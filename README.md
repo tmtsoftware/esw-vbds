@@ -37,7 +37,7 @@ vbds-client 0.0.1
 Usage: vbds-client [options]
 
   -n, --name <name>        The name of the vbds-server server(default: vbds)
-  -h, --host <host name>   The VBDS HTTP server host name (default: 127.0.0.1)
+  --host <host name>       The VBDS HTTP server host name (default: 127.0.0.1)
   -p, --port <number>      The VBDS HTTP server port number (default: 80)
   --create <stream name>   Creates a new VBDS stream with the given name
   --delete <stream name>   Deletes the VBDS stream with the given name
@@ -46,7 +46,7 @@ Usage: vbds-client [options]
                            Subscribes to the given VBDS stream (see --action option)
   --dir <path>             Directory to hold received data files (default: current directory)
   -a, --action <shell-command>
-                           A shell command to execute when a new file is received (args: stream-name file-name)
+                           A shell command to execute when a new file is received (args: file-name)
   --publish <stream-name>  Publish to the given stream (see --data option)
   --delay <duration>       Delay between publishing files in a directory (see --data)
   --data <file-name>       Specifies the file (or directory full of files) to publish
@@ -55,6 +55,8 @@ Usage: vbds-client [options]
   --help                   
   --version                
 ```
+
+_Note that in the current implementation, the vdbs-client does not exit after short commands, such as publishing or creating a stream. This will be fixed later_
 
 ## VBDS REST API
 
@@ -65,41 +67,44 @@ Usage: vbds-client [options]
 | Delete a stream               | DELETE    | /vbds/admin/streams/{streamName} | OK (200) – Deleted stream name in JSON; NotFound (404) if stream does not exist
 | Publish an image to a stream  | POST      | /vbds/transfer/streams/{streamName}/image | Accepted (204) – (no content); Bad Request (400) – for non-existent stream
 | Create a subscription         | POST      | /vbds/access/streams/{streamName} | SwitchingProtocols (101) – Creates a websocket connection for receiving the data
-| Delete a subscription         | Delete    | /vbds/access/streams/{streamName} | Accepted (204) – (no content); NotFound (404) if stream does not exist
+
+To delete a subscription, just close the websocket for it. Subscriptions are automatically deleted if a client disconnects.
 
 ## Running the Server
 
-You can test `vbds-server` by first starting an instance as a seed node. For example:
+You can test `vbds-server` by first starting an instance as a seed node (hostA). For example:
 
-    vbds-server --http-port 7777 --akka-port 8888 -s 127.0.0.1:8888
+    vbds-server --http-host hostA --http-port 7777 --akka-host hostA --akka-port 8888 -s hostA:8888
 
-and then starting one or more other instances (normally on other hosts) that can join the Akka cluster:
+and then starting one or more other instances on other hosts that can join the Akka cluster:
 
-    vbds-server --http-port 7778 -s 127.0.0.1:8888
+    vbds-server --http-host hostB --http-port 7777 --akka-host hostB -s hostA:8888
 
 In the first case we specified an Akka port (8888) for the cluster seed node. In the second case, a random port was used,
-since no -akka-port option was specified. 
+since no -akka-port option was specified. We need to know the akka host and port for the seed node, 
+and of course the HTTP host and port, so we can send requests to it.
 
 
 ### Test Client Using [curl](https://curl.haxx.se/) and [wscat](https://github.com/websockets/wscat)
 
 Create a stream named `WFS1-RAW`:
 
-    curl --request POST http://127.0.0.1:7777/vbds/admin/streams/WFS1-RAW
+    curl --request POST http://hostA:7777/vbds/admin/streams/WFS1-RAW
 
-Subscribe to the stream using wscat (Install with `npm install -g wscat`)
+Subscribe to the stream using wscat (Just for testing, with non-binary files: Install with `npm install -g wscat`)
 
-    wscat -c ws://127.0.0.1:7777/vbds/access/streams/WFS1-RAW
+    wscat -c ws://hostA:7777/vbds/access/streams/WFS1-RAW
 
 Subscribe to the same stream from the other server:
 
-    wscat -c ws://127.0.0.1:7778/vbds/access/streams/WFS1-RAW
+    wscat -c ws://hostB:7777/vbds/access/streams/WFS1-RAW
 
 Publish some data (Replace MyFile with the file name):
 
-    curl --request POST -F data=@MyFile http://127.0.0.1:7777/vbds/transfer/streams/WFS1-RAW
+    curl --request POST -F data=@MyFile http://hostA:7777/vbds/transfer/streams/WFS1-RAW
 
-The data should be displayed in the stdout of the wscat application.
+The data should be displayed in the stdout of the wscat application. 
+Note that instead of a file, a directory can be specified, in which case all the files in the directory are sorted and sent (for testing).
 
 
 ## Multi-jvm and Multi-Node Tests
@@ -113,11 +118,75 @@ To test locally on different JVMs, run:
 To test with remote hosts, set the `multiNodeHosts` environment variable to a comma separated list of hosts and 
 then run `sbt multiNodeTest`. For example: 
 
-    export multiNodeHosts="192.168.178.77,username@192.168.178.36"
+    export multiNodeHosts="username@hostA,username@hostB"
     sbt multiNodeTest
 
 This copies the necessary jars to the `~/multi-node-test` dir on each host and runs a part of the test there.
 There are other settings that might be of interest. 
 See [Multi Node Testing](https://doc.akka.io/docs/akka/current/multi-node-testing.html).
 
+## Testing on AWS
+
+Assuming you have two (or more) CentOS hosts on [AWS](https://aws.amazon.com/) and you want to run the multi-node tests, 
+there are some issues to consider: 
+
+* The local system administrator (who has the AWS account) needs to configure the nodes to open the required ports 
+  (or all ports, if random ports are used).
+  Otherwise communication between the hosts will be blocked, exxcept for ssh connections.
+
+* If you want to run the multi-node test (`sbt multiNodeTest`), you should check out the vbds source code on one of the AWS hosts 
+  and run the sbt command from there using the internal IP addresses, which are different than the public IP addresses 
+  that would be needed from the outside.
+  
+* The same goes for testing manually with the vbds-server command line app: Use the internal IP addresses, otherwise there will be
+  problems with the cluster.
+
+
+## Performance Test Results
+
+Test with one Publisher, with two subscribers: One subscriber on host A, one subscriber on host B (publisher on host A):
+
+* 1000 x 1mb files:
+
+```
+[JVM-3] subscriber1: Received 1001 1000 kb files in 28.384 seconds (0.028 secs per file, 35.266 hz, 35.266 mb/sec)
+[JVM-4] subscriber2: Received 1000 1000 kb files in 28.15 seconds (0.028 secs per file, 35.524 hz, 35.524 mb/sec)
+```
+
+* 100 x 100mb files:
+
+```
+[JVM-3] subscriber1: Received 100 100000 kb files in 101.225 seconds (1.012 secs per file, 0.988 hz, 98.790 mb/sec)
+[JVM-4] subscriber2: Received 100 100000 kb files in 101.217 seconds (1.012 secs per file, 0.988 hz, 98.798 mb/sec) 
+```
+
+### Performance issues: Fast publisher, Fast and Slow Subscribers
+
+Akka streams are used in the tests on both client and server, with websockets in the middle.
+Obviously, if one of the subscribers is too slow, it will either have to buffer the received images, or skip some of them.
+Since the image data is sent in "chunks", just dropping a single websocket message would result in a corrupted image.
+The code would have to be smart enough to drop everything up until the next image.
+
+In the current test-client implementation, the received data is saved to temp files and deleted when done.
+
+Depending on how the client is implemented, a slow client could potentially cause the server to publisher at a slower rate.
+If this turns out to be a problem, it might be necessary to allow the subscribers to specify a slower rate.
+
+## Implementation Notes
+
+This is the basic flow of a published data file:
+
+* When a VBDS client publishes a data file, the client POSTS the data to the VBDS HTTP server.
+
+* The VBDS server receives the data in chunks and broadcasts it (using Akka Streams) to the local subscriber's websockets 
+  and also POSTS the data to any other VBDS servers that have subscribers for that stream 
+  (The websocket writes and HTTP POSTS are both in the same broadcast graph).
+
+* The other VBDS servers that receive the data also broadcast it to their subscribers.
+
+* On the client side, the clients receive multiple websocket messages for each data file, 
+  ending with a message containing a single newline, which is not part of the data.
+  The clients need to collect the data until the file is complete and then can display it, do calculations, etc.
+
+The clients have to decide what to do if another file arrives before the last one has been processed (i.e.: Buffer it or drop it).
 
