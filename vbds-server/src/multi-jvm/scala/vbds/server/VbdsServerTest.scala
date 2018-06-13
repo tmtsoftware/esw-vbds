@@ -80,7 +80,7 @@ object VbdsServerTest {
   val subscriber2Delay = Duration.Zero
 
   // If true, compare files to make sure the file was transferred correctly
-  val doCompareFiles = true
+  val doCompareFiles = false
 
   val testFile = makeFile(testFileSizeBytes, testFileName)
   testFile.deleteOnExit()
