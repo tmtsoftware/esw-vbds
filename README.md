@@ -174,7 +174,8 @@ Obviously, if one of the subscribers is too slow, it will either have to buffer 
 Since the image data is sent in "chunks", just dropping a single websocket message would result in a corrupted image.
 The code would have to be smart enough to drop everything up until the next image.
 
-In the current test-client implementation, the received data is saved to temp files and deleted when done.
+In the current test-client implementation, the received data is saved to temp files, the file names are streamed to the
+receiver and each received file is deleted when done.
 
 Depending on how the client is implemented, a slow client could potentially cause the server to publisher at a slower rate.
 If this turns out to be a problem, it might be necessary to allow the subscribers to specify a slower rate.
