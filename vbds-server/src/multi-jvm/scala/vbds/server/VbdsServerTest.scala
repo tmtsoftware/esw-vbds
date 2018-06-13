@@ -64,7 +64,7 @@ object VbdsServerTest {
   val testFileName = "vbdsTestFile"
   val testFileSizeKb    = 1000 * 500
   val numFilesToPublish = 20
-  val printInterval     = 10
+  val printInterval     = 1
 
   val testFileSizeBytes = testFileSizeKb * 1000
 
