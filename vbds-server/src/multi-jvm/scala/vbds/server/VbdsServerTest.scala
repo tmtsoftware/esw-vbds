@@ -101,13 +101,16 @@ object VbdsServerTest {
                           delay: FiniteDuration): Unit = {
 
     def printStats() = {
-      val testSecs    = (System.currentTimeMillis() - startTime) / 1000.0
-      val secsPerFile = testSecs / r.count
-      val mbPerSec    = (testFileSizeKb / 1000.0 * r.count) / testSecs
-      val hz          = 1.0 / secsPerFile
-      println(
-        f"$name: Received ${r.count} $testFileSizeKb kb files in $testSecs seconds ($secsPerFile%1.3f secs per file, $hz%1.3f hz, $mbPerSec%1.3f mb/sec)"
-      )
+      if (r.count > 1) {
+        val count = r.count -1 // Subtract 1, since a lazy val was usd for startTime, which means it would be 0 the first time through
+        val testSecs    = (System.currentTimeMillis() - startTime) / 1000.0
+        val secsPerFile = testSecs / count
+        val mbPerSec    = (testFileSizeKb / 1000.0 * count) / testSecs
+        val hz          = 1.0 / secsPerFile
+        println(
+          f"$name: Received $count $testFileSizeKb kb files in $testSecs seconds ($secsPerFile%1.3f secs per file, $hz%1.3f hz, $mbPerSec%1.3f mb/sec)"
+        )
+      }
     }
 
     if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
@@ -190,7 +193,7 @@ class VbdsServerTest(name: String)
         enterBarrier("subscribedToStream")
         within(longTimeout) {
           enterBarrier("receivedFiles")
-          println(s"XXX server1 enterBarrier receivedFiles")
+          println("server1: enterBarrier receivedFiles")
 //          bindingF.foreach(server.stop)
         }
       }
@@ -216,7 +219,7 @@ class VbdsServerTest(name: String)
         enterBarrier("subscribedToStream")
         within(longTimeout) {
           enterBarrier("receivedFiles")
-          println(s"XXX server2 enterBarrier receivedFiles")
+          println("server2: enterBarrier receivedFiles")
 //          bindingF.foreach(server.stop)
         }
       }
@@ -238,7 +241,7 @@ class VbdsServerTest(name: String)
 //        subscription.unsubscribe()
         within(longTimeout) {
           enterBarrier("receivedFiles")
-          println(s"XXX subscriber1 enterBarrier receivedFiles")
+          println("subscriber1: enterBarrier receivedFiles")
         }
       }
 
@@ -259,7 +262,7 @@ class VbdsServerTest(name: String)
 //        subscription.unsubscribe()
         within(longTimeout) {
           enterBarrier("receivedFiles")
-          println(s"XXX subscriber2 enterBarrier receivedFiles")
+          println("subscriber2: enterBarrier receivedFiles")
         }
       }
 
@@ -278,7 +281,7 @@ class VbdsServerTest(name: String)
         }
         within(longTimeout) {
           enterBarrier("receivedFiles")
-          println(s"XXX publisher1 enterBarrier receivedFiles")
+          println("publisher1: enterBarrier receivedFiles")
         }
       }
 
