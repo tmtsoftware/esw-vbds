@@ -146,18 +146,25 @@ there are some issues to consider:
 
 Test with one Publisher, with two subscribers: One subscriber on host A, one subscriber on host B (publisher on host A):
 
-* 1000 x 1mb files:
+* 1mb files:
 
 ```
 [JVM-3] subscriber1: Received 1001 1000 kb files in 28.384 seconds (0.028 secs per file, 35.266 hz, 35.266 mb/sec)
 [JVM-4] subscriber2: Received 1000 1000 kb files in 28.15 seconds (0.028 secs per file, 35.524 hz, 35.524 mb/sec)
 ```
 
-* 100 x 100mb files:
+* 100mb files:
 
 ```
 [JVM-3] subscriber1: Received 100 100000 kb files in 101.225 seconds (1.012 secs per file, 0.988 hz, 98.790 mb/sec)
 [JVM-4] subscriber2: Received 100 100000 kb files in 101.217 seconds (1.012 secs per file, 0.988 hz, 98.798 mb/sec) 
+```
+
+* 500mb files:
+
+```
+[JVM-3] subscriber1: Received 19 500000 kb files in 95.577 seconds (5.030 secs per file, 0.199 hz, 99.396 mb/sec)
+[JVM-4] subscriber2: Received 19 500000 kb files in 91.649 seconds (4.824 secs per file, 0.207 hz, 103.656 mb/sec)
 ```
 
 ### Performance issues: Fast publisher, Fast and Slow Subscribers
