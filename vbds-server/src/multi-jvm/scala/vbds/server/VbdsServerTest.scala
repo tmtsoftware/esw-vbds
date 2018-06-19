@@ -58,15 +58,16 @@ object VbdsServerTest {
   val seedPort        = 8888
   val server1HttpPort = 7777
   val server2HttpPort = server1HttpPort + 1
-
   val streamName = "WFS1-RAW"
-
   val testFileName = "vbdsTestFile"
-  val testFileSizeKb    = 1000 * 500
-  val numFilesToPublish = 20
-  val printInterval     = 1
 
-  val testFileSizeBytes = testFileSizeKb * 1000
+  // --- Edit this ---
+  val testFileSizeBytes = 4608
+  val numFilesToPublish = 5000
+  val printInterval     = 1000
+  // ---
+
+  val testFileSizeKb    = testFileSizeBytes/1000.0
 
   val shortTimeout = 10.seconds
   val longTimeout  = 10.hours // in case you want to test with lots of files...
@@ -108,7 +109,7 @@ object VbdsServerTest {
         val mbPerSec    = (testFileSizeKb / 1000.0 * count) / testSecs
         val hz          = 1.0 / secsPerFile
         println(
-          f"$name: Received $count $testFileSizeKb kb files in $testSecs seconds ($secsPerFile%1.3f secs per file, $hz%1.3f hz, $mbPerSec%1.3f mb/sec)"
+          f"$name: Received $count $testFileSizeBytes byte files in $testSecs seconds ($secsPerFile%1.3f secs per file, $hz%1.3f hz, $mbPerSec%1.3f mb/sec)"
         )
       }
     }
