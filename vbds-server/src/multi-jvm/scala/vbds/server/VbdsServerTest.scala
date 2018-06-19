@@ -63,8 +63,8 @@ object VbdsServerTest {
 
   // --- Edit this ---
   val testFileSizeBytes = 256*256
-  val numFilesToPublish = 10000
-  val printInterval     = 1000
+  val numFilesToPublish = 100000
+  val printInterval     = 10000
   // ---
 
   val testFileSizeKb    = testFileSizeBytes/1000.0
@@ -109,7 +109,7 @@ object VbdsServerTest {
         val mbPerSec    = (testFileSizeKb / 1000.0 * count) / testSecs
         val hz          = 1.0 / secsPerFile
         println(
-          f"$name: Received $count $testFileSizeBytes byte files in $testSecs seconds ($secsPerFile%1.3f secs per file, $hz%1.3f hz, $mbPerSec%1.3f mb/sec)"
+          f"$name: Received $count $testFileSizeBytes byte files in $testSecs seconds ($secsPerFile%1.4f secs per file, $hz%1.4f hz, $mbPerSec%1.4f mb/sec)"
         )
       }
     }
