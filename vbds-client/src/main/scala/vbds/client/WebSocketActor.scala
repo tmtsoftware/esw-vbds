@@ -71,7 +71,7 @@ class WebSocketActor(name: String,
       sender() ! Ack
 
     case bm: BinaryMessage ⇒
-      log.debug(s"$name: Received binary message for stream $streamName")
+//      log.debug(s"$name: Received binary message for stream $streamName")
       val replyTo = sender()
       val f       = bm.dataStream.map(handleByteString).runWith(Sink.ignore)
       f.onComplete {
@@ -104,13 +104,13 @@ class WebSocketActor(name: String,
         os.close()
         log.debug(s"$name: Wrote $file")
       }
-      log.debug(s"$name: Queue offer file $count on stream $streamName")
+      if (log.isDebugEnabled) log.debug(s"$name: Queue offer file $count on stream $streamName")
       val rf = ReceivedFile(streamName, count, file.toPath)
       queue.offer(rf).onComplete {
         case Success(queueOfferResult) =>
           queueOfferResult match {
             case QueueOfferResult.Enqueued =>
-              log.debug(s"$name: Enqueued ${rf.path}")
+              if (log.isDebugEnabled) log.debug(s"$name: Enqueued ${rf.path}")
             case QueueOfferResult.Dropped =>
               log.warning(s"$name: Dropped ${rf.path}")
             case QueueOfferResult.Failure(ex) =>
