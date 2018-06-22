@@ -38,6 +38,7 @@ object VbdsServerTestConfig extends MultiNodeConfig {
   commonConfig(ConfigFactory.parseString("""
       | akka.loglevel = INFO
       | akka.log-dead-letters-during-shutdown = off
+      | akka.testconductor.barrier-timeout = 60s
     """))
 
 }
