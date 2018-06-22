@@ -67,12 +67,12 @@ object VbdsServerTest {
 //  val testFileSizeBytes = 256*256*2
 //  val testFileSizeBytes = 48*48*2
   val numFilesToPublish = 50
-  val printInterval     = 10
+  val printInterval     = 1
   // ---
 
   val testFileSizeKb    = testFileSizeBytes/1000.0
 
-  val shortTimeout = 10.seconds
+  val shortTimeout = 60.seconds
   val longTimeout  = 10.hours // in case you want to test with lots of files...
 
   // Simulate a slow publisher/subscriber (XXX Not sure simulated slow subscriber is working correctly)
