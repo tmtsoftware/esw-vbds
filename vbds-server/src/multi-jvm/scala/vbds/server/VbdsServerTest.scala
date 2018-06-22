@@ -62,10 +62,11 @@ object VbdsServerTest {
   val testFileName = "vbdsTestFile"
 
   // --- Edit this ---
+  val testFileSizeBytes = 640 * 1000 * 1000 // 640 mb
 //  val testFileSizeBytes = 256*256*2
-  val testFileSizeBytes = 48*48*2
-  val numFilesToPublish = 100000/2
-  val printInterval     = 10000
+//  val testFileSizeBytes = 48*48*2
+  val numFilesToPublish = 500
+  val printInterval     = 100
   // ---
 
   val testFileSizeKb    = testFileSizeBytes/1000.0
@@ -278,7 +279,8 @@ class VbdsServerTest(name: String)
         assert(createResponse.status == StatusCodes.OK)
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
-        Source(1 to numFilesToPublish+20).runForeach { _ =>
+        // Note: +1 to make sure test completes
+        Source(1 to numFilesToPublish+1).runForeach { _ =>
           client.publish(streamName, testFile, publisherDelay).await(shortTimeout)
         }
         within(longTimeout) {

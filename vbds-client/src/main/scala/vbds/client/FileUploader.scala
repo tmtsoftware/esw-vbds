@@ -19,7 +19,6 @@ class FileUploader(chunkSize: Int = 1024 * 1024)(implicit val system: ActorSyste
 
   import system.dispatcher
 
-  // XXX TODO FIXME: Errors on exit?
   private def poolClientFlow(uri: Uri) = {
     Http().cachedHostConnectionPool[Path](uri.authority.host.address(), uri.authority.port)
   }
