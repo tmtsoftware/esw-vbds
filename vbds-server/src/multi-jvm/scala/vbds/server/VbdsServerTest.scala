@@ -65,14 +65,14 @@ object VbdsServerTest {
   // --- Edit this ---
 //  val testFileSizeBytes = 640 * 1000 * 1000 // 640 mb
 //  val testFileSizeBytes = 1000 * 1000 * 1000 // 1gb (XXX timed out)
-  val testFileSizeBytes =   75 * 1000 * 1000 // 75mb
-//  val testFileSizeBytes = 256*256*2
+//  val testFileSizeBytes =   75 * 1000 * 1000 // 75mb
+  val testFileSizeBytes = 256*256*2
 //  val testFileSizeBytes = 48*48*2
   val numFilesToPublish = 5000
   val printInterval     = 1000
   // ---
 
-  val testFileSizeKb    = testFileSizeBytes/1000.0
+  val testFileSizeMb    = testFileSizeBytes/1000000.0
 
   val shortTimeout = 60.seconds
   val longTimeout  = 10.hours // in case you want to test with lots of files...
@@ -111,7 +111,7 @@ object VbdsServerTest {
         val count = r.count -1 // Subtract 1, since a lazy val was usd for startTime, which means it would be 0 the first time through
         val testSecs    = (System.currentTimeMillis() - startTime) / 1000.0
         val secsPerFile = testSecs / count
-        val mbPerSec    = (testFileSizeKb / 1000.0 * count) / testSecs
+        val mbPerSec    = (testFileSizeMb * count) / testSecs
         val hz          = 1.0 / secsPerFile
         println(
           f"$name: Received $count $testFileSizeBytes byte files in $testSecs seconds ($secsPerFile%1.4f secs per file, $hz%1.4f hz, $mbPerSec%1.4f mb/sec)"
