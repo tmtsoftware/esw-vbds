@@ -91,6 +91,9 @@ object VbdsServerTest {
   val testFile = makeFile(testFileSizeBytes, testFileName)
   testFile.deleteOnExit()
 
+  // Time at start of each set of test files (print interval)
+  var startTime: Long = System.currentTimeMillis()
+
   private def getTempDir(name: String): File = {
     val dir = new File(s"${System.getProperty("java.io.tmpdir")}/$name")
     dir.mkdir()
@@ -103,21 +106,17 @@ object VbdsServerTest {
   private def receiveFile(name: String,
                           r: ReceivedFile,
                           promise: Promise[ReceivedFile],
-                          startTime: => Long,
                           delay: FiniteDuration): Unit = {
 
-    val t = startTime
     def printStats() = {
-      if (r.count > 1) {
-        val count = r.count -1 // Subtract 1, since a lazy val was usd for startTime, which means it would be 0 the first time through
-        val testSecs    = (System.currentTimeMillis() - t) / 1000.0
-        val secsPerFile = testSecs / count
-        val mbPerSec    = (testFileSizeMb * count) / testSecs
-        val hz          = 1.0 / secsPerFile
-        println(
-          f"$name: Received $count $testFileSizeBytes byte files in $testSecs seconds ($secsPerFile%1.4f secs per file, $hz%1.4f hz, $mbPerSec%1.4f mb/sec)"
-        )
-      }
+      val testSecs = (System.currentTimeMillis() - printInterval) / 1000.0
+      val secsPerFile = testSecs / printInterval
+      val mbPerSec = (testFileSizeMb * printInterval) / testSecs
+      val hz = 1.0 / secsPerFile
+      println(
+        f"$name: Received $printInterval $testFileSizeBytes byte files in $testSecs seconds ($secsPerFile%1.4f secs per file, $hz%1.4f hz, $mbPerSec%1.4f mb/sec)"
+      )
+      startTime = System.currentTimeMillis()
     }
 
     if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
@@ -140,11 +139,10 @@ object VbdsServerTest {
   def makeQueue(name: String, promise: Promise[ReceivedFile], log: LoggingAdapter, delay: FiniteDuration)(
       implicit mat: Materializer
   ): SourceQueueWithComplete[ReceivedFile] = {
-    lazy val startTime: Long = System.currentTimeMillis()
     println(s"$name: Started timing")
     Source
       .queue[ReceivedFile](20, OverflowStrategy.backpressure)
-      .map(receiveFile(name, _, promise, startTime, delay))
+      .map(receiveFile(name, _, promise, delay))
       .to(Sink.ignore)
       .run()
   }
