@@ -106,10 +106,11 @@ object VbdsServerTest {
                           startTime: => Long,
                           delay: FiniteDuration): Unit = {
 
+    val t = startTime
     def printStats() = {
       if (r.count > 1) {
         val count = r.count -1 // Subtract 1, since a lazy val was usd for startTime, which means it would be 0 the first time through
-        val testSecs    = (System.currentTimeMillis() - startTime) / 1000.0
+        val testSecs    = (System.currentTimeMillis() - t) / 1000.0
         val secsPerFile = testSecs / count
         val mbPerSec    = (testFileSizeMb * count) / testSecs
         val hz          = 1.0 / secsPerFile
