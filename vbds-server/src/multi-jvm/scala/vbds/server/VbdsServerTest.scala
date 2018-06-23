@@ -282,8 +282,8 @@ class VbdsServerTest(name: String)
         assert(createResponse.status == StatusCodes.OK)
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
-        // Note: +1 to make sure test completes
-        Source(1 to numFilesToPublish+1).runForeach { _ =>
+        // Note: +5 to make sure test completes
+        Source(1 to numFilesToPublish+5).runForeach { _ =>
           client.publish(streamName, testFile, publisherDelay).await(shortTimeout)
         }
         within(longTimeout) {
