@@ -109,12 +109,12 @@ object VbdsServerTest {
                           delay: FiniteDuration): Unit = {
 
     def printStats() = {
-      val testSecs = (System.currentTimeMillis() - printInterval) / 1000.0
+      val testSecs = (System.currentTimeMillis() - startTime) / 1000.0
       val secsPerFile = testSecs / printInterval
       val mbPerSec = (testFileSizeMb * printInterval) / testSecs
       val hz = 1.0 / secsPerFile
       println(
-        f"$name: Received $printInterval $testFileSizeBytes byte files in $testSecs seconds ($secsPerFile%1.4f secs per file, $hz%1.4f hz, $mbPerSec%1.4f mb/sec)"
+        f"$name: ${r.count}: Received $printInterval $testFileSizeBytes byte files in $testSecs seconds ($secsPerFile%1.4f secs per file, $hz%1.4f hz, $mbPerSec%1.4f mb/sec)"
       )
       startTime = System.currentTimeMillis()
     }
