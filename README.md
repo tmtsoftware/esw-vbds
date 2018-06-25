@@ -61,7 +61,7 @@ _Note that in the current implementation, the vdbs-client does not exit after sh
 ## VBDS REST API
 
 | Description                   | Verb      | URI                               | Response |
-| ----------------------------- |    -------|---------------------------------- |--------- |          
+| ----------------------------- |-----------|---------------------------------- |--------- |          
 | List all streams              | GET       | /vbds/admin/streams              | OK (200) – Stream names in JSON; empty document if no streams
 | Create a stream               | POST      | /vbds/admin/streams/{streamName} | OK (200) – New stream name in JSON; Conflict (409) if stream exists
 | Delete a stream               | DELETE    | /vbds/admin/streams/{streamName} | OK (200) – Deleted stream name in JSON; NotFound (404) if stream does not exist
@@ -145,27 +145,28 @@ there are some issues to consider:
 ## Performance Test Results
 
 Test with one Publisher, with two subscribers: One subscriber on host A, one subscriber on host B (publisher on host A):
+(Tests were performed on two AWS hosts with a 10 gigabit ethernet connection and CPU: Intel(R) Xeon(R) Platinum 8175M CPU @ 2.50GHz.)
 
-* 1mb files:
+1 gb files:
 
-```
-[JVM-3] subscriber1: Received 1001 1000 kb files in 28.384 seconds (0.028 secs per file, 35.266 hz, 35.266 mb/sec)
-[JVM-4] subscriber2: Received 1000 1000 kb files in 28.15 seconds (0.028 secs per file, 35.524 hz, 35.524 mb/sec)
-```
+    3.7437 secs per file, 0.2671 hz, 267.1154 mb/sec
 
-* 100mb files:
+640 mb files:
 
-```
-[JVM-3] subscriber1: Received 100 100000 kb files in 101.225 seconds (1.012 secs per file, 0.988 hz, 98.790 mb/sec)
-[JVM-4] subscriber2: Received 100 100000 kb files in 101.217 seconds (1.012 secs per file, 0.988 hz, 98.798 mb/sec) 
-```
+    2.3990 secs per file, 0.4168 hz, 266.7834 mb/sec
 
-* 500mb files:
+75mb files:
 
-```
-[JVM-3] subscriber1: Received 19 500000 kb files in 95.577 seconds (5.030 secs per file, 0.199 hz, 99.396 mb/sec)
-[JVM-4] subscriber2: Received 19 500000 kb files in 91.649 seconds (4.824 secs per file, 0.207 hz, 103.656 mb/sec)
-```
+    0.2994 secs per file, 3.3395 hz, 250.4625 mb/sec
+
+256 x 256 x 2 = 131 kb files
+
+    0.0037 secs per file, 268.2403 hz, 35.1588 mb/sec
+
+48 x 48 x 2 = 4608 byte files:
+
+    0.0034 secs per file, 290.4697 hz, 1.3385 mb/sec
+
 
 ### Performance issues: Fast publisher, Fast and Slow Subscribers
 
