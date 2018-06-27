@@ -17,7 +17,7 @@ class AdminRoute(adminData: AdminApi) extends Directives with JsonSupport {
       // List all streams: Response: OK: Stream names in JSON; empty document if no streams
       get {
         onSuccess(adminData.listStreams()) { streams =>
-          complete(streams)
+          Cors.cors(complete(streams))
         }
       } ~
         // Create a stream, Response: OK: Stream name returned as JSON, or 409: Conflict stream exists

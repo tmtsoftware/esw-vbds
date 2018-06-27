@@ -35,7 +35,7 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
     // List all streams: Response: OK: Stream names in JSON; empty document if no streams
     get {
       onSuccess(adminApi.listStreams()) { streams =>
-        complete(streams)
+        Cors.cors(complete(streams))
       }
     } ~
     // Publish a data file to a stream, Response: 204 – Success (no content) or 400 – Bad Request (non- existent stream)

@@ -35,7 +35,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
       // List all streams: Response: OK: Stream names in JSON; empty document if no streams
       get {
         onSuccess(adminData.listStreams()) { streams =>
-          complete(streams)
+          Cors.cors(complete(streams))
         }
         // Create a stream subscription: Response: SwitchingProtocols - Creates a websocket connection to the Access Service
         path(Remaining) { name =>
