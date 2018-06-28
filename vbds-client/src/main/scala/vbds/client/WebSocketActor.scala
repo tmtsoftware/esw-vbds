@@ -14,6 +14,9 @@ import vbds.client.WebSocketActor._
 import scala.concurrent.duration._
 import scala.util._
 
+/**
+  * An actor that receives websocket messages from the VBDS server.
+  */
 object WebSocketActor {
 
   sealed trait WebSocketActorMessage
@@ -43,6 +46,9 @@ object WebSocketActor {
     Props(new WebSocketActor(name, streamName, dir, queue, saveFiles))
 }
 
+/**
+  * An actor that receives websocket messages from the VBDS server.
+  */
 class WebSocketActor(name: String,
                      streamName: String,
                      dir: File,
