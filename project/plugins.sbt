@@ -4,3 +4,9 @@ addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.5.1")
 addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.3.3")
 addSbtPlugin("com.eed3si9n" % "sbt-buildinfo" % "0.8.0")
 addSbtPlugin("com.typesafe.sbt" % "sbt-multi-jvm" % "0.4.0")
+
+// web client
+addSbtPlugin("org.scala-js" % "sbt-scalajs" % "0.6.22")
+addSbtPlugin("ch.epfl.scala" % "sbt-scalajs-bundler" % "0.13.0")
+addSbtPlugin("com.lihaoyi" % "workbench" % "0.4.1")
+
