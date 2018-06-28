@@ -57,11 +57,11 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
 
               onSuccess(accessData.addSubscription(name, id, sink)) { _ =>
                 extractUpgradeToWebSocket { upgrade =>
-                  complete(upgrade.handleMessagesWithSinkSource(inSink, source.map(BinaryMessage(_))))
+                  Cors.cors(complete(upgrade.handleMessagesWithSinkSource(inSink, source.map(BinaryMessage(_)))))
                 }
               }
             } else {
-              complete(StatusCodes.NotFound -> s"The stream $name does not exists")
+              Cors.cors(complete(StatusCodes.NotFound -> s"The stream $name does not exists"))
             }
           }
         }
@@ -72,11 +72,11 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
             onSuccess(accessData.subscriptionExists(id)) { exists =>
               if (exists) {
                 onSuccess(accessData.deleteSubscription(id)) {
-                  complete(StatusCodes.Accepted)
+                  Cors.cors(complete(StatusCodes.Accepted))
                 }
               } else {
-                complete(
-                  StatusCodes.NotFound -> s"The subscription with the id $id does not exist")
+                Cors.cors(complete(
+                  StatusCodes.NotFound -> s"The subscription with the id $id does not exist"))
               }
             }
 

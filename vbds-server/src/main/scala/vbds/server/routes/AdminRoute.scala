@@ -25,10 +25,10 @@ class AdminRoute(adminData: AdminApi) extends Directives with JsonSupport {
           path(Remaining) { name =>
             onSuccess(adminData.streamExists(name)) { exists =>
               if (exists) {
-                complete(Conflict -> s"The stream $name already exists")
+                Cors.cors(complete(Conflict -> s"The stream $name already exists"))
               } else {
                 onSuccess(adminData.addStream(name)) { info =>
-                  complete(info)
+                  Cors.cors(complete(info))
                 }
               }
             }
@@ -40,10 +40,10 @@ class AdminRoute(adminData: AdminApi) extends Directives with JsonSupport {
             onSuccess(adminData.streamExists(name)) { exists =>
               if (exists) {
                 onSuccess(adminData.deleteStream(name)) { info =>
-                  complete(info)
+                  Cors.cors(complete(info))
                 }
               } else {
-                complete(NotFound -> s"The stream $name does not exists")
+                Cors.cors(complete(NotFound -> s"The stream $name does not exists"))
               }
             }
 

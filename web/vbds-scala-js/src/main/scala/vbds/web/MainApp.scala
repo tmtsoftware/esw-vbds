@@ -1,21 +1,35 @@
 package vbds.web
 
 import org.scalajs.dom
+import org.scalajs.dom.{Event, MessageEvent}
+import org.scalajs.dom.raw.WebSocket
 
 object MainApp {
 
   import upickle.default._
+
   case class StreamInfo(name: String)
+
   object StreamInfo {
-      implicit def rw: ReadWriter[StreamInfo] = macroRW
+    implicit def rw: ReadWriter[StreamInfo] = macroRW
   }
 
-  private val listStreamsUri = "http://192.168.178.77:7777/vbds/admin/streams"
+  // XXX TODO FIXME: Add feature to enter or discover host and port of vbds-server!
+  val host = "192.168.178.77"
+  val port = 7777
+
+  val adminRoute                = "/vbds/admin/streams"
+  val accessRoute               = "/vbds/access/streams"
+  val transferRoute             = "/vbds/transfer/streams"
+
+  private val listStreamsUri = s"http://$host:$port$adminRoute"
+
+  private def subscribeUri(stream: String) = s"ws://$host:$port$accessRoute/$stream"
 
   // Combobox listing the available streams
   private val streamsItem = {
     import scalatags.JsDom.all._
-    select(onchange := subscribeToStream _)(
+    select(onchange := MainApp.this.subscribeToStream _)(
       option(value := "", selected := true)("")
     ).render
   }
@@ -43,13 +57,11 @@ object MainApp {
   }
 
 
-  // Temp: print streams
-  private def listStreams(): Unit = {
-    // XXX temp
-
+  // Update the menu with the list of streams
+  private def updateStreamsList(): Unit = {
     val xhr = new dom.XMLHttpRequest()
     xhr.open("GET", listStreamsUri)
-    xhr.onload = { e: dom.Event =>
+    xhr.onload = { _: dom.Event =>
       if (xhr.status == 200) {
         println(s"XXX Streams available: ${xhr.responseText}")
         val streams = read[List[StreamInfo]](xhr.responseText)
@@ -61,12 +73,26 @@ object MainApp {
   }
 
 
-  // Called when button is pressed
+  // Called when a stream is selected: Subscribe to the websocket for the stream
   private def subscribeToStream(): Unit = {
-    val s = streamsItem.value
-    println(s"Subscribe to stream: $s")
+    // XXX TODO FIXME: Unsubscribe to previous stream!
 
-    //      JS9Wrapper.Load("file:///shared/data/tmt/frames/input/out-12363.jpg")
+    getSelectedStream.foreach { stream =>
+      println(s"Subscribe to stream: $stream")
+      val ws = new WebSocket(subscribeUri(stream))
+      ws.onopen = { event: Event ⇒
+        println(s"Opened websocket for stream $stream")
+      }
+      ws.onerror = { event: Event ⇒
+        println(s"Error for stream $stream websocket: $event")
+      }
+      ws.onmessage = { event: MessageEvent ⇒
+        println(s"Received message on websocket for stream $stream")
+      }
+      ws.onclose = { event: Event ⇒
+        println(s"Websocket closed for stream $stream")
+      }
+    }
   }
 
 
@@ -74,11 +100,11 @@ object MainApp {
     import scalatags.JsDom.all._
     println("Starting 'vbds-scala-js'...")
 
-//    val streamField = input(`type` := "text").render
+    //    val streamField = input(`type` := "text").render
 
-    listStreams()
+    updateStreamsList()
 
-//    val subscribeButton = button(`type` := "submit", onclick := subscribeToStream _)("Subscribe").render
+    //    val subscribeButton = button(`type` := "submit", onclick := subscribeToStream _)("Subscribe").render
 
     val layout = div(
       p("VBDS Test"),

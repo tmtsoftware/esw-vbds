@@ -48,13 +48,13 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
                 // Add a ByteString containing a single newline to mark the end of the stream for one data file
                 val terminatedSource = source.concat(Source.single(ByteString("\n")))
                 onSuccess(transferApi.publish(streamName, terminatedSource, dist = true)) { _ =>
-                  complete(Accepted)
+                  Cors.cors(complete(Accepted))
                 }
             }
           } else {
             extractRequest { r =>
               r.discardEntityBytes()
-              complete(BadRequest -> s"The stream $streamName does not exists")
+              Cors.cors(complete(BadRequest -> s"The stream $streamName does not exists"))
             }
           }
         }
@@ -68,7 +68,7 @@ class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: Trans
         withoutSizeLimit {
           extractDataBytes { source =>
             onSuccess(transferApi.publish(streamName, source, dist = false)) { _ =>
-              complete(Accepted)
+              Cors.cors(complete(Accepted))
             }
           }
 
