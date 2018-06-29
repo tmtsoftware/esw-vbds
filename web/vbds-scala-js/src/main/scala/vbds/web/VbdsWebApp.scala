@@ -10,20 +10,22 @@ import VbdsWebApp._
 
 import upickle.default._
 
-
+/**
+  * A web app that lets you subscribe to vbds images and displays them in a JS9 window on the page.
+  */
 object VbdsWebApp {
 
   // Object returns when listing streams
-  case class StreamInfo(name: String)
+  private case class StreamInfo(name: String)
 
-  object StreamInfo {
+  private object StreamInfo {
     // JSON support
     implicit def rw: ReadWriter[StreamInfo] = macroRW
   }
 
   // XXX TODO FIXME: Add feature to enter or discover host and port of vbds-server!
   private val host = "192.168.178.77"
-  val port = 7777
+  private val port = 7777
 
   // vbds server routes
   private val adminRoute                = "/vbds/admin/streams"
@@ -42,6 +44,10 @@ class VbdsWebApp {
 
   // Can't save temp files from the browser, so have to keep the image parts in memory...
   private var currentImageData: List[Uint8Array] = Nil
+
+  // WebSocket for current subscription
+  private var currentWebSocket: Option[WebSocket] = None
+
 
   // Combobox listing the available streams
   private val streamsItem = {
@@ -70,16 +76,13 @@ class VbdsWebApp {
     }
   }
 
-
   // Update the menu with the list of streams
   private def updateStreamsList(): Unit = {
     val xhr = new dom.XMLHttpRequest()
     xhr.open("GET", listStreamsUri)
     xhr.onload = { _: dom.Event =>
       if (xhr.status == 200) {
-        println(s"XXX Streams available: ${xhr.responseText}")
         val streams = read[List[StreamInfo]](xhr.responseText)
-        println(s"XXX List of streams: $streams")
         updateStreamOptions(streams)
       }
     }
@@ -89,27 +92,24 @@ class VbdsWebApp {
   // Combine the image parts and send to the display
   private def displayImage(): Unit = {
     val buffers = currentImageData.reverse
-    val length = buffers.map(_.byteLength).sum
-    val offsets = buffers.map(_.byteLength).scanLeft(0)(_+_).reverse.tail.reverse
-    val imageData = new Uint8Array(length)
-    buffers.zip(offsets).foreach { p =>
-      imageData.set(p._1, p._2)
-    }
     currentImageData = Nil
     val properties = js.Dynamic.literal("type" -> "image/fits").asInstanceOf[BlobPropertyBag]
-    val blob = new Blob(js.Array(imageData), properties)
-    JS9Wrapper.Load(blob)
+    // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
+    val blob = new Blob(js.Array(buffers :_*), properties)
+//    JS9.Load(blob)
+    JS9.RefreshImage(blob)
   }
 
   // Called when a stream is selected: Subscribe to the websocket for the stream
   private def subscribeToStream(event: dom.Event): Unit = {
-    // XXX TODO FIXME: Unsubscribe to previous stream!
+    // Close previous web socket, which unsubscribes to the previous stream
+    currentWebSocket.foreach(_.close())
 
     getSelectedStream.foreach { stream =>
       println(s"Subscribe to stream: $stream")
       val ws = new WebSocket(subscribeUri(stream))
+      currentWebSocket = Some(ws)
       ws.binaryType = "arraybuffer"
-
       ws.onopen = { _: Event ⇒
         println(s"Opened websocket for stream $stream")
       }
@@ -117,12 +117,12 @@ class VbdsWebApp {
         println(s"Error for stream $stream websocket: $event")
       }
       ws.onmessage = { event: MessageEvent ⇒
-//        println(s"Received message on websocket for stream: $stream: ${event.data}")
         val arrayBuffer = event.data.asInstanceOf[ArrayBuffer]
+        // End marker is a message with one byte ("\n")
         if (arrayBuffer.byteLength == 1) {
           displayImage()
         } else {
-          currentImageData =  new Uint8Array(arrayBuffer, 0, arrayBuffer.byteLength) :: currentImageData
+          currentImageData =  new Uint8Array(arrayBuffer) :: currentImageData
         }
       }
       ws.onclose = { event: Event ⇒

@@ -42,10 +42,10 @@ object Dependencies {
     "com.github.japgolly.scalacss" %%% "core" % "0.5.5",
     "com.github.japgolly.scalacss" %%% "ext-scalatags" % "0.5.5",
     "com.lihaoyi" %%% "upickle" % "0.6.6",
-    "org.scalatest" %%% "scalatest" % "3.0.5" % "test",
+    "org.scalatest" %%% "scalatest" % "3.0.5" % "test"
 
-    "org.akka-js" %%% "akkajsactor" % "1.2.5.13",
-    "org.akka-js" %%% "akkajsactorstream" % "1.2.5.13"
+//    "org.akka-js" %%% "akkajsactor" % "1.2.5.13",
+//    "org.akka-js" %%% "akkajsactorstream" % "1.2.5.13"
   ))
 
 }

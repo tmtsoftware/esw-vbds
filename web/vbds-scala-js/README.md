@@ -13,7 +13,7 @@ To build and test the web app, run:
 
 and point your browser at:
 
-    http://localhost:12345/target/scala-2.12/classes/index-dev.html
+    http://localhost:12345/web/vbds-scala-js/target/scala-2.12/classes/index-dev.html
 
 You can ignore the errors and warnings printed by the scalajs-bundler sbt plugin. (TODO)
 
