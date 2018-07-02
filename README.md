@@ -144,8 +144,8 @@ there are some issues to consider:
 
 ## Performance Test Results
 
-Test with one Publisher, with two subscribers: One subscriber on host A, one subscriber on host B (publisher on host A):
-(Tests were performed on two AWS hosts with a 10 gigabit ethernet connection and CPU: Intel(R) Xeon(R) Platinum 8175M CPU @ 2.50GHz.)
+The VBDS was tested with one Publisher, and two subscribers: One subscriber on host A, one subscriber on host B (publisher on host A).
+The tests were performed on two AWS hosts with a 10 gigabit ethernet connection and CPU: Intel(R) Xeon(R) Platinum 8175M CPU @ 2.50GHz:
 
 1 gb files:
 
@@ -166,6 +166,24 @@ Test with one Publisher, with two subscribers: One subscriber on host A, one sub
 48 x 48 x 2 = 4608 byte files:
 
     0.0034 secs per file, 290.4697 hz, 1.3385 mb/sec
+
+For comparison, here are the results on another pair of AWS machines with a slower network connection (1 gigabit ethernet connection and CPU: Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz):
+
+100 mb files:
+
+    1.012 secs per file, 0.988 hz, 98.790 mb/sec
+
+1 mb files:
+
+    0.028 secs per file, 35.266 hz, 35.266 mb/sec
+
+256 x 256 x 2 = 131 kb files
+
+    0.0063 secs per file, 157.6551 hz, 20.6642 mb/sec
+    
+48 x 48 x 2 = 4608 byte files:
+
+    0.0048 secs per file, 209.9643 hz, 0.9675 mb/sec
 
 
 ### Performance issues: Fast publisher, Fast and Slow Subscribers
