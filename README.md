@@ -56,6 +56,9 @@ Usage: vbds-client [options]
   --version                
 ```
 
+A prototype web app based on [Scala.js](https://www.scala-js.org/) and [JS9](https://js9.si.edu/) is available under 
+[web/vbds-scala-js](web/vbds-scala-js)
+
 _Note that in the current implementation, the vdbs-client does not exit after short commands, such as publishing or creating a stream. This will be fixed later_
 
 ## VBDS REST API
