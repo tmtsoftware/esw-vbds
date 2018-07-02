@@ -23,20 +23,10 @@ object VbdsWebApp {
     implicit def rw: ReadWriter[StreamInfo] = macroRW
   }
 
-  // XXX TODO FIXME: Add feature to enter or discover host and port of vbds-server!
-  private val host = "192.168.178.77"
-  private val port = 7777
-
   // vbds server routes
   private val adminRoute                = "/vbds/admin/streams"
   private val accessRoute               = "/vbds/access/streams"
   //  private val transferRoute             = "/vbds/transfer/streams"
-
-  // URI to get a list of streams
-  private val listStreamsUri = s"http://$host:$port$adminRoute"
-
-  // URI to subscribe to a stream
-  private def subscribeUri(stream: String) = s"ws://$host:$port$accessRoute/$stream"
 
 }
 
@@ -47,6 +37,30 @@ class VbdsWebApp {
 
   // WebSocket for current subscription
   private var currentWebSocket: Option[WebSocket] = None
+
+  private val (hostField, portField) = {
+    // XXX TODO: FIXME
+    import scalatags.JsDom.all._
+    (
+      input(`type` := "text", value := "192.168.178.77").render,
+      input(`type` := "text", value := "7777").render
+    )
+  }
+
+ private val updateStreamsListButton = {
+   import scalatags.JsDom.all._
+   button(`type` := "submit", onclick := updateStreamsList _)("Update").render
+ }
+
+  // URI to get a list of streams
+  private def listStreamsUri = {
+    s"http://${hostField.value}:${portField.value}$adminRoute"
+  }
+
+  // URI to subscribe to a stream
+  private def subscribeUri(stream: String) = {
+    s"ws://${hostField.value}:${portField.value}$accessRoute/$stream"
+  }
 
 
   // Combobox listing the available streams
@@ -83,6 +97,7 @@ class VbdsWebApp {
     xhr.onload = { _: dom.Event =>
       if (xhr.status == 200) {
         val streams = read[List[StreamInfo]](xhr.responseText)
+        println(s"XXX streams = $streams")
         updateStreamOptions(streams)
       }
     }
@@ -93,6 +108,7 @@ class VbdsWebApp {
   private def displayImage(): Unit = {
     val buffers = currentImageData.reverse
     currentImageData = Nil
+//    JS9.CloseImage()
     val properties = js.Dynamic.literal("type" -> "image/fits").asInstanceOf[BlobPropertyBag]
     // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
     val blob = new Blob(js.Array(buffers :_*), properties)
@@ -136,15 +152,16 @@ class VbdsWebApp {
     import scalatags.JsDom.all._
     println("Starting 'vbds-scala-js'...")
 
-    //    val streamField = input(`type` := "text").render
-    //    val subscribeButton = button(`type` := "submit", onclick := subscribeToStream _)("Subscribe").render
-
-    updateStreamsList()
-
+    // XXX TODO: Use css for layout...
     val layout = div(
       p("VBDS Test"),
-      p("Stream name: ", streamsItem)
+      p("VBDS Server"),
+      p("Host: ", hostField),
+      p("Port: ", portField),
+      p("Stream name: ", streamsItem, " ", updateStreamsListButton)
     ).render
+
+    JS9.SetImageInherit("true")
 
     dom.document.body.appendChild(layout.render)
   }
