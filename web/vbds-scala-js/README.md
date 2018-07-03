@@ -5,6 +5,7 @@ This directory contains a VBDS web client based on Scala.js and JS9.
 
 After checking out from Github, run this command to download JS9 and any other npm based dependencies:
 
+    cd web/vbds-scala-js
     npm install
 
 To build and test the web app, run:

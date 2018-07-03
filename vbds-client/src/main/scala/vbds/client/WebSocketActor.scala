@@ -11,6 +11,7 @@ import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.scaladsl.Sink
 import vbds.client.WebSocketActor._
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util._
 
@@ -79,7 +80,7 @@ class WebSocketActor(name: String,
     case bm: BinaryMessage ⇒
 //      log.debug(s"$name: Received binary message for stream $streamName")
       val replyTo = sender()
-      val f       = bm.dataStream.map(handleByteString).runWith(Sink.ignore)
+      val f       = bm.dataStream.mapAsync(1)(handleByteString).runWith(Sink.ignore)
       f.onComplete {
         case Success(_) =>
           replyTo ! Ack // ack to allow the stream to proceed sending more elements
@@ -104,7 +105,7 @@ class WebSocketActor(name: String,
     if (saveFiles) os = new FileOutputStream(file)
   }
 
-  private def handleByteString(bs: ByteString): Unit = {
+  private def handleByteString(bs: ByteString): Future[Unit] = {
     if (bs.size == 1 && bs.utf8String == "\n") {
       if (saveFiles) {
         os.close()
@@ -112,7 +113,8 @@ class WebSocketActor(name: String,
       }
       if (log.isDebugEnabled) log.debug(s"$name: Queue offer file $count on stream $streamName")
       val rf = ReceivedFile(streamName, count, file.toPath)
-      queue.offer(rf).onComplete {
+      val f = queue.offer(rf)
+      f.onComplete {
         case Success(queueOfferResult) =>
           queueOfferResult match {
             case QueueOfferResult.Enqueued =>
@@ -128,8 +130,10 @@ class WebSocketActor(name: String,
           log.error(ex, s"$name: Failed to enqueue ${rf.path}")
       }
       newFile()
+      f.map(_ => ())
     } else {
       if (saveFiles) os.write(bs.toArray)
+      Future.successful(())
     }
   }
 

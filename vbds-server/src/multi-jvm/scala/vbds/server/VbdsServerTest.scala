@@ -142,7 +142,7 @@ object VbdsServerTest {
   ): SourceQueueWithComplete[ReceivedFile] = {
     println(s"$name: Started timing")
     Source
-      .queue[ReceivedFile](20, OverflowStrategy.backpressure)
+      .queue[ReceivedFile](1, OverflowStrategy.backpressure)
       .map(receiveFile(name, _, promise, delay))
       .to(Sink.ignore)
       .run()
@@ -283,7 +283,7 @@ class VbdsServerTest(name: String)
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
         // Note: +5 to make sure test completes
-        Source(1 to numFilesToPublish+5).runForeach { _ =>
+        Source(1 to numFilesToPublish).runForeach { _ => // XXX might hang unless we add extra files at end?
           client.publish(streamName, testFile, publisherDelay).await(shortTimeout)
         }
         within(longTimeout) {
