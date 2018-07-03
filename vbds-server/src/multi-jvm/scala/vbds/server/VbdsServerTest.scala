@@ -65,11 +65,12 @@ object VbdsServerTest {
   // --- Edit this ---
 //  val testFileSizeBytes = 640 * 1000 * 1000 // 640 mb
 //  val testFileSizeBytes = 1000 * 1000 * 1000 // 1gb (XXX timed out)
-  val testFileSizeBytes =   75 * 1000 * 1000 // 75mb
+//  val testFileSizeBytes =   75 * 1000 * 1000 // 75mb
+  val testFileSizeBytes =   6 * 1000 * 1000 // 1mb
 //  val testFileSizeBytes = 256*256*2
 //  val testFileSizeBytes = 48*48*2
-  val numFilesToPublish = 5000
-  val printInterval     = 1000
+  val numFilesToPublish = 1000
+  val printInterval     = 100
   // ---
 
   val testFileSizeMb    = testFileSizeBytes/1000000.0
@@ -86,7 +87,7 @@ object VbdsServerTest {
   val subscriber2Delay = Duration.Zero
 
   // If true, compare files to make sure the file was transferred correctly
-  val doCompareFiles = false
+  val doCompareFiles = true
 
   val testFile = makeFile(testFileSizeBytes, testFileName)
   testFile.deleteOnExit()
@@ -194,7 +195,6 @@ class VbdsServerTest(name: String)
         )
         expectNoMessage(2.seconds)
         enterBarrier("deployed")
-        println("XXX server1: streamCreated")
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
         within(longTimeout) {
@@ -221,7 +221,6 @@ class VbdsServerTest(name: String)
 
         expectNoMessage(2.seconds)
         enterBarrier("deployed")
-        println("XXX server2: streamCreated")
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
         within(longTimeout) {
@@ -237,7 +236,6 @@ class VbdsServerTest(name: String)
         implicit val materializer = ActorMaterializer()
         enterBarrier("deployed")
         val client = new VbdsClient("subscriber1", host, server1HttpPort)
-        println("XXX subscriber1: streamCreated")
         enterBarrier("streamCreated")
         val promise = Promise[ReceivedFile]
         val queue   = makeQueue("subscriber1", promise, log, subscriber1Delay)
@@ -259,7 +257,6 @@ class VbdsServerTest(name: String)
         implicit val materializer = ActorMaterializer()
         enterBarrier("deployed")
         val client = new VbdsClient("subscriber2", host, server2HttpPort)
-        println("XXX subscriber2: streamCreated")
         enterBarrier("streamCreated")
         val promise = Promise[ReceivedFile]
         val queue   = makeQueue("subscriber2", promise, log, subscriber2Delay)
@@ -283,7 +280,6 @@ class VbdsServerTest(name: String)
         val client         = new VbdsClient("publisher1", host, server1HttpPort)
         val createResponse = client.createStream(streamName).await(shortTimeout)
         assert(createResponse.status == StatusCodes.OK)
-        println("XXX publisher1: streamCreated")
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
         // Note: +5 to make sure test completes

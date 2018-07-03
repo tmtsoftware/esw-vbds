@@ -1,7 +1,7 @@
 import sbt._
 
 object Libs {
-  val ScalaVersion = "2.12.4"
+  val ScalaVersion = "2.12.6"
 
   val `scalatest` = "org.scalatest" %% "scalatest" % "3.0.5" //Apache License 2.0
   val `scala-async` = "org.scala-lang.modules" %% "scala-async" % "0.9.7" //BSD 3-clause "New" or "Revised" License
