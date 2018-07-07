@@ -1,6 +1,6 @@
 package vbds.web
 
-import org.scalajs.dom.Blob
+import org.scalajs.dom.{Blob, BlobPropertyBag}
 
 import scala.scalajs.js
 import scala.scalajs.js.annotation._
@@ -35,7 +35,7 @@ object JS9 extends js.Object {
     * Some day, all browsers will support full 64-bit addressing and this problem will go away ...
     *
     */
-  def CloseImage(): Unit = js.native
+  def CloseImage(options: BlobPropertyBag = js.native): Unit = js.native
 
   /**
     * Set the image inherit mode.

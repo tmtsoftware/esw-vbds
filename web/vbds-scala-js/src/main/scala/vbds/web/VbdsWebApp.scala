@@ -1,5 +1,7 @@
 package vbds.web
 
+import java.util.Date
+
 import org.scalajs.dom
 import org.scalajs.dom.{BlobPropertyBag, Event, MessageEvent}
 import org.scalajs.dom.raw.{Blob, WebSocket}
@@ -7,7 +9,6 @@ import org.scalajs.dom.raw.{Blob, WebSocket}
 import scala.scalajs.js
 import scala.scalajs.js.typedarray.{ArrayBuffer, Uint8Array}
 import VbdsWebApp._
-
 import upickle.default._
 
 /**
@@ -28,6 +29,11 @@ object VbdsWebApp {
   private val accessRoute               = "/vbds/access/streams"
   //  private val transferRoute             = "/vbds/transfer/streams"
 
+  // XXX TODO FIXME: Pass in image type from server!
+  //    val loadProps = js.Dynamic.literal("type" -> "image/fits").asInstanceOf[BlobPropertyBag]
+  val loadProps = js.Dynamic.literal("type" -> "image/jpeg").asInstanceOf[BlobPropertyBag]
+
+  val closeProps = js.Dynamic.literal("clear" -> false).asInstanceOf[BlobPropertyBag]
 }
 
 class VbdsWebApp {
@@ -108,22 +114,24 @@ class VbdsWebApp {
   private def displayImage(): Unit = {
     val buffers = currentImageData.reverse
     currentImageData = Nil
-//    JS9.CloseImage()
-    val properties = js.Dynamic.literal("type" -> "image/fits").asInstanceOf[BlobPropertyBag]
+//    JS9.CloseImage(closeProps)
+
     // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
-    val blob = new Blob(js.Array(buffers :_*), properties)
-//    JS9.Load(blob)
-    JS9.RefreshImage(blob)
+    val blob = new Blob(js.Array(buffers :_*), loadProps)
+    JS9.Load(blob)
+//    JS9.RefreshImage(blob)
   }
 
   // Called when a stream is selected: Subscribe to the websocket for the stream
   private def subscribeToStream(event: dom.Event): Unit = {
     // Close previous web socket, which unsubscribes to the previous stream
     currentWebSocket.foreach(_.close())
+    JS9.SetImageInherit("true")
 
     getSelectedStream.foreach { stream =>
       println(s"Subscribe to stream: $stream")
       val ws = new WebSocket(subscribeUri(stream))
+      val ack = () => ws.send("ACK")
       currentWebSocket = Some(ws)
       ws.binaryType = "arraybuffer"
       ws.onopen = { _: Event ⇒
@@ -133,6 +141,7 @@ class VbdsWebApp {
         println(s"Error for stream $stream websocket: $event")
       }
       ws.onmessage = { event: MessageEvent ⇒
+        println(s"XXX Received Message: parts = ${currentImageData.size}")
         val arrayBuffer = event.data.asInstanceOf[ArrayBuffer]
         // End marker is a message with one byte ("\n")
         if (arrayBuffer.byteLength == 1) {
@@ -140,6 +149,13 @@ class VbdsWebApp {
         } else {
           currentImageData =  new Uint8Array(arrayBuffer) :: currentImageData
         }
+
+        // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
+//        ws.send("ACK")
+
+        // XXX TEMP
+        println(s"XXX ${new Date()}: Sending ACK")
+        dom.window.setTimeout(ack, 10000)
       }
       ws.onclose = { event: Event ⇒
         println(s"Websocket closed for stream $stream")
@@ -160,8 +176,6 @@ class VbdsWebApp {
       p("Port: ", portField),
       p("Stream name: ", streamsItem, " ", updateStreamsListButton)
     ).render
-
-    JS9.SetImageInherit("true")
 
     dom.document.body.appendChild(layout.render)
   }

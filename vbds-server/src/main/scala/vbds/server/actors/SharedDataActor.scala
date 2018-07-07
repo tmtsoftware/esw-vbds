@@ -9,13 +9,16 @@ import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.ddata.Replicator._
 import akka.stream.{ActorMaterializer, ClosedShape}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink, Source}
-import akka.util.ByteString
+import akka.util.{ByteString, Timeout}
 import vbds.server.models.{AccessInfo, ServerInfo, StreamInfo}
 import akka.pattern.pipe
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.{ContentTypes, HttpRequest}
+import akka.pattern.ask
+import scala.concurrent.duration._
+import vbds.server.routes.AccessRoute.WebsocketResponseActor
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
@@ -36,7 +39,7 @@ private[server] object SharedDataActor {
   // Tells the actor the host and port that the http server is listening on
   case class LocalAddress(a: InetSocketAddress) extends SharedDataActorMessages
 
-  case class AddSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed]) extends SharedDataActorMessages
+  case class AddSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef) extends SharedDataActorMessages
 
   case class DeleteSubscription(id: String) extends SharedDataActorMessages
 
@@ -56,6 +59,15 @@ private[server] object SharedDataActor {
    * @param port       subscriber's http port
    */
   private case class RemoteAccessInfo(streamName: String, host: String, port: Int)
+
+  /**
+    * Holds information per local subscriber
+    *
+    * @param sink Sink that writes to the subscriber's websocket
+    * @param wsResponseActor an Actor that is used to check if the client has processed the last message (to avoid overflow)
+    */
+  private[server] case class LocalSubscriberInfo(sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef)
+
 
   // Route used to distribute data to remote HTTP server
   val distRoute      = "/vbds/transfer/internal"
@@ -86,7 +98,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
   // A map with information about subscribers that subscribed via this server.
   // The key is from shared cluster data (CRDT) and the value is a Sink that writes to the subscriber's websocket
-  var localSubscribers = Map[AccessInfo, Sink[ByteString, NotUsed]]()
+  var localSubscribers = Map[AccessInfo, LocalSubscriberInfo]()
 
   // A map with information about remote HTTP servers with subscribers.
   // The key is from shared cluster data (CRDT) and the value is a flow thaht sends requests to the remote server.
@@ -130,11 +142,11 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       streams = data.elements
       log.debug("Current streams: {}", streams)
 
-    case AddSubscription(name, id, sink) =>
+    case AddSubscription(name, id, sink, wsResponseActor) =>
       log.debug(s"Adding Subscription to stream $name with id $id")
       val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, id)
       replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ + info)
-      localSubscribers = localSubscribers + (info -> sink)
+      localSubscribers = localSubscribers + (info -> LocalSubscriberInfo(sink, wsResponseActor))
       sender() ! info
 
     case DeleteSubscription(id) =>
@@ -206,7 +218,17 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
       // Send data for each local subscribers to its websocket
       def websocketFlow(a: AccessInfo): Flow[ByteString, ByteString, NotUsed] =
-        Flow[ByteString].alsoTo(localSubscribers(a)).map(_ => ByteString.empty)
+        Flow[ByteString].alsoTo(localSubscribers(a).sink).mapAsync(1) {_ =>
+          implicit val timeout = Timeout(20.seconds)
+          // Wait for ws client to respond in order to avoid overflowing the ws input buffer
+          log.info(s"XXX Before GET")
+          val f = (localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get).map(_ => ByteString.empty)
+          f.onComplete {
+            case Success(_) => log.info("XXX After GET")
+            case Failure(ex) => log.error("XXX Error After Get", ex)
+          }
+          f
+        }
 
       val localFlows = localSet.map(websocketFlow)
 
