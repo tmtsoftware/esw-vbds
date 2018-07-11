@@ -138,27 +138,10 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
     // We need a Source for writing to the websocket, but we want a Sink:
     // This provides a Sink that feeds the Source.
     val (outSink, outSource) = MergeHub.source[Message].preMaterialize()
-
-//    // Queue to send to server to acknowledge message, for flow control
-//    val outQueue = Source
-//      .queue[String](1, OverflowStrategy.backpressure)
-//      .map(TextMessage(_))
-//      .map { x =>
-//        println(s"\nXXXXXXXXXXX in outsource: $x\n")
-//        x
-//      }
-//      .to(outSink)
-//      .run()
-
     val receiver   = system.actorOf(WebSocketActor.props(name, streamName, dir, inQueue, outSink, saveFiles))
     val wsListener = new WebSocketListener
     val uri = Uri(s"ws://$host:$port$accessRoute/$streamName")
-    val result = wsListener.subscribe(uri, receiver, outSource)
-
-    // Send message to server to get started
-//    outQueue.offer("ACK")
-
-    result
+    wsListener.subscribe(uri, receiver, outSource)
   }
 
 }
