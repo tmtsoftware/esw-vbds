@@ -18,7 +18,6 @@ import vbds.server.routes.AccessRoute.WebsocketResponseActor
 object AccessRoute {
 
   // Actor to handle ACK responses from websocket clients
-  // (XXX TODO: Is it possible to do this with just streams?)
   object WebsocketResponseActor {
     // Responds with Ack if there is a response from the ws client
     final case object Get
@@ -105,6 +104,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
                 .to(Sink.onComplete[Message] { _ =>
                   log.info(s"Deleting subscription with id $id after client closed websocket connection")
                   accessData.deleteSubscription(id)
+                  system.stop(wsResponseActor)
                 })
 
               onSuccess(accessData.addSubscription(name, id, sink, wsResponseActor)) { _ =>

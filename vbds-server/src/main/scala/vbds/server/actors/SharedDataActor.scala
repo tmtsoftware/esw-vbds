@@ -209,6 +209,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
     // Construct a runnable graph that broadcasts the published data to all of the subscribers
     val g = RunnableGraph.fromGraph(GraphDSL.create(Sink.ignore) { implicit builder => out =>
       import GraphDSL.Implicits._
+      implicit val timeout = Timeout(20.seconds)
 
       // Broadcast with an output for each subscriber
       val bcast = builder.add(Broadcast[ByteString](numOut))
@@ -216,26 +217,22 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       // Merge afterwards to get a single output
       val merge = builder.add(Merge[ByteString](numOut))
 
-      // Send data for each local subscribers to its websocket
+      // Send data for each local subscribers to its websocket.
+      // Wait for ws client to respond in order to avoid overflowing the ws input buffer.
       def websocketFlow(a: AccessInfo): Flow[ByteString, ByteString, NotUsed] =
-        Flow[ByteString].alsoTo(localSubscribers(a).sink).mapAsync(1) {_ =>
-          implicit val timeout = Timeout(20.seconds)
-          // Wait for ws client to respond in order to avoid overflowing the ws input buffer
-          log.info(s"XXX Before GET")
-          val f = (localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get).map(_ => ByteString.empty)
-          f.onComplete {
-            case Success(_) => log.info("XXX After GET")
-            case Failure(ex) => log.error("XXX Error After Get", ex)
-          }
-          f
-        }
+        Flow[ByteString]
+          .alsoTo(localSubscribers(a).sink).mapAsync(1)(_ =>
+          (localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get).map(_ => ByteString.empty)
+        )
 
+      // Set of flows to local subscriber websockets
       val localFlows = localSet.map(websocketFlow)
 
       // If dist is true, send data for each remote subscriber as HTTP POST to the server hosting its websocket
       def requestFlow(h: ServerInfo): Flow[ByteString, HttpRequest, NotUsed] =
         Flow[ByteString].map(makeHttpRequest(streamName, h, _))
 
+      // Set of flows to remote servers containing subscribers
       val remoteFlows =
         if (dist) remoteHostSet.map(h => requestFlow(h).via(remoteConnections(h)).map(_ => ByteString.empty)) else Set.empty
 

@@ -114,7 +114,7 @@ class VbdsWebApp {
   private def displayImage(): Unit = {
     val buffers = currentImageData.reverse
     currentImageData = Nil
-//    JS9.CloseImage(closeProps)
+    JS9.CloseImage(closeProps)
 
     // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
     val blob = new Blob(js.Array(buffers :_*), loadProps)
@@ -141,7 +141,6 @@ class VbdsWebApp {
         println(s"Error for stream $stream websocket: $event")
       }
       ws.onmessage = { event: MessageEvent ⇒
-        println(s"XXX Received Message: parts = ${currentImageData.size}")
         val arrayBuffer = event.data.asInstanceOf[ArrayBuffer]
         // End marker is a message with one byte ("\n")
         if (arrayBuffer.byteLength == 1) {
@@ -149,13 +148,10 @@ class VbdsWebApp {
         } else {
           currentImageData =  new Uint8Array(arrayBuffer) :: currentImageData
         }
+        println(s"XXX Received Message: size = ${arrayBuffer.byteLength},  parts = ${currentImageData.size}")
 
         // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
-//        ws.send("ACK")
-
-        // XXX TEMP
-        println(s"XXX ${new Date()}: Sending ACK")
-        dom.window.setTimeout(ack, 10000)
+        ws.send("ACK")
       }
       ws.onclose = { event: Event ⇒
         println(s"Websocket closed for stream $stream")
