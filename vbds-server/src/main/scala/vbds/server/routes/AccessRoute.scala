@@ -2,7 +2,7 @@ package vbds.server.routes
 
 import java.util.UUID
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message}
@@ -31,7 +31,7 @@ object AccessRoute {
     def props(): Props = Props(new WebsocketResponseActor)
   }
 
-  class WebsocketResponseActor extends Actor {
+  class WebsocketResponseActor extends Actor with ActorLogging {
     import WebsocketResponseActor._
     def receive: Receive = receiveResponses(0, Nil)
 
@@ -93,7 +93,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
               // This provides a Sink that feeds the Source.
               val (sink, source) = MergeHub.source[ByteString].preMaterialize()
               val id             = UUID.randomUUID().toString
-              val wsResponseActor = system.actorOf(WebsocketResponseActor.props())
+                val wsResponseActor = system.actorOf(WebsocketResponseActor.props())
 
               val inSink = Flow[Message]
                 .map { msg =>

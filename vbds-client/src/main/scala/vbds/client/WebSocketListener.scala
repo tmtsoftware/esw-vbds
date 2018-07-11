@@ -38,9 +38,10 @@ class WebSocketListener(implicit val system: ActorSystem, implicit val materiali
     * @param actorRef the actor that will receive the websocket messages
     * @return an object containing the HTTP response and a promise that can be used to disconnect (which also unsubscribes)
     */
-  def subscribe(uri: Uri, actorRef: ActorRef): VbdsClient.Subscription = {
+  def subscribe(uri: Uri, actorRef: ActorRef, outSource: Source[Message, NotUsed]): VbdsClient.Subscription = {
+
     // A sink that sends messages to the actor, with back pressure
-    val sink: Sink[Message, NotUsed] = Sink.actorRefWithAck(
+    val inSink: Sink[Message, NotUsed] = Sink.actorRefWithAck(
       actorRef,
       onInitMessage = WebSocketActor.StreamInitialized,
       ackMessage = WebSocketActor.Ack,
@@ -49,10 +50,19 @@ class WebSocketListener(implicit val system: ActorSystem, implicit val materiali
     )
 
     // Using Source.maybe materializes into a promise which will allow us to complete the source later
-    val flow: Flow[Message, Message, Promise[Option[Message]]] =
-      Flow.fromSinkAndSourceMat(sink, Source.maybe[Message])(Keep.right)
+//    val flow: Flow[Message, Message, Promise[Option[Message]]] =
+//      Flow.fromSinkAndSourceMat(inSink, Source.maybe[Message])(Keep.right)
 
-    val (upgradeResponse, promise) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
+    // Creates a Flow from a Sink and a Source where the Flow's input will be sent to the Sink and
+    // the Flow's output will come from the Source.
+    val flow = Flow.fromSinkAndSource(inSink, outSource)
+
+//    val (upgradeResponse, promise) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
+    val (upgradeResponse, _) = Http().singleWebSocketRequest(WebSocketRequest(uri), flow)
+
+    // XXX TODO FIXME
+    val promise: Promise[Option[Message]] = Promise[Option[Message]]()
+
     new SubscribeResult(upgradeResponse.map(_.response), promise)
   }
 

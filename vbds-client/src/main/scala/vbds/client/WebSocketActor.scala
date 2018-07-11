@@ -3,12 +3,12 @@ package vbds.client
 import java.io.{File, FileOutputStream}
 import java.nio.file.Path
 
+import akka.NotUsed
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
-import akka.http.scaladsl.model.ws.{BinaryMessage, TextMessage}
+import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.util.{ByteString, Timeout}
 import akka.stream.{Materializer, QueueOfferResult}
-import akka.stream.scaladsl.SourceQueueWithComplete
-import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.{Sink, Source, SourceQueueWithComplete}
 import vbds.client.WebSocketActor._
 
 import scala.concurrent.Future
@@ -32,19 +32,28 @@ object WebSocketActor {
 
   final case class ReceivedFile(streamName: String, count: Int, path: Path)
 
+  // Acknowledge message for received websocket message
+  val ackMessage = TextMessage("ACK")
+
   /**
    * Used to create the actor
    * @param name the name of the client, for logging
    * @param streamName the name of the stream we are subscribed to
    * @param dir the directory in which to save the files received (if saveFiles is true)
-   * @param queue a queue to write messages to when a file is received
+   * @param inQueue a queue to write messages to when a file is received
+   * @param outSink a sink to send to server to acknowledge the message, for flow control
    * @param saveFiles if true, save the files in the given dir (Set to false for throughput tests)
    */
-  def props(name: String, streamName: String, dir: File, queue: SourceQueueWithComplete[ReceivedFile], saveFiles: Boolean)(
+  def props(name: String,
+            streamName: String,
+            dir: File,
+            inQueue: SourceQueueWithComplete[ReceivedFile],
+            outSink: Sink[Message, NotUsed],
+            saveFiles: Boolean)(
       implicit system: ActorSystem,
       mat: Materializer
   ): Props =
-    Props(new WebSocketActor(name, streamName, dir, queue, saveFiles))
+    Props(new WebSocketActor(name, streamName, dir, inQueue, outSink, saveFiles))
 }
 
 /**
@@ -53,7 +62,8 @@ object WebSocketActor {
 class WebSocketActor(name: String,
                      streamName: String,
                      dir: File,
-                     queue: SourceQueueWithComplete[ReceivedFile],
+                     inQueue: SourceQueueWithComplete[ReceivedFile],
+                     outSink: Sink[Message, NotUsed],
                      saveFiles: Boolean)(
     implicit val system: ActorSystem,
     implicit val mat: Materializer
@@ -106,14 +116,16 @@ class WebSocketActor(name: String,
   }
 
   private def handleByteString(bs: ByteString): Future[Unit] = {
-    if (bs.size == 1 && bs.utf8String == "\n") {
+    Source.single(ackMessage).runWith(outSink)
+
+    val result = if (bs.size == 1 && bs.utf8String == "\n") {
       if (saveFiles) {
         os.close()
         log.debug(s"$name: Wrote $file")
       }
       if (log.isDebugEnabled) log.debug(s"$name: Queue offer file $count on stream $streamName")
       val rf = ReceivedFile(streamName, count, file.toPath)
-      val f = queue.offer(rf)
+      val f = inQueue.offer(rf)
       f.onComplete {
         case Success(queueOfferResult) =>
           queueOfferResult match {
@@ -135,6 +147,7 @@ class WebSocketActor(name: String,
       if (saveFiles) os.write(bs.toArray)
       Future.successful(())
     }
+    result
   }
 
 }

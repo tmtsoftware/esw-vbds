@@ -3,13 +3,14 @@ package vbds.client
 import java.io.File
 import java.nio.file.Path
 
-import akka.Done
+import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
-import akka.stream.Materializer
-import akka.stream.scaladsl.SourceQueueWithComplete
+import akka.http.scaladsl.model.ws.{Message, TextMessage}
+import akka.stream.{Materializer, OverflowStrategy}
+import akka.stream.scaladsl.{MergeHub, Source, SourceQueueWithComplete}
 import vbds.client.VbdsClient.Subscription
 import vbds.client.WebSocketActor.ReceivedFile
 
@@ -123,19 +124,41 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
    *
    * @param streamName the name of the stream we are subscribed to
    * @param dir the directory in which to save the files received (if saveFiles is true)
-   * @param queue a queue to write messages to when a file is received
+   * @param inQueue a queue to write messages to when a file is received
    * @param saveFiles if true, save the files in the given dir (Set to false for throughput tests)
 
    * @return the HTTP response
    */
   def subscribe(streamName: String,
                 dir: File,
-                queue: SourceQueueWithComplete[ReceivedFile],
+                inQueue: SourceQueueWithComplete[ReceivedFile],
                 saveFiles: Boolean): Subscription = {
     log.debug(s"subscribe to $streamName")
-    val receiver   = system.actorOf(WebSocketActor.props(name, streamName, dir, queue, saveFiles))
+
+    // We need a Source for writing to the websocket, but we want a Sink:
+    // This provides a Sink that feeds the Source.
+    val (outSink, outSource) = MergeHub.source[Message].preMaterialize()
+
+//    // Queue to send to server to acknowledge message, for flow control
+//    val outQueue = Source
+//      .queue[String](1, OverflowStrategy.backpressure)
+//      .map(TextMessage(_))
+//      .map { x =>
+//        println(s"\nXXXXXXXXXXX in outsource: $x\n")
+//        x
+//      }
+//      .to(outSink)
+//      .run()
+
+    val receiver   = system.actorOf(WebSocketActor.props(name, streamName, dir, inQueue, outSink, saveFiles))
     val wsListener = new WebSocketListener
-    wsListener.subscribe(Uri(s"ws://$host:$port$accessRoute/$streamName"), receiver)
+    val uri = Uri(s"ws://$host:$port$accessRoute/$streamName")
+    val result = wsListener.subscribe(uri, receiver, outSource)
+
+    // Send message to server to get started
+//    outQueue.offer("ACK")
+
+    result
   }
 
 }

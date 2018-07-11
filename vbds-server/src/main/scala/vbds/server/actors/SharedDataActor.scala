@@ -39,7 +39,8 @@ private[server] object SharedDataActor {
   // Tells the actor the host and port that the http server is listening on
   case class LocalAddress(a: InetSocketAddress) extends SharedDataActorMessages
 
-  case class AddSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef) extends SharedDataActorMessages
+  case class AddSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef)
+      extends SharedDataActorMessages
 
   case class DeleteSubscription(id: String) extends SharedDataActorMessages
 
@@ -61,16 +62,15 @@ private[server] object SharedDataActor {
   private case class RemoteAccessInfo(streamName: String, host: String, port: Int)
 
   /**
-    * Holds information per local subscriber
-    *
-    * @param sink Sink that writes to the subscriber's websocket
-    * @param wsResponseActor an Actor that is used to check if the client has processed the last message (to avoid overflow)
-    */
+   * Holds information per local subscriber
+   *
+   * @param sink            Sink that writes to the subscriber's websocket
+   * @param wsResponseActor an Actor that is used to check if the client has processed the last message (to avoid overflow)
+   */
   private[server] case class LocalSubscriberInfo(sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef)
 
-
   // Route used to distribute data to remote HTTP server
-  val distRoute      = "/vbds/transfer/internal"
+  val distRoute = "/vbds/transfer/internal"
 }
 
 /**
@@ -157,7 +157,6 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       }
       sender() ! id
 
-
     // --- Sends a request to get the list of subscriptions (See the following cases for the response) ---
     case ListSubscriptions =>
       sender() ! subscriptions
@@ -185,7 +184,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
    * Publishes the contents of the given data source to the given set of subscribers and sends a Done message to
    * the given actor when done.
    *
-   * @param streamName name of the stream to publish on
+   * @param streamName    name of the stream to publish on
    * @param subscriberSet the set of subscribers for the stream
    * @param source        source of the data being published
    * @param dist          if true, also distribute the data to the HTTP servers corresponding to any remote subscribers
@@ -221,9 +220,8 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       // Wait for ws client to respond in order to avoid overflowing the ws input buffer.
       def websocketFlow(a: AccessInfo): Flow[ByteString, ByteString, NotUsed] =
         Flow[ByteString]
-          .alsoTo(localSubscribers(a).sink).mapAsync(1)(_ =>
-          (localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get).map(_ => ByteString.empty)
-        )
+          .alsoTo(localSubscribers(a).sink)
+          .mapAsync(1)(_ => (localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get).map(_ => ByteString.empty))
 
       // Set of flows to local subscriber websockets
       val localFlows = localSet.map(websocketFlow)
@@ -256,11 +254,11 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
    * Returns a pair of sets for the local and remote subscribers
    *
    * @param subscriberSet all subscribers for the stream
-   * @param dist true if published data should be distributed to remote subscribers
+   * @param dist          true if published data should be distributed to remote subscribers
    */
   private def getSubscribers(subscriberSet: Set[AccessInfo], dist: Boolean): (Set[AccessInfo], Set[AccessInfo]) = {
     val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains _)
-    if (dist) (localSet, remoteSet) else (localSet  , Set.empty[AccessInfo])
+    if (dist) (localSet, remoteSet) else (localSet, Set.empty[AccessInfo])
   }
 
   /**
