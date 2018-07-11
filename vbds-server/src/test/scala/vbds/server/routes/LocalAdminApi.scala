@@ -19,14 +19,14 @@ class LocalAdminApi(system: ActorSystem) extends AdminApi {
     Future.successful(result)
   }
 
-  def addStream(name: String): Future[StreamInfo] = {
-    val result = StreamInfo(name)
+  def addStream(name: String, contentType: String): Future[StreamInfo] = {
+    val result = StreamInfo(name, contentType)
     streams = streams + result
     Future.successful(result)
   }
 
   def deleteStream(name: String): Future[StreamInfo] = {
-    val result = StreamInfo(name)
+    val result = streams.find(_.name == name).getOrElse(StreamInfo(name, ""))
     streams = streams - result
     Future.successful(result)
   }

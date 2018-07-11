@@ -1,7 +1,5 @@
 package vbds.web
 
-import java.util.Date
-
 import org.scalajs.dom
 import org.scalajs.dom.{BlobPropertyBag, Event, MessageEvent}
 import org.scalajs.dom.raw.{Blob, WebSocket}
@@ -17,7 +15,7 @@ import upickle.default._
 object VbdsWebApp {
 
   // Object returns when listing streams
-  private case class StreamInfo(name: String)
+  private case class StreamInfo(name: String, contentType: String)
 
   private object StreamInfo {
     // JSON support
@@ -29,9 +27,7 @@ object VbdsWebApp {
   private val accessRoute               = "/vbds/access/streams"
   //  private val transferRoute             = "/vbds/transfer/streams"
 
-  // XXX TODO FIXME: Pass in image type from server!
-  //    val loadProps = js.Dynamic.literal("type" -> "image/fits").asInstanceOf[BlobPropertyBag]
-  val loadProps = js.Dynamic.literal("type" -> "image/jpeg").asInstanceOf[BlobPropertyBag]
+  val defaultLoadProps = js.Dynamic.literal("type" -> "image/fits").asInstanceOf[BlobPropertyBag]
 
   val closeProps = js.Dynamic.literal("clear" -> false).asInstanceOf[BlobPropertyBag]
 }
@@ -64,8 +60,8 @@ class VbdsWebApp {
   }
 
   // URI to subscribe to a stream
-  private def subscribeUri(stream: String) = {
-    s"ws://${hostField.value}:${portField.value}$accessRoute/$stream"
+  private def subscribeUri(stream: StreamInfo) = {
+    s"ws://${hostField.value}:${portField.value}$accessRoute/${stream.name}"
   }
 
 
@@ -79,11 +75,24 @@ class VbdsWebApp {
   }
 
   // Gets the currently selected stream name
-  private def getSelectedStream: Option[String] =
+  private def getSelectedStream: Option[StreamInfo] =
     streamsItem.value match {
       case "" => None
-      case x => Some(x)
+      case x => Some(read[StreamInfo](x))
     }
+
+  // Use the content type of the stream to tell the display what kind of image this is.
+  private def getLoadProps: BlobPropertyBag = {
+    getSelectedStream match {
+      case Some(streamInfo) =>
+        if (streamInfo.contentType.nonEmpty)
+          js.Dynamic.literal("type" -> streamInfo.contentType).asInstanceOf[BlobPropertyBag]
+        else
+          defaultLoadProps
+      case None =>
+        defaultLoadProps
+    }
+  }
 
   // Update the streams combobox options
   private def updateStreamOptions(items: List[StreamInfo]): Unit = {
@@ -92,7 +101,7 @@ class VbdsWebApp {
       streamsItem.remove(i)
     }
     items.foreach { str =>
-      streamsItem.add(option(value := str.name)(str.name).render)
+      streamsItem.add(option(value := write(str))(str.name).render)
     }
   }
 
@@ -117,7 +126,7 @@ class VbdsWebApp {
     JS9.CloseImage(closeProps)
 
     // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
-    val blob = new Blob(js.Array(buffers :_*), loadProps)
+    val blob = new Blob(js.Array(buffers :_*), getLoadProps)
     JS9.Load(blob)
 //    JS9.RefreshImage(blob)
   }

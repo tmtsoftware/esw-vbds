@@ -21,11 +21,11 @@ class StreamAdminSpec extends WordSpec with Matchers with ScalatestRouteTest wit
     "allow adding a stream" in {
       Post("/vbds/admin/streams/firstStream") ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[StreamInfo] shouldEqual StreamInfo("firstStream")
+        responseAs[StreamInfo] shouldEqual StreamInfo("firstStream", "")
       }
       Post("/vbds/admin/streams/secondStream") ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[StreamInfo] shouldEqual StreamInfo("secondStream")
+        responseAs[StreamInfo] shouldEqual StreamInfo("secondStream", "")
       }
       Post("/vbds/admin/streams/secondStream") ~> route ~> check {
         status shouldEqual StatusCodes.Conflict
@@ -36,15 +36,15 @@ class StreamAdminSpec extends WordSpec with Matchers with ScalatestRouteTest wit
     "return list of streams" in {
       Get("/vbds/admin/streams") ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[Set[StreamInfo]] shouldEqual Set(StreamInfo("firstStream"),
-                                                    StreamInfo("secondStream"))
+        responseAs[Set[StreamInfo]] shouldEqual Set(StreamInfo("firstStream", ""),
+                                                    StreamInfo("secondStream", ""))
       }
     }
 
     "delete a stream" in {
       Delete("/vbds/admin/streams/firstStream") ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[StreamInfo] shouldEqual StreamInfo("firstStream")
+        responseAs[StreamInfo] shouldEqual StreamInfo("firstStream", "")
       }
       Delete("/vbds/admin/streams/firstStream") ~> route ~> check {
         status shouldEqual StatusCodes.NotFound
@@ -52,7 +52,7 @@ class StreamAdminSpec extends WordSpec with Matchers with ScalatestRouteTest wit
       }
       Get("/vbds/admin/streams") ~> route ~> check {
         status shouldEqual StatusCodes.OK
-        responseAs[Set[StreamInfo]] shouldEqual Set(StreamInfo("secondStream"))
+        responseAs[Set[StreamInfo]] shouldEqual Set(StreamInfo("secondStream", ""))
       }
     }
   }

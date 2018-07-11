@@ -24,6 +24,7 @@ object VbdsClientApp extends App {
                              host: String = "127.0.0.1",
                              port: Int = 80,
                              create: Option[String] = None,
+                             contentType: Option[String] = None,
                              delete: Option[String] = None,
                              subscribe: Option[String] = None,
                              dir: Option[String] = None,
@@ -53,6 +54,10 @@ object VbdsClientApp extends App {
     opt[String]("create") valueName "<stream name>" action { (x, c) =>
       c.copy(create = Some(x))
     } text "Creates a new VBDS stream with the given name"
+
+    opt[String]("contentType") valueName "<content-type>" action { (x, c) =>
+      c.copy(contentType = Some(x))
+    } text "Specifies the content type of the files in the stream"
 
     opt[String]("delete") valueName "<stream name>" action { (x, c) =>
       c.copy(delete = Some(x))
@@ -113,7 +118,7 @@ object VbdsClientApp extends App {
     implicit val materializer = ActorMaterializer()
 
     val client = new VbdsClient(options.name, options.host, options.port)
-    options.create.foreach(s => handleHttpResponse(s"create $s", client.createStream(s)))
+    options.create.foreach(s => handleHttpResponse(s"create $s", client.createStream(s, options.contentType.getOrElse(""))))
     options.delete.foreach(s => handleHttpResponse(s"delete $s", client.deleteStream(s)))
     if (options.list) handleHttpResponse("list", client.listStreams())
 

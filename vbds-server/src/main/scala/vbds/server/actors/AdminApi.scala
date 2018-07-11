@@ -17,7 +17,7 @@ trait AdminApi {
 
   def streamExists(name: String): Future[Boolean]
 
-  def addStream(name: String): Future[StreamInfo]
+  def addStream(name: String, contentType: String): Future[StreamInfo]
 
   def deleteStream(name: String): Future[StreamInfo]
 }
@@ -41,8 +41,8 @@ class AdminApiImpl(sharedDataActor: ActorRef)(implicit system: ActorSystem,
     listStreams().map(_.exists(_.name == name))
   }
 
-  def addStream(name: String): Future[StreamInfo] = {
-    (sharedDataActor ? AddStream(name)).mapTo[StreamInfo]
+  def addStream(name: String, contentType: String): Future[StreamInfo] = {
+    (sharedDataActor ? AddStream(name, contentType)).mapTo[StreamInfo]
   }
 
   def deleteStream(name: String): Future[StreamInfo] = {

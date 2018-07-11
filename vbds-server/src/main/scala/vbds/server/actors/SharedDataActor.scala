@@ -30,7 +30,7 @@ private[server] object SharedDataActor {
 
   sealed trait SharedDataActorMessages
 
-  case class AddStream(streamName: String) extends SharedDataActorMessages
+  case class AddStream(streamName: String, contentType: String) extends SharedDataActorMessages
 
   case class DeleteStream(streamName: String) extends SharedDataActorMessages
 
@@ -119,17 +119,18 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
     case LocalAddress(a) =>
       localAddress = a
 
-    case AddStream(name) =>
-      log.debug("Adding: {}", name)
-      val info = StreamInfo(name)
+    case AddStream(name, contentType) =>
+      log.debug("Adding: {}: {}", name, contentType)
+      val info = StreamInfo(name, contentType)
       replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(_ + info)
       sender() ! info
 
     case DeleteStream(name) =>
       log.debug("Removing: {}", name)
-      val info = StreamInfo(name)
-      replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(_ - info)
-      sender() ! info
+      streams.find(_.name == name).foreach { info =>
+        replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(_ - info)
+        sender() ! info
+      }
 
     // --- Sends a request to get the list of streams (See the following cases for the response) ---
     case ListStreams =>

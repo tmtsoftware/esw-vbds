@@ -278,12 +278,12 @@ class VbdsServerTest(name: String)
         implicit val materializer = ActorMaterializer()
         enterBarrier("deployed")
         val client         = new VbdsClient("publisher1", host, server1HttpPort)
-        val createResponse = client.createStream(streamName).await(shortTimeout)
+        val createResponse = client.createStream(streamName, "").await(shortTimeout)
         assert(createResponse.status == StatusCodes.OK)
         enterBarrier("streamCreated")
         enterBarrier("subscribedToStream")
-        // Note: +5 to make sure test completes
-        Source(1 to numFilesToPublish).runForeach { _ => // XXX might hang unless we add extra files at end?
+        // Note: +??? to make sure test completes
+        Source(1 to numFilesToPublish+5).runForeach { _ => // XXX might hang unless we add extra files at end?
           client.publish(streamName, testFile, publisherDelay).await(shortTimeout)
         }
         within(longTimeout) {

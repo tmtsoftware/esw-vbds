@@ -40,6 +40,8 @@ Usage: vbds-client [options]
   --host <host name>       The VBDS HTTP server host name (default: 127.0.0.1)
   -p, --port <number>      The VBDS HTTP server port number (default: 80)
   --create <stream name>   Creates a new VBDS stream with the given name
+  --contentType <content-type>
+                           Specifies the content type of the files in the stream
   --delete <stream name>   Deletes the VBDS stream with the given name
   -l, --list               List the available streams
   --subscribe <stream name>
@@ -69,7 +71,7 @@ A prototype web app based on [Scala.js](https://www.scala-js.org/) and [JS9](htt
 | Description                   | Verb      | URI                               | Response |
 | ----------------------------- |-----------|---------------------------------- |--------- |          
 | List all streams              | GET       | /vbds/admin/streams              | OK (200) – Stream names in JSON; empty document if no streams
-| Create a stream               | POST      | /vbds/admin/streams/{streamName} | OK (200) – New stream name in JSON; Conflict (409) if stream exists
+| Create a stream               | POST      | /vbds/admin/streams/{streamName}?contentType=... | OK (200) – New stream name in JSON; Conflict (409) if stream exists
 | Delete a stream               | DELETE    | /vbds/admin/streams/{streamName} | OK (200) – Deleted stream name in JSON; NotFound (404) if stream does not exist
 | Publish an image to a stream  | POST      | /vbds/transfer/streams/{streamName}/image | Accepted (204) – (no content); Bad Request (400) – for non-existent stream
 | Create a subscription         | POST      | /vbds/access/streams/{streamName} | SwitchingProtocols (101) – Creates a websocket connection for receiving the data

@@ -3,14 +3,14 @@ package vbds.client
 import java.io.File
 import java.nio.file.Path
 
-import akka.{Done, NotUsed}
+import akka.Done
 import akka.actor.ActorSystem
 import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
-import akka.stream.{Materializer, OverflowStrategy}
-import akka.stream.scaladsl.{MergeHub, Source, SourceQueueWithComplete}
+import akka.http.scaladsl.model.ws.Message
+import akka.stream.Materializer
+import akka.stream.scaladsl.{MergeHub, SourceQueueWithComplete}
 import vbds.client.VbdsClient.Subscription
 import vbds.client.WebSocketActor.ReceivedFile
 
@@ -55,8 +55,11 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
   /**
    * Creates a stream with the given name
    */
-  def createStream(streamName: String): Future[HttpResponse] = {
-    Http().singleRequest(HttpRequest(method = HttpMethods.POST, uri = s"http://$host:$port$adminRoute/$streamName"))
+  def createStream(streamName: String, contentType: String): Future[HttpResponse] = {
+    if (contentType.nonEmpty)
+      Http().singleRequest(HttpRequest(method = HttpMethods.POST, uri = s"http://$host:$port$adminRoute/$streamName?contentType=$contentType"))
+    else
+      Http().singleRequest(HttpRequest(method = HttpMethods.POST, uri = s"http://$host:$port$adminRoute/$streamName"))
   }
 
   /**

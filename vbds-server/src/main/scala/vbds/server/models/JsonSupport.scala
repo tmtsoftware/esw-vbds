@@ -7,6 +7,6 @@ import spray.json.DefaultJsonProtocol
   * Defines JSON I/O for model objects
   */
 trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
-  implicit val streamInfoFormat = jsonFormat1(StreamInfo)
+  implicit val streamInfoFormat = jsonFormat2(StreamInfo)
   implicit val accessInfoFormat = jsonFormat4(AccessInfo)
 }
