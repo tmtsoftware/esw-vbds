@@ -123,7 +123,7 @@ class VbdsWebApp {
   private def displayImage(): Unit = {
     val buffers = currentImageData.reverse
     currentImageData = Nil
-//    JS9.CloseImage(closeProps)
+    JS9.CloseImage(closeProps)
 
     // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
     val blob = new Blob(js.Array(buffers :_*), getLoadProps)
