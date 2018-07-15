@@ -8,6 +8,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.Multipart.FormData
 import akka.http.scaladsl.model._
+import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.{Materializer, ThrottleMode}
 import akka.stream.scaladsl._
 
@@ -20,7 +21,7 @@ class FileUploader(chunkSize: Int = 1024 * 1024)(implicit val system: ActorSyste
   import system.dispatcher
 
   private def poolClientFlow(uri: Uri) = {
-    Http().cachedHostConnectionPool[Path](uri.authority.host.address(), uri.authority.port)
+    Http().cachedHostConnectionPool[Path](uri.authority.host.address(), uri.authority.port, ConnectionPoolSettings("max-connections: 1"))
   }
 
   private def createUploadRequest(streamName: String, uri: Uri, path: Path): Future[(HttpRequest, Path)] = {

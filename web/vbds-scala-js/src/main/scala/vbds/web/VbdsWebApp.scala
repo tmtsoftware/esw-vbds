@@ -123,7 +123,7 @@ class VbdsWebApp {
   private def displayImage(): Unit = {
     val buffers = currentImageData.reverse
     currentImageData = Nil
-    JS9.CloseImage(closeProps)
+//    JS9.CloseImage(closeProps)
 
     // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
     val blob = new Blob(js.Array(buffers :_*), getLoadProps)
@@ -140,7 +140,6 @@ class VbdsWebApp {
     getSelectedStream.foreach { stream =>
       println(s"Subscribe to stream: $stream")
       val ws = new WebSocket(subscribeUri(stream))
-      val ack = () => ws.send("ACK")
       currentWebSocket = Some(ws)
       ws.binaryType = "arraybuffer"
       ws.onopen = { _: Event ⇒
@@ -157,7 +156,6 @@ class VbdsWebApp {
         } else {
           currentImageData =  new Uint8Array(arrayBuffer) :: currentImageData
         }
-        println(s"XXX Received Message: size = ${arrayBuffer.byteLength},  parts = ${currentImageData.size}")
 
         // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
         ws.send("ACK")
