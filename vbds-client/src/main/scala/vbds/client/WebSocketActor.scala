@@ -16,8 +16,8 @@ import scala.concurrent.duration._
 import scala.util._
 
 /**
-  * An actor that receives websocket messages from the VBDS server.
-  */
+ * An actor that receives websocket messages from the VBDS server.
+ */
 object WebSocketActor {
 
   sealed trait WebSocketActorMessage
@@ -33,10 +33,11 @@ object WebSocketActor {
   final case class ReceivedFile(streamName: String, count: Int, path: Path)
 
   // Acknowledge message for received websocket message
-  val ackMessage = TextMessage("ACK")
+  val wsAckMessage = TextMessage("ACK")
 
   /**
    * Used to create the actor
+   *
    * @param name the name of the client, for logging
    * @param streamName the name of the stream we are subscribed to
    * @param dir the directory in which to save the files received (if saveFiles is true)
@@ -57,8 +58,8 @@ object WebSocketActor {
 }
 
 /**
-  * An actor that receives websocket messages from the VBDS server.
-  */
+ * An actor that receives websocket messages from the VBDS server.
+ */
 class WebSocketActor(name: String,
                      streamName: String,
                      dir: File,
@@ -88,15 +89,17 @@ class WebSocketActor(name: String,
       sender() ! Ack
 
     case bm: BinaryMessage ⇒
-//      log.debug(s"$name: Received binary message for stream $streamName")
       val replyTo = sender()
       val f       = bm.dataStream.mapAsync(1)(handleByteString).runWith(Sink.ignore)
       f.onComplete {
         case Success(_) =>
           replyTo ! Ack // ack to allow the stream to proceed sending more elements
+          sendWsAck()
+
         case Failure(ex) =>
           log.error(ex, s"$name: Failed to handle BinaryMessage")
           replyTo ! Ack
+          sendWsAck()
       }
 
     case tm: TextMessage =>
@@ -115,9 +118,12 @@ class WebSocketActor(name: String,
     if (saveFiles) os = new FileOutputStream(file)
   }
 
-  private def handleByteString(bs: ByteString): Future[Unit] = {
-    Source.single(ackMessage).runWith(outSink)
+  // Sends a reply on the websocket acknowledging the bytestring, to prevent overflow
+  private def sendWsAck(): Unit =
+    Source.single(wsAckMessage).runWith(outSink)
 
+  // Called when a ByteString is received on the websocket
+  private def handleByteString(bs: ByteString): Future[Unit] = {
     val result = if (bs.size == 1 && bs.utf8String == "\n") {
       if (saveFiles) {
         os.close()
@@ -125,7 +131,7 @@ class WebSocketActor(name: String,
       }
       if (log.isDebugEnabled) log.debug(s"$name: Queue offer file $count on stream $streamName")
       val rf = ReceivedFile(streamName, count, file.toPath)
-      val f = inQueue.offer(rf)
+      val f  = inQueue.offer(rf)
       f.onComplete {
         case Success(queueOfferResult) =>
           queueOfferResult match {
