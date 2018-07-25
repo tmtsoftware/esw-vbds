@@ -65,6 +65,10 @@ _Note that in the current implementation, the vdbs-client does not exit after sh
 A prototype web app based on [Scala.js](https://www.scala-js.org/) and [JS9](https://js9.si.edu/) is available under 
 [web/vbds-scala-js](web/vbds-scala-js). 
 
+__Note__: In order to prevent overloading a subscriber when the publisher is too fast, a subscriber needs to reply on its websocket with a 
+short "ACK" message after receiving each message (image fragment). 
+This should prevent too many messages from being queued in a browser's websocket queue.
+
 
 ## VBDS REST API
 
@@ -199,7 +203,8 @@ For comparison, here are the results on another pair of AWS machines with a slow
 Akka streams are used in the tests on both client and server, with websockets in the middle.
 Obviously, if one of the subscribers is too slow, it will either have to buffer the received images, or skip some of them.
 Since the image data is sent in "chunks", just dropping a single websocket message would result in a corrupted image.
-The code would have to be smart enough to drop everything up until the next image.
+The code would have to be smart enough to drop everything up until the next image. 
+For this reason a client websocket acknowledgement message is currently required.
 
 In the current test-client implementation, the received data is saved to temp files, the file names are streamed to the
 receiver and each received file is deleted when done.
@@ -222,6 +227,6 @@ This is the basic flow of a published data file:
 * On the client side, the clients receive multiple websocket messages for each data file, 
   ending with a message containing a single newline, which is not part of the data.
   The clients need to collect the data until the file is complete and then can display it, do calculations, etc.
+  The client also needs to acknowledge each websocket message with a short "ACK" message, for flow control reasons.
 
-The clients have to decide what to do if another file arrives before the last one has been processed (i.e.: Buffer it or drop it).
 

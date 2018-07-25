@@ -44,7 +44,7 @@ class VbdsWebApp {
     // XXX TODO: FIXME
     import scalatags.JsDom.all._
     (
-      input(`type` := "text", value := "192.168.178.77").render,
+      input(`type` := "text", value := "127.0.0.1").render,
       input(`type` := "text", value := "7777").render
     )
   }
