@@ -1,7 +1,0 @@
-{
-  "name": "vbds-scala-js",
-  "version": "0.1.0",
-  "dependencies": {
-    "js9": "^2.1.0"
-  }
-}
