@@ -9,9 +9,14 @@ import scala.scalajs.js.typedarray.{ArrayBuffer, Uint8Array}
 import VbdsWebApp._
 import upickle.default._
 
+import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
+import scala.concurrent.ExecutionContext.Implicits.global
+
 /**
-  * A web app that lets you subscribe to vbds images and displays them in a JS9 window on the page.
-  */
+ * A web app that lets you subscribe to vbds images and displays them in a JS9 window on the page.
+ */
 object VbdsWebApp {
 
   // Object returns when listing streams
@@ -23,8 +28,8 @@ object VbdsWebApp {
   }
 
   // vbds server routes
-  private val adminRoute                = "/vbds/admin/streams"
-  private val accessRoute               = "/vbds/access/streams"
+  private val adminRoute  = "/vbds/admin/streams"
+  private val accessRoute = "/vbds/access/streams"
   //  private val transferRoute             = "/vbds/transfer/streams"
 
   val defaultLoadProps = js.Dynamic.literal("type" -> "image/fits").asInstanceOf[BlobPropertyBag]
@@ -49,10 +54,10 @@ class VbdsWebApp {
     )
   }
 
- private val updateStreamsListButton = {
-   import scalatags.JsDom.all._
-   button(`type` := "submit", onclick := updateStreamsList _)("Update").render
- }
+  private val updateStreamsListButton = {
+    import scalatags.JsDom.all._
+    button(`type` := "submit", onclick := updateStreamsList _)("Update").render
+  }
 
   // URI to get a list of streams
   private def listStreamsUri = {
@@ -63,7 +68,6 @@ class VbdsWebApp {
   private def subscribeUri(stream: StreamInfo) = {
     s"ws://${hostField.value}:${portField.value}$accessRoute/${stream.name}"
   }
-
 
   // Combobox listing the available streams
   private val streamsItem = {
@@ -78,11 +82,11 @@ class VbdsWebApp {
   private def getSelectedStream: Option[StreamInfo] =
     streamsItem.value match {
       case "" => None
-      case x => Some(read[StreamInfo](x))
+      case x  => Some(read[StreamInfo](x))
     }
 
   // Use the content type of the stream to tell the display what kind of image this is.
-  private def getLoadProps: BlobPropertyBag = {
+  private def getImageProps: BlobPropertyBag = {
     getSelectedStream match {
       case Some(streamInfo) =>
         if (streamInfo.contentType.nonEmpty)
@@ -119,16 +123,32 @@ class VbdsWebApp {
     xhr.send()
   }
 
+  // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
+  private def onloadHandler(p: Promise[Unit])(): Unit = {
+    println(s"XXX called onload handler")
+    p.complete(Success(()))
+  }
+
+  // XXX Might be that onload is not always called...
+  def loadProps(p: Promise[Unit]) = js.Dynamic.literal("onload" -> onloadHandler(p) _).asInstanceOf[BlobPropertyBag]
+
   // Combine the image parts and send to the display
-  private def displayImage(): Unit = {
+  private def displayImage(): Future[Unit] = {
     val buffers = currentImageData.reverse
     currentImageData = Nil
     JS9.CloseImage(closeProps)
 
     // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
-    val blob = new Blob(js.Array(buffers :_*), getLoadProps)
-    JS9.Load(blob)
-//    JS9.RefreshImage(blob)
+    val blob = new Blob(js.Array(buffers: _*), getImageProps)
+    println("XXX Loading image")
+    val p = Promise[Unit]
+    JS9.Load(blob, loadProps(p))
+    p.future
+  }
+
+  // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
+  private def sendAck(ws: WebSocket): Unit = {
+    ws.send("ACK")
   }
 
   // Called when a stream is selected: Subscribe to the websocket for the stream
@@ -152,20 +172,20 @@ class VbdsWebApp {
         val arrayBuffer = event.data.asInstanceOf[ArrayBuffer]
         // End marker is a message with one byte ("\n")
         if (arrayBuffer.byteLength == 1) {
-          displayImage()
+          displayImage().onComplete {
+            case Success(_) => sendAck(ws)
+            case Failure(_) => println("Image load failed"); sendAck(ws)
+          }
         } else {
-          currentImageData =  new Uint8Array(arrayBuffer) :: currentImageData
+          currentImageData = new Uint8Array(arrayBuffer) :: currentImageData
+          sendAck(ws)
         }
-
-        // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
-        ws.send("ACK")
       }
       ws.onclose = { event: Event ⇒
         println(s"Websocket closed for stream $stream")
       }
     }
   }
-
 
   def init(): Unit = {
     import scalatags.JsDom.all._
