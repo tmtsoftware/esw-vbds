@@ -17,6 +17,12 @@ and point your browser at:
 
     http://localhost:12345/web/vbds-scala-js/target/scala-2.12/classes/index-dev.html
 
+for the development version, or:
+    
+    http://localhost:12345/web/vbds-scala-js/target/scala-2.12/classes/index.html
+
+for the optimized Javascript.
+
 Note that the web app needs to be run via an http server to avoid cross-site scripting errors when accessing the VBDS server.
 The sbt workbench plugin starts an http server on localhost:12345 for testing.
 
