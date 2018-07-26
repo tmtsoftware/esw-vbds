@@ -5,8 +5,16 @@
 # Note: Assumes the node.js minified command is available:
 # Use: "npm install -g minifier" to install.
 
-# Set this to the directory containing the JS9 release
+# EDIT: Set this to the directory containing the JS9 release
 js9dir=../../../../js9
+
+if test ! -d $js9dir; then
+    echo "$js9dir does not exist. Please edit to set correct path to JS9 sources."
+    exit 1
+fi
+
+targetDir=src/main/resources/js9
+test -d || mkdir $targetDir
 
 (cd $js9dir; make refresh)
 
@@ -20,6 +28,5 @@ cp $js9dir/favicon.ico \
     $js9dir/js9plugins.js \
     $js9dir/js9worker.js \
     $js9dir/astroem.js $js9dir/astroemw.js $js9dir/astroemw.wasm \
-    src/main/resources/js9
-
+    $targetDir
 

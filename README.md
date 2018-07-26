@@ -13,6 +13,8 @@ To build and install the applications, run:
 
     sbt publishLocal stage
 
+See [web/vbds-scala-js](web/vbds-scala-js) for instructions on how to build the JS9 based web app.
+
 ## Applications
 
 The main application is an HTTP server called `vbds-server`:
