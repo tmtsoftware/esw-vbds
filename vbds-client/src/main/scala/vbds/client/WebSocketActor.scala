@@ -81,6 +81,9 @@ class WebSocketActor(name: String,
 
   log.debug(s"$name: Started WebSocketActor")
 
+  // Current server implementation requires an initial ACK from the client
+  sendWsAck()
+
   def receive: Receive = {
     case StreamInitialized ⇒
       log.debug(s"$name: Initialized stream for $streamName")

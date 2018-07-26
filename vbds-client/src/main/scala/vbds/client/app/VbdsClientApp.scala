@@ -15,8 +15,8 @@ import scala.concurrent.duration._
 import vbds.client.WebSocketActor._
 
 /**
-  * A VIZ Bulk Data System HTTP client command line application.
-  */
+ * A VIZ Bulk Data System HTTP client command line application.
+ */
 object VbdsClientApp extends App {
 
   // Command line options
@@ -114,7 +114,7 @@ object VbdsClientApp extends App {
 
   // Run the application (The actor system is only used locally, no need for remote)
   private def run(options: Options): Unit = {
-    implicit val system = ActorSystem()
+    implicit val system       = ActorSystem()
     implicit val materializer = ActorMaterializer()
 
     val client = new VbdsClient(options.name, options.host, options.port)
@@ -157,6 +157,13 @@ object VbdsClientApp extends App {
     import system.dispatcher
     resp.onComplete {
       case Success(_) =>
+        system.terminate().onComplete {
+          case Success(_) =>
+            System.exit(0)
+          case Failure(ex) =>
+            ex.printStackTrace()
+            System.exit(0)
+        }
       case Failure(ex) =>
         println(s"$command failed: $ex")
         ex.printStackTrace()
@@ -167,6 +174,16 @@ object VbdsClientApp extends App {
     import system.dispatcher
     resp.onComplete {
       case Success(_) =>
+        println(s"XXX $command completed")
+        system.terminate().onComplete {
+          case Success(_) =>
+            println("XXX shutdown completed")
+            System.exit(0)
+          case Failure(ex) =>
+            println("XXX shutdown failed: $ex")
+            ex.printStackTrace()
+            System.exit(0)
+        }
       case Failure(ex) =>
         println(s"$command failed: $ex")
         ex.printStackTrace()
