@@ -7,6 +7,14 @@ Applications use an HTTP/REST API to send commands to one of the servers in the 
 If a data file is published to one remote server and there are multiple subscribers attached to another server, the published files are each
 only transfered once to the other server, and then from there via websocket to each subscriber.
 
+## Build
+
+To build and install the applications, run: 
+
+    sbt publishLocal stage
+
+## Applications
+
 The main application is an HTTP server called `vbds-server`:
 
 ```
@@ -228,5 +236,4 @@ This is the basic flow of a published data file:
   ending with a message containing a single newline, which is not part of the data.
   The clients need to collect the data until the file is complete and then can display it, do calculations, etc.
   The client also needs to acknowledge each websocket message with a short "ACK" message, for flow control reasons.
-
-
+  (The current implementation also requires an initial ACK from the client to get started.)

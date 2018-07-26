@@ -18,6 +18,7 @@ object JS9 extends js.Object {
     * @param options optional object or json string containing image parameters
     */
   def Load(input: Blob, options: BlobPropertyBag): Unit = js.native
+  def Load(input: Blob): Unit = js.native
 
 
   /**

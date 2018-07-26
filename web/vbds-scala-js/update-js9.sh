@@ -6,7 +6,7 @@
 # Use: "npm install -g minifier" to install.
 
 # Set this to the directory containing the JS9 release
-js9dir=../../js9
+js9dir=../../../../js9
 
 (cd $js9dir; make refresh)
 
@@ -20,6 +20,6 @@ cp $js9dir/favicon.ico \
     $js9dir/js9plugins.js \
     $js9dir/js9worker.js \
     $js9dir/astroem.js $js9dir/astroemw.js $js9dir/astroemw.wasm \
-    web/vbds-scala-js/src/main/resources/js9
+    src/main/resources/js9
 
 

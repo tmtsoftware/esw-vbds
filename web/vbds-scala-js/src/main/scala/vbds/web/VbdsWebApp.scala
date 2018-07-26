@@ -11,7 +11,7 @@ import upickle.default._
 
 import scala.concurrent.{Await, Future, Promise}
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
@@ -124,16 +124,16 @@ class VbdsWebApp {
   }
 
   // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
-  private def onloadHandler(p: Promise[Unit])(): Unit = {
+  private def onloadHandler(p: Promise[Boolean])(): Unit = {
     println(s"XXX called onload handler")
-    p.complete(Success(()))
+    p.success(true)
   }
 
   // XXX Might be that onload is not always called...
-  def loadProps(p: Promise[Unit]) = js.Dynamic.literal("onload" -> onloadHandler(p) _).asInstanceOf[BlobPropertyBag]
+  def loadProps(p: Promise[Boolean]) = js.Dynamic.literal("onload" -> onloadHandler(p) _).asInstanceOf[BlobPropertyBag]
 
   // Combine the image parts and send to the display
-  private def displayImage(): Future[Unit] = {
+  private def displayImage(): Future[Boolean] = {
     val buffers = currentImageData.reverse
     currentImageData = Nil
     JS9.CloseImage(closeProps)
@@ -141,13 +141,15 @@ class VbdsWebApp {
     // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
     val blob = new Blob(js.Array(buffers: _*), getImageProps)
     println("XXX Loading image")
-    val p = Promise[Unit]
+    val p = Promise[Boolean]
     JS9.Load(blob, loadProps(p))
+    dom.window.setTimeout( () => Try(p.failure(new RuntimeException("Image load failed"))), 1000)
     p.future
   }
 
   // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
   private def sendAck(ws: WebSocket): Unit = {
+    println("XXX send ACK")
     ws.send("ACK")
   }
 
@@ -164,6 +166,7 @@ class VbdsWebApp {
       ws.binaryType = "arraybuffer"
       ws.onopen = { _: Event ⇒
         println(s"Opened websocket for stream $stream")
+        sendAck(ws) // XXX Just to get started
       }
       ws.onerror = { event: Event ⇒
         println(s"Error for stream $stream websocket: $event")
@@ -172,11 +175,16 @@ class VbdsWebApp {
         val arrayBuffer = event.data.asInstanceOf[ArrayBuffer]
         // End marker is a message with one byte ("\n")
         if (arrayBuffer.byteLength == 1) {
-          displayImage().onComplete {
-            case Success(_) => sendAck(ws)
-            case Failure(_) => println("Image load failed"); sendAck(ws)
+          try {
+            displayImage().onComplete {
+              case Success(_) => println("XXX Image load succeeded!"); sendAck(ws)
+              case Failure(ex) => println(s"Load image failed"); sendAck(ws)
+            }
+          } catch {
+            case ex: Exception => println("Image load failed!")
           }
         } else {
+          println("XXX Received image chunk")
           currentImageData = new Uint8Array(arrayBuffer) :: currentImageData
           sendAck(ws)
         }

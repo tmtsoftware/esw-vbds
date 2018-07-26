@@ -33,7 +33,7 @@ object AccessRoute {
 
   class WebsocketResponseActor extends Actor with ActorLogging {
     import WebsocketResponseActor._
-    def receive: Receive = receiveResponses(0, Nil)
+    def receive: Receive = receiveResponses(1, Nil)
 
     def receiveResponses(responses: Int, senders: List[ActorRef]): Receive = {
       case Put =>
