@@ -161,7 +161,7 @@ object VbdsClientApp extends App {
           case Success(_) =>
             System.exit(0)
           case Failure(ex) =>
-            ex.printStackTrace()
+//            ex.printStackTrace()
             System.exit(0)
         }
       case Failure(ex) =>
@@ -174,14 +174,12 @@ object VbdsClientApp extends App {
     import system.dispatcher
     resp.onComplete {
       case Success(_) =>
-        println(s"XXX $command completed")
         system.terminate().onComplete {
           case Success(_) =>
-            println("XXX shutdown completed")
             System.exit(0)
           case Failure(ex) =>
-            println("XXX shutdown failed: $ex")
-            ex.printStackTrace()
+//            println("XXX shutdown failed: $ex")
+//            ex.printStackTrace()
             System.exit(0)
         }
       case Failure(ex) =>
