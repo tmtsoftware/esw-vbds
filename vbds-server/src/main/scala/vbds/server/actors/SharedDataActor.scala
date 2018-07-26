@@ -221,8 +221,8 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       // Wait for ws client to respond in order to avoid overflowing the ws input buffer.
       def websocketFlow(a: AccessInfo): Flow[ByteString, ByteString, NotUsed] =
         Flow[ByteString]
+          .mapAsync(1)(bs => (localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get).map(_ => bs))
           .alsoTo(localSubscribers(a).sink)
-          .mapAsync(1)(_ => (localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get).map(_ => ByteString.empty))
 
       // Set of flows to local subscriber websockets
       val localFlows = localSet.map(websocketFlow)

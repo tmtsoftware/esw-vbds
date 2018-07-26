@@ -1,5 +1,6 @@
 package vbds.web
 
+import org.scalajs.dom.raw.BlobPropertyBag
 import org.scalajs.dom.{Blob, BlobPropertyBag}
 
 import scala.scalajs.js
@@ -14,18 +15,19 @@ object JS9 extends js.Object {
     * Load a FITS file or a PNG representation file into JS9. You also can pass an in-memory buffer containing a FITS file, or a string containing a base64-encoded FITS file.
     *
     * @param input url, fitsy object, in-memory FITS, or FITS blob
-    * @param opts optional object or json string containing image parameters
+    * @param options optional object or json string containing image parameters
     */
-  def Load(input: Blob, opts: String = ""): Unit = js.native
+  def Load(input: Blob, options: BlobPropertyBag): Unit = js.native
+  def Load(input: Blob): Unit = js.native
 
 
   /**
     * Re-read the image data and re-display.
     *
     * @param input  object, javascript array, typed array, FITS blob, or string
-    * @param opts optional options or function to call when refresh is complete
+    * @param options optional options or function to call when refresh is complete
     */
-  def RefreshImage(input: Blob, opts: String = ""): Unit = js.native
+  def RefreshImage(input: Blob, options: BlobPropertyBag): Unit = js.native
 
   /**
     * Clear the image from the display and mark resources for release.

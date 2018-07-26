@@ -48,4 +48,10 @@ object Dependencies {
 //    "org.akka-js" %%% "akkajsactorstream" % "1.2.5.13"
   ))
 
+  // ScalaJS client JavaScript dependencies
+  val clientJsDeps = Def.setting(Seq(
+    "org.webjars" % "jquery" % "2.2.1" / "jquery.js" minified "jquery.min.js"
+  ))
+
+
 }

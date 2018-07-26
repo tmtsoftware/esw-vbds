@@ -7,6 +7,16 @@ Applications use an HTTP/REST API to send commands to one of the servers in the 
 If a data file is published to one remote server and there are multiple subscribers attached to another server, the published files are each
 only transfered once to the other server, and then from there via websocket to each subscriber.
 
+## Build
+
+To build and install the applications, run: 
+
+    sbt publishLocal stage
+
+See [web/vbds-scala-js](web/vbds-scala-js) for instructions on how to build the JS9 based web app.
+
+## Applications
+
 The main application is an HTTP server called `vbds-server`:
 
 ```
@@ -58,8 +68,6 @@ Usage: vbds-client [options]
   --version                
 ```
 
-_Note that in the current implementation, the vdbs-client does not exit after short commands, such as publishing or creating a stream. This will be fixed later_
-
 ## Web App to Display FITS Image from VBDS Streams
 
 A prototype web app based on [Scala.js](https://www.scala-js.org/) and [JS9](https://js9.si.edu/) is available under 
@@ -97,26 +105,38 @@ since no -akka-port option was specified. We need to know the akka host and port
 and of course the HTTP host and port, so we can send requests to it.
 
 
-### Test Client Using [curl](https://curl.haxx.se/) and [wscat](https://github.com/websockets/wscat)
+### Test using vbds-client Application
 
-Create a stream named `WFS1-RAW`:
+Create a FITS stream named `WFS1-RAW`: (Note: The content type is optional, but may be used by image viewers)
 
-    curl --request POST http://hostA:7777/vbds/admin/streams/WFS1-RAW
+    vbds-client --host hostA -p 7777 --create WFS1-RAW --contentType "image/fits"
 
-Subscribe to the stream using wscat (Just for testing, with non-binary files: Install with `npm install -g wscat`)
+Subscribe to the stream (`-a` or `--action` takes a shell command that receives a filename argument):
+
+    vbds-client --host hostA --port 7777 --subscribe WFS1-RAW -a echo
+
+Publish some data (Replace MyFile with the file name):
+
+    vbds-client --host hostA -p 7777 --publish WFS1-RAW --data myFile.fits
+
+Note that instead of a file, a directory can be specified, in which case all the files in the directory are sorted and sent (for testing).
+
+### Test Using [curl](https://curl.haxx.se/) and [wscat](https://github.com/websockets/wscat)
+
+Create a FITS stream named `WFS1-RAW`: (Note: The content type is optional, but may be used by image viewers)
+
+    curl --request POST http://hostA:7777/vbds/admin/streams/WFS1-RAW?contentType=image/fits
+
+Subscribe to the stream using wscat (Just for testing, with non-binary files: Install with `npm install -g wscat`).
+(Note that you will need to type enter at the wscat prompt to simulate the client ACK responses.)
 
     wscat -c ws://hostA:7777/vbds/access/streams/WFS1-RAW
-
-Subscribe to the same stream from the other server:
-
-    wscat -c ws://hostB:7777/vbds/access/streams/WFS1-RAW
 
 Publish some data (Replace MyFile with the file name):
 
     curl --request POST -F data=@MyFile http://hostA:7777/vbds/transfer/streams/WFS1-RAW
 
 The data should be displayed in the stdout of the wscat application. 
-Note that instead of a file, a directory can be specified, in which case all the files in the directory are sorted and sent (for testing).
 
 
 ## Multi-jvm and Multi-Node Tests
@@ -228,5 +248,4 @@ This is the basic flow of a published data file:
   ending with a message containing a single newline, which is not part of the data.
   The clients need to collect the data until the file is complete and then can display it, do calculations, etc.
   The client also needs to acknowledge each websocket message with a short "ACK" message, for flow control reasons.
-
-
+  (The current implementation also requires an initial ACK from the client to get started.)
