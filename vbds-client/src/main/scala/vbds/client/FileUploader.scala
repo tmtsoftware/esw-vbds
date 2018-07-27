@@ -25,6 +25,7 @@ class FileUploader(chunkSize: Int = 1024 * 1024)(implicit val system: ActorSyste
   }
 
   private def createUploadRequest(streamName: String, uri: Uri, path: Path): Future[(HttpRequest, Path)] = {
+    println(s"XXX createUploadRequest $path")
 //    println(s"XXX Uploading $path")
     val bodyPart = FormData.BodyPart.fromPath("data", ContentTypes.`application/octet-stream`, path, chunkSize)
     val body     = FormData(bodyPart) // only one file per upload
@@ -55,7 +56,7 @@ class FileUploader(chunkSize: Int = 1024 * 1024)(implicit val system: ActorSyste
     }
     val source = Source(files)
     if (delay != Duration.Zero)
-      upload(source.throttle(1, delay, 1, ThrottleMode.shaping))
+      upload(source.throttle(1, delay, 1, ThrottleMode.Shaping))
     else upload(source)
   }
 }

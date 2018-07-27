@@ -46,7 +46,6 @@ class VbdsWebApp {
   private var currentWebSocket: Option[WebSocket] = None
 
   private val (hostField, portField) = {
-    // XXX TODO: FIXME
     import scalatags.JsDom.all._
     (
       input(`type` := "text", value := "127.0.0.1").render,
@@ -138,6 +137,11 @@ class VbdsWebApp {
     currentImageData = Nil
     JS9.CloseImage(closeProps)
 
+    // --- XXX TEMP XXX
+    val s = new String(buffers.head.toArray.take(6).map(_.asInstanceOf[Char]))
+    if (s != "SIMPLE") println(s"\nXXX INVALID FITS START: $s\n")
+    // ---
+
     // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
     val blob = new Blob(js.Array(buffers: _*), getImageProps)
     println("XXX Loading image")
@@ -151,6 +155,12 @@ class VbdsWebApp {
   private def sendAck(ws: WebSocket): Unit = {
     println("XXX send ACK")
     ws.send("ACK")
+  }
+
+  // Returns true if the array buffer contains the marker for the end of a file stream ("\n")
+  private def isEndOfFileMarker(arrayBuffer: Uint8Array): Boolean = {
+    val s = new String(arrayBuffer.toArray.take(1).map(_.asInstanceOf[Char]))
+    s == "\n"
   }
 
   // Called when a stream is selected: Subscribe to the websocket for the stream
@@ -172,9 +182,9 @@ class VbdsWebApp {
         println(s"Error for stream $stream websocket: $event")
       }
       ws.onmessage = { event: MessageEvent ⇒
-        val arrayBuffer = event.data.asInstanceOf[ArrayBuffer]
+        val arrayBuffer = new Uint8Array(event.data.asInstanceOf[ArrayBuffer])
         // End marker is a message with one byte ("\n")
-        if (arrayBuffer.byteLength == 1) {
+        if (arrayBuffer.byteLength == 1 && isEndOfFileMarker(arrayBuffer)) {
           try {
             displayImage().onComplete {
               case Success(_) => println("XXX Image load succeeded!"); sendAck(ws)
@@ -184,7 +194,7 @@ class VbdsWebApp {
             case ex: Exception => println("Image load failed!")
           }
         } else {
-          println("XXX Received image chunk")
+          println(s"XXX Received image chunk: size: ${arrayBuffer.byteLength}")
           currentImageData = new Uint8Array(arrayBuffer) :: currentImageData
           sendAck(ws)
         }

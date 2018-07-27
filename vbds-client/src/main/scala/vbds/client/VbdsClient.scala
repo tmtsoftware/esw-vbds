@@ -88,7 +88,7 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
 
     val handler: ((Try[HttpResponse], Path)) => Unit = {
       case (Success(response), path) =>
-        if (response.status == StatusCodes.Accepted) log.debug(s"Result for file: $path was successful")
+        if (response.status == StatusCodes.Accepted) log.info(s"Result for file: $path was successful")
         else log.error(s"Publish of $path returned unexpected status code: ${response.status}")
         response.discardEntityBytes() // don't forget this
       case (Failure(ex), path) =>

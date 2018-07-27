@@ -223,6 +223,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
         Flow[ByteString]
           .mapAsync(1)(bs => (localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get).map(_ => bs))
           .alsoTo(localSubscribers(a).sink)
+          .map(_ => ByteString.empty)
 
       // Set of flows to local subscriber websockets
       val localFlows = localSet.map(websocketFlow)
