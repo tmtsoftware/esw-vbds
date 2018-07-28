@@ -14,7 +14,6 @@ import vbds.server.actors.{AccessApi, AdminApi}
 import vbds.server.models.JsonSupport
 import vbds.server.routes.AccessRoute.WebsocketResponseActor
 
-
 object AccessRoute {
 
   // Actor to handle ACK responses from websocket clients
@@ -56,7 +55,6 @@ object AccessRoute {
 
 }
 
-
 /**
  * Provides the HTTP route for the VBDS Access Service.
  *
@@ -91,10 +89,11 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
 
               // We need a Source for writing to the websocket, but we want a Sink:
               // This provides a Sink that feeds the Source.
-              val (sink, source) = MergeHub.source[ByteString].preMaterialize()
-              val id             = UUID.randomUUID().toString
-                val wsResponseActor = system.actorOf(WebsocketResponseActor.props())
+              val (sink, source)  = MergeHub.source[ByteString].preMaterialize()
+              val id              = UUID.randomUUID().toString
+              val wsResponseActor = system.actorOf(WebsocketResponseActor.props())
 
+              // Input from client ws
               val inSink = Flow[Message]
                 .map { msg =>
                   // Notify this actor that the ws client responded, so that the publisher can check it

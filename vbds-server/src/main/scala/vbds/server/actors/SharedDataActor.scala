@@ -8,7 +8,7 @@ import akka.cluster.Cluster
 import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.ddata.Replicator._
 import akka.stream.{ActorMaterializer, ClosedShape}
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink, Source}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import vbds.server.models.{AccessInfo, ServerInfo, StreamInfo}
 import akka.pattern.pipe
@@ -17,6 +17,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.{ContentTypes, HttpRequest}
 import akka.pattern.ask
+
 import scala.concurrent.duration._
 import vbds.server.routes.AccessRoute.WebsocketResponseActor
 
@@ -120,13 +121,13 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       localAddress = a
 
     case AddStream(name, contentType) =>
-      log.debug("Adding: {}: {}", name, contentType)
+      log.info("Adding: {}: {}", name, contentType)
       val info = StreamInfo(name, contentType)
       replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(_ + info)
       sender() ! info
 
     case DeleteStream(name) =>
-      log.debug("Removing: {}", name)
+      log.info("Removing: {}", name)
       streams.find(_.name == name).foreach { info =>
         replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(_ - info)
         sender() ! info
@@ -141,10 +142,10 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
     case c @ Changed(`adminDataKey`) ⇒
       val data = c.get(adminDataKey)
       streams = data.elements
-      log.debug("Current streams: {}", streams)
+      log.info("Current streams: {}", streams)
 
     case AddSubscription(name, id, sink, wsResponseActor) =>
-      log.debug(s"Adding Subscription to stream $name with id $id")
+      log.info(s"Adding Subscription to stream $name with id $id")
       val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, id)
       replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ + info)
       localSubscribers = localSubscribers + (info -> LocalSubscriberInfo(sink, wsResponseActor))
@@ -153,7 +154,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
     case DeleteSubscription(id) =>
       val s = subscriptions.find(_.id == id)
       s.foreach { info =>
-        log.debug("Removing Subscription with id: {}", info)
+        log.info("Removing Subscription with id: {}", info)
         replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ - info)
       }
       sender() ! id
@@ -165,7 +166,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
     case c @ Changed(`accessDataKey`) ⇒
       val data = c.get(accessDataKey)
       subscriptions = data.elements
-      log.debug("Current subscriptions: {}", subscriptions)
+      log.info("Current subscriptions: {}", subscriptions)
 
     case Publish(streamName, source, dist) =>
       val subscriberSet = subscriptions.filter(_.streamName == streamName)
@@ -202,7 +203,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     // Number of broadcast outputs
     val numOut = localSet.size + remoteHostSet.size
-    log.debug(
+    log.info(
       s"Publish dist=$dist, subscribers: $numOut (${localSet.size} local, ${remoteSet.size} remote on ${remoteHostSet.size} hosts)"
     )
 
@@ -219,11 +220,12 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
       // Send data for each local subscribers to its websocket.
       // Wait for ws client to respond in order to avoid overflowing the ws input buffer.
-      def websocketFlow(a: AccessInfo): Flow[ByteString, ByteString, NotUsed] =
+      def websocketFlow(a: AccessInfo) =
         Flow[ByteString]
-          .mapAsync(1)(bs => (localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get).map(_ => bs))
           .alsoTo(localSubscribers(a).sink)
-          .map(_ => ByteString.empty)
+          .mapAsync(1) { bs =>
+            (localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get).map(_ => bs)
+          }
 
       // Set of flows to local subscriber websockets
       val localFlows = localSet.map(websocketFlow)
@@ -234,10 +236,14 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
       // Set of flows to remote servers containing subscribers
       val remoteFlows =
-        if (dist) remoteHostSet.map(h => requestFlow(h).via(remoteConnections(h)).map(_ => ByteString.empty)) else Set.empty
+        if (dist)
+          remoteHostSet.map(h => requestFlow(h).via(remoteConnections(h)).map(_ => ByteString.empty))
+        else Set.empty
+
+      val src = builder.add(source) // XXX Needed?
 
       // Create the graph
-      source ~> bcast
+      src ~> bcast
       localFlows.foreach(bcast ~> _ ~> merge)
       if (dist) remoteFlows.foreach(bcast ~> _ ~> merge)
       merge ~> out
@@ -246,7 +252,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     val f = g.run()
     f.onComplete {
-      case Success(_)  => log.debug("Publish complete")
+      case Success(_)  => log.info("Publish complete")
       case Failure(ex) => log.error(s"Publish failed with $ex")
     }
     f

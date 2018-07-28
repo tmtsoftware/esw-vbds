@@ -9,8 +9,7 @@ import scala.scalajs.js.typedarray.{ArrayBuffer, Uint8Array}
 import VbdsWebApp._
 import upickle.default._
 
-import scala.concurrent.{Await, Future, Promise}
-import scala.concurrent.duration._
+import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success, Try}
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -41,6 +40,9 @@ class VbdsWebApp {
 
   // Can't save temp files from the browser, so have to keep the image parts in memory...
   private var currentImageData: List[Uint8Array] = Nil
+
+  // Set to true while image is being displayed (XXX TODO FIXME)
+  private var busyDisplay = false
 
   // WebSocket for current subscription
   private var currentWebSocket: Option[WebSocket] = None
@@ -133,27 +135,31 @@ class VbdsWebApp {
 
   // Combine the image parts and send to the display
   private def displayImage(): Future[Boolean] = {
-    val buffers = currentImageData.reverse
-    currentImageData = Nil
-    JS9.CloseImage(closeProps)
+    if (busyDisplay) {
+      Future.failed(new RuntimeException("Display is busy"))
+    } else {
+      busyDisplay = true
+      val buffers = currentImageData.reverse
+      currentImageData = Nil
+      JS9.CloseImage(closeProps)
 
-    // --- XXX TEMP XXX
-    val s = new String(buffers.head.toArray.take(6).map(_.asInstanceOf[Char]))
-    if (s != "SIMPLE") println(s"\nXXX INVALID FITS START: $s\n")
-    // ---
+      // --- XXX TEMP XXX
+      val s = new String(buffers.head.toArray.take(6).map(_.asInstanceOf[Char]))
+      if (s != "SIMPLE") println(s"\nXXX INVALID FITS START: $s\n")
+      // ---
 
-    // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
-    val blob = new Blob(js.Array(buffers: _*), getImageProps)
-    println("XXX Loading image")
-    val p = Promise[Boolean]
-    JS9.Load(blob, loadProps(p))
-    dom.window.setTimeout( () => Try(p.failure(new RuntimeException("Image load failed"))), 1000)
-    p.future
+      // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
+      val blob = new Blob(js.Array(buffers: _*), getImageProps)
+      println("XXX Loading image")
+      val p = Promise[Boolean]
+      JS9.Load(blob, loadProps(p))
+      dom.window.setTimeout(() => Try(if (!p.isCompleted) p.failure(new RuntimeException("Image load failed"))), 1000)
+      p.future
+    }
   }
 
   // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
   private def sendAck(ws: WebSocket): Unit = {
-    println("XXX send ACK")
     ws.send("ACK")
   }
 
@@ -176,7 +182,6 @@ class VbdsWebApp {
       ws.binaryType = "arraybuffer"
       ws.onopen = { _: Event ⇒
         println(s"Opened websocket for stream $stream")
-        sendAck(ws) // XXX Just to get started
       }
       ws.onerror = { event: Event ⇒
         println(s"Error for stream $stream websocket: $event")
@@ -187,8 +192,14 @@ class VbdsWebApp {
         if (arrayBuffer.byteLength == 1 && isEndOfFileMarker(arrayBuffer)) {
           try {
             displayImage().onComplete {
-              case Success(_) => println("XXX Image load succeeded!"); sendAck(ws)
-              case Failure(ex) => println(s"Load image failed"); sendAck(ws)
+              case Success(_)  =>
+                println("XXX Image load succeeded!")
+                sendAck(ws)
+                busyDisplay = false
+              case Failure(ex) =>
+                println(s"Load image failed")
+                sendAck(ws)
+                busyDisplay = false
             }
           } catch {
             case ex: Exception => println("Image load failed!")

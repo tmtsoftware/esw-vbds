@@ -81,9 +81,6 @@ class WebSocketActor(name: String,
 
   log.debug(s"$name: Started WebSocketActor")
 
-  // Current server implementation requires an initial ACK from the client
-  sendWsAck()
-
   def receive: Receive = {
     case StreamInitialized ⇒
       log.debug(s"$name: Initialized stream for $streamName")
@@ -122,8 +119,9 @@ class WebSocketActor(name: String,
   }
 
   // Sends a reply on the websocket acknowledging the bytestring, to prevent overflow
-  private def sendWsAck(): Unit =
+  private def sendWsAck(): Unit = {
     Source.single(wsAckMessage).runWith(outSink)
+  }
 
   // Called when a ByteString is received on the websocket
   private def handleByteString(bs: ByteString): Future[Unit] = {

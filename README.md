@@ -248,4 +248,3 @@ This is the basic flow of a published data file:
   ending with a message containing a single newline, which is not part of the data.
   The clients need to collect the data until the file is complete and then can display it, do calculations, etc.
   The client also needs to acknowledge each websocket message with a short "ACK" message, for flow control reasons.
-  (The current implementation also requires an initial ACK from the client to get started.)
