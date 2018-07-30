@@ -3,13 +3,14 @@ package vbds.client.app
 import java.io.File
 
 import akka.Done
-import akka.actor.ActorSystem
+import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.http.scaladsl.model.HttpResponse
-import akka.stream.{ActorMaterializer, OverflowStrategy}
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{FileIO, Framing}
+import akka.util.ByteString
 import vbds.client.VbdsClient
 
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
 import scala.concurrent.duration._
 import vbds.client.WebSocketActor._
@@ -18,6 +19,8 @@ import vbds.client.WebSocketActor._
  * A VIZ Bulk Data System HTTP client command line application.
  */
 object VbdsClientApp extends App {
+  implicit val system       = ActorSystem()
+  implicit val materializer = ActorMaterializer()
 
   // Command line options
   private case class Options(name: String = "vbds",
@@ -114,8 +117,6 @@ object VbdsClientApp extends App {
 
   // Run the application (The actor system is only used locally, no need for remote)
   private def run(options: Options): Unit = {
-    implicit val system       = ActorSystem()
-    implicit val materializer = ActorMaterializer()
 
     val client = new VbdsClient(options.name, options.host, options.port)
     options.create.foreach(s => handleHttpResponse(s"create $s", client.createStream(s, options.contentType.getOrElse(""))))
@@ -127,26 +128,58 @@ object VbdsClientApp extends App {
       options.publish.foreach(s => handlePublishResponse(s"publish $s", client.publish(s, options.data.get, delay)))
     }
 
-    val queue = Source
-      .queue[ReceivedFile](1, OverflowStrategy.dropHead)
-      .map { r =>
-        if (r.count % 100 == 0) println(s"Received ${r.count} files for stream ${r.streamName}")
-        options.action.foreach(doAction(r, _))
-        r.path.toFile.delete()
-      }
-      .to(Sink.ignore)
-      .run()
+    val clientActor = system.actorOf(ClientActor.props(options))
 
     options.subscribe.foreach(
-      s => client.subscribe(s, new File(options.dir.getOrElse(".")), queue, saveFiles = true)
+      s => client.subscribe(s, new File(options.dir.getOrElse(".")), clientActor, saveFiles = true)
     )
+  }
+
+  // Actor to receive and acknowledge files
+  private object ClientActor {
+    def props(options: Options): Props = Props(new ClientActor(options))
+
+    // XXX Temp
+    def checkFits(r: ReceivedFile): Future[Done] = {
+      FileIO
+        .fromPath(r.path)
+        .via(
+          Framing
+            .delimiter(ByteString("\n"), 80, allowTruncation = true)
+            .map(_.utf8String)
+        )
+        .take(1)
+        .runForeach {s =>
+          if (!s.startsWith("SIMPLE")) println(s"XXX $r.path is not a FITS file")
+        }
+    }
+  }
+
+  private class ClientActor(options: Options) extends Actor with ActorLogging {
+    import ClientActor._
+
+    def receive: Receive = {
+      case r: ReceivedFile =>
+        println(s"Received ${r.count} files for stream ${r.streamName}")
+        options.action.foreach(doAction(r, _))
+
+        // XXX temp
+        Await.ready(checkFits(r), 5.seconds)
+
+        r.path.toFile.delete()
+        sender() ! r
+
+      case x =>
+    }
   }
 
   // XXX TODO: Change to actor or callback
   private def doAction(r: ReceivedFile, action: String): Unit = {
     import sys.process._
     try {
+      println(s"XXX Start $action")
       s"$action ${r.path}".!
+      println(s"XXX Done with $action")
     } catch {
       case ex: Exception => println(s"Error: Action for file ${r.count} of stream ${r.streamName} failed: $ex")
     }

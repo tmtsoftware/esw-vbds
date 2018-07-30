@@ -4,16 +4,17 @@ import java.io.{File, FileOutputStream}
 import java.nio.file.Path
 
 import akka.NotUsed
-import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.util.{ByteString, Timeout}
 import akka.stream.{Materializer, QueueOfferResult}
 import akka.stream.scaladsl.{Sink, Source, SourceQueueWithComplete}
 import vbds.client.WebSocketActor._
 
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.util._
+import akka.pattern.ask
 
 /**
  * An actor that receives websocket messages from the VBDS server.
@@ -41,20 +42,20 @@ object WebSocketActor {
    * @param name the name of the client, for logging
    * @param streamName the name of the stream we are subscribed to
    * @param dir the directory in which to save the files received (if saveFiles is true)
-   * @param inQueue a queue to write messages to when a file is received
+   * @param clientActor an actor to write messages to when a file is received
    * @param outSink a sink to send to server to acknowledge the message, for flow control
    * @param saveFiles if true, save the files in the given dir (Set to false for throughput tests)
    */
   def props(name: String,
             streamName: String,
             dir: File,
-            inQueue: SourceQueueWithComplete[ReceivedFile],
+            clientActor: ActorRef,
             outSink: Sink[Message, NotUsed],
             saveFiles: Boolean)(
       implicit system: ActorSystem,
       mat: Materializer
   ): Props =
-    Props(new WebSocketActor(name, streamName, dir, inQueue, outSink, saveFiles))
+    Props(new WebSocketActor(name, streamName, dir, clientActor, outSink, saveFiles))
 }
 
 /**
@@ -63,7 +64,7 @@ object WebSocketActor {
 class WebSocketActor(name: String,
                      streamName: String,
                      dir: File,
-                     inQueue: SourceQueueWithComplete[ReceivedFile],
+                     clientActor: ActorRef,
                      outSink: Sink[Message, NotUsed],
                      saveFiles: Boolean)(
     implicit val system: ActorSystem,
@@ -79,11 +80,11 @@ class WebSocketActor(name: String,
   var os: FileOutputStream = _
   implicit val askTimeout  = Timeout(6.seconds)
 
-  log.debug(s"$name: Started WebSocketActor")
+  log.info(s"$name: Started WebSocketActor")
 
   def receive: Receive = {
     case StreamInitialized ⇒
-      log.debug(s"$name: Initialized stream for $streamName")
+      log.info(s"$name: Initialized stream for $streamName")
       count = 0
       newFile()
       sender() ! Ack
@@ -120,6 +121,7 @@ class WebSocketActor(name: String,
 
   // Sends a reply on the websocket acknowledging the bytestring, to prevent overflow
   private def sendWsAck(): Unit = {
+    log.info("XXX Client sends ACK")
     Source.single(wsAckMessage).runWith(outSink)
   }
 
@@ -128,26 +130,10 @@ class WebSocketActor(name: String,
     val result = if (bs.size == 1 && bs.utf8String == "\n") {
       if (saveFiles) {
         os.close()
-        log.debug(s"$name: Wrote $file")
+        log.info(s"$name: Wrote $file")
       }
-      if (log.isDebugEnabled) log.debug(s"$name: Queue offer file $count on stream $streamName")
       val rf = ReceivedFile(streamName, count, file.toPath)
-      val f  = inQueue.offer(rf)
-      f.onComplete {
-        case Success(queueOfferResult) =>
-          queueOfferResult match {
-            case QueueOfferResult.Enqueued =>
-              if (log.isDebugEnabled) log.debug(s"$name: Enqueued ${rf.path}")
-            case QueueOfferResult.Dropped =>
-              log.warning(s"$name: Dropped ${rf.path}")
-            case QueueOfferResult.Failure(ex) =>
-              log.error(ex, s"$name: Failed to queue ${rf.path}")
-            case QueueOfferResult.QueueClosed =>
-              log.warning(s"$name: Closed queue on ${rf.path}")
-          }
-        case Failure(ex) =>
-          log.error(ex, s"$name: Failed to enqueue ${rf.path}")
-      }
+      val f  = clientActor ? rf
       newFile()
       f.map(_ => ())
     } else {

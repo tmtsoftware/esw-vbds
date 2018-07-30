@@ -173,7 +173,6 @@ class VbdsWebApp {
   private def subscribeToStream(event: dom.Event): Unit = {
     // Close previous web socket, which unsubscribes to the previous stream
     currentWebSocket.foreach(_.close())
-    JS9.SetImageInherit("true")
 
     getSelectedStream.foreach { stream =>
       println(s"Subscribe to stream: $stream")

@@ -4,7 +4,7 @@ import java.io.File
 import java.nio.file.Path
 
 import akka.Done
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
@@ -127,21 +127,21 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
    *
    * @param streamName the name of the stream we are subscribed to
    * @param dir the directory in which to save the files received (if saveFiles is true)
-   * @param inQueue a queue to write messages to when a file is received
+   * @param clientActor an acto to write messages to when a file is received
    * @param saveFiles if true, save the files in the given dir (Set to false for throughput tests)
 
    * @return the HTTP response
    */
   def subscribe(streamName: String,
                 dir: File,
-                inQueue: SourceQueueWithComplete[ReceivedFile],
+                clientActor: ActorRef,
                 saveFiles: Boolean): Subscription = {
     log.debug(s"subscribe to $streamName")
 
     // We need a Source for writing to the websocket, but we want a Sink:
     // This provides a Sink that feeds the Source.
     val (outSink, outSource) = MergeHub.source[Message].preMaterialize()
-    val receiver   = system.actorOf(WebSocketActor.props(name, streamName, dir, inQueue, outSink, saveFiles))
+    val receiver   = system.actorOf(WebSocketActor.props(name, streamName, dir, clientActor, outSink, saveFiles))
     val wsListener = new WebSocketListener
     val uri = Uri(s"ws://$host:$port$accessRoute/$streamName")
     wsListener.subscribe(uri, receiver, outSource)

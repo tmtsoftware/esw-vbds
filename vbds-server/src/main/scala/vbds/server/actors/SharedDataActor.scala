@@ -8,7 +8,7 @@ import akka.cluster.Cluster
 import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.ddata.Replicator._
 import akka.stream.{ActorMaterializer, ClosedShape}
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import vbds.server.models.{AccessInfo, ServerInfo, StreamInfo}
 import akka.pattern.pipe
@@ -218,32 +218,35 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       // Merge afterwards to get a single output
       val merge = builder.add(Merge[ByteString](numOut))
 
+      // Wait for the client to acknowledge the message
+      def waitForAck(a: AccessInfo): Future[Any] = {
+        localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get
+      }
+
       // Send data for each local subscribers to its websocket.
       // Wait for ws client to respond in order to avoid overflowing the ws input buffer.
       def websocketFlow(a: AccessInfo) =
         Flow[ByteString]
           .alsoTo(localSubscribers(a).sink)
-          .mapAsync(1) { bs =>
-            (localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get).map(_ => bs)
+          .mapAsync(1) { _ =>
+            waitForAck(a).map(_ => ByteString.empty)
           }
 
       // Set of flows to local subscriber websockets
       val localFlows = localSet.map(websocketFlow)
 
       // If dist is true, send data for each remote subscriber as HTTP POST to the server hosting its websocket
-      def requestFlow(h: ServerInfo): Flow[ByteString, HttpRequest, NotUsed] =
-        Flow[ByteString].map(makeHttpRequest(streamName, h, _))
+      def remoteFlow(h: ServerInfo) =
+        Flow[ByteString]
+          .map(makeHttpRequest(streamName, h, _))
+          .via(remoteConnections(h))
+          .map(_ => ByteString.empty)
 
       // Set of flows to remote servers containing subscribers
-      val remoteFlows =
-        if (dist)
-          remoteHostSet.map(h => requestFlow(h).via(remoteConnections(h)).map(_ => ByteString.empty))
-        else Set.empty
-
-      val src = builder.add(source) // XXX Needed?
+      val remoteFlows = if (dist) remoteHostSet.map(remoteFlow) else Set.empty
 
       // Create the graph
-      src ~> bcast
+      source ~> bcast
       localFlows.foreach(bcast ~> _ ~> merge)
       if (dist) remoteFlows.foreach(bcast ~> _ ~> merge)
       merge ~> out
