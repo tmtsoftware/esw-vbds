@@ -10,7 +10,7 @@ import akka.http.scaladsl.server.Directives
 import akka.stream._
 import akka.stream.scaladsl.{Flow, MergeHub, Sink}
 import akka.util.ByteString
-import vbds.server.actors.{AccessApi, AdminApi}
+import vbds.server.actors.{AccessApi, AdminApi, CheckFitsActor}
 import vbds.server.models.JsonSupport
 import vbds.server.routes.AccessRoute.WebsocketResponseActor
 
@@ -90,9 +90,10 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
 
               // We need a Source for writing to the websocket, but we want a Sink:
               // This provides a Sink that feeds the Source.
-              val (sink, source)  = MergeHub.source[ByteString].preMaterialize()
+              val (sink, source)  = MergeHub.source[ByteString](1).preMaterialize()
               val id              = UUID.randomUUID().toString
               val wsResponseActor = system.actorOf(WebsocketResponseActor.props())
+              val checkFitsActor = system.actorOf(CheckFitsActor.props())
 
               // Input from client ws
               val inSink = Flow[Message]
@@ -107,7 +108,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
                   system.stop(wsResponseActor)
                 })
 
-              onSuccess(accessData.addSubscription(name, id, sink, wsResponseActor)) { _ =>
+              onSuccess(accessData.addSubscription(name, id, sink, wsResponseActor, checkFitsActor)) { _ =>
                 extractUpgradeToWebSocket { upgrade =>
                   Cors.cors(complete(upgrade.handleMessagesWithSinkSource(inSink, source.map(BinaryMessage(_)))))
                 }

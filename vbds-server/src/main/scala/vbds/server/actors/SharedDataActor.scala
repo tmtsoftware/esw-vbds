@@ -8,7 +8,7 @@ import akka.cluster.Cluster
 import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.ddata.Replicator._
 import akka.stream.{ActorMaterializer, ClosedShape}
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink, Source}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import vbds.server.models.{AccessInfo, ServerInfo, StreamInfo}
 import akka.pattern.pipe
@@ -21,7 +21,7 @@ import akka.pattern.ask
 import scala.concurrent.duration._
 import vbds.server.routes.AccessRoute.WebsocketResponseActor
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
 /**
@@ -40,7 +40,11 @@ private[server] object SharedDataActor {
   // Tells the actor the host and port that the http server is listening on
   case class LocalAddress(a: InetSocketAddress) extends SharedDataActorMessages
 
-  case class AddSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef)
+  case class AddSubscription(streamName: String,
+                             id: String,
+                             sink: Sink[ByteString, NotUsed],
+                             wsResponseActor: ActorRef,
+                             checkFitsActor: ActorRef)
       extends SharedDataActorMessages
 
   case class DeleteSubscription(id: String) extends SharedDataActorMessages
@@ -68,7 +72,9 @@ private[server] object SharedDataActor {
    * @param sink            Sink that writes to the subscriber's websocket
    * @param wsResponseActor an Actor that is used to check if the client has processed the last message (to avoid overflow)
    */
-  private[server] case class LocalSubscriberInfo(sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef)
+  private[server] case class LocalSubscriberInfo(sink: Sink[ByteString, NotUsed],
+                                                 wsResponseActor: ActorRef,
+                                                 checkFitsActor: ActorRef)
 
   // Route used to distribute data to remote HTTP server
   val distRoute = "/vbds/transfer/internal"
@@ -84,7 +90,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
     extends Actor
     with ActorLogging {
 
-  import system._
+  import system.dispatcher
   import SharedDataActor._
 
   // The local IP address, set at runtime via a message from the code that starts the HTTP server.
@@ -144,11 +150,11 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       streams = data.elements
       log.info("Current streams: {}", streams)
 
-    case AddSubscription(name, id, sink, wsResponseActor) =>
+    case AddSubscription(name, id, sink, wsResponseActor, checkFitsActor) =>
       log.info(s"Adding Subscription to stream $name with id $id")
       val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, id)
       replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ + info)
-      localSubscribers = localSubscribers + (info -> LocalSubscriberInfo(sink, wsResponseActor))
+      localSubscribers = localSubscribers + (info -> LocalSubscriberInfo(sink, wsResponseActor, checkFitsActor))
       sender() ! info
 
     case DeleteSubscription(id) =>
@@ -228,7 +234,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       def websocketFlow(a: AccessInfo) =
         Flow[ByteString]
           .alsoTo(localSubscribers(a).sink)
-          .mapAsync(1) { _ =>
+          .mapAsync(1) { bs =>
             waitForAck(a).map(_ => ByteString.empty)
           }
 

@@ -1,10 +1,11 @@
 package vbds.misc
+
 import akka.Done
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.stream.{ActorMaterializer, ClosedShape}
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink, Source}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, MergeHub, RunnableGraph, Sink, Source}
 import akka.testkit.TestKit
-import akka.util.Timeout
+import akka.util.{ByteString, Timeout}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.FunSuiteLike
 
@@ -13,7 +14,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 import akka.pattern.ask
 
-object StreamTest {
+object StreamTest2 {
   // Actor to receive and acknowledge files
   private object TestActor {
     def props(): Props = Props(new TestActor())
@@ -31,11 +32,14 @@ object StreamTest {
 }
 
 // Place to experiment with streams
-class StreamTest extends TestKit(ActorSystem("test", ConfigFactory.parseString(""))) with FunSuiteLike {
-  import StreamTest._
+class StreamTest2 extends TestKit(ActorSystem("test", ConfigFactory.parseString(""))) with FunSuiteLike {
+  import StreamTest2._
 
   implicit val mat = ActorMaterializer()
   import system.dispatcher
+
+  val (sink, source)  = MergeHub.source[Int](1).preMaterialize()
+  source.runForeach(i => println(s"MergeHub source received $i"))
 
   def runGraph(t: Int, testActor: ActorRef): Future[Done] = {
     val g = RunnableGraph.fromGraph(GraphDSL.create(Sink.ignore) { implicit builder => out =>
@@ -50,10 +54,10 @@ class StreamTest extends TestKit(ActorSystem("test", ConfigFactory.parseString("
       // Merge afterwards to get a single output
       val merge = builder.add(Merge[Int](numOut))
 
-      val sink1 = Sink.foreach[Int](i => println(s"sink1 => $t: $i"))
+//      val sink1 = Sink.foreach[Int](i => println(s"sink1 => $t: $i"))
 
       val flow1 = Flow[Int]
-        .alsoTo(sink1)
+        .alsoTo(sink)
         .mapAsync(1) { i =>
           if (i == 5) {
             (testActor ? "flow1 => $t: $i").map(_ => i)

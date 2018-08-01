@@ -8,7 +8,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.Multipart.FormData
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.settings.ConnectionPoolSettings
 import akka.stream.{Materializer, ThrottleMode}
 import akka.stream.scaladsl._
 
@@ -21,12 +20,10 @@ class FileUploader(chunkSize: Int = 1024 * 1024)(implicit val system: ActorSyste
   import system.dispatcher
 
   private def poolClientFlow(uri: Uri) = {
-    Http().cachedHostConnectionPool[Path](uri.authority.host.address(), uri.authority.port, ConnectionPoolSettings("max-connections: 1"))
+    Http().cachedHostConnectionPool[Path](uri.authority.host.address(), uri.authority.port)
   }
 
   private def createUploadRequest(streamName: String, uri: Uri, path: Path): Future[(HttpRequest, Path)] = {
-    println(s"XXX createUploadRequest $path")
-//    println(s"XXX Uploading $path")
     val bodyPart = FormData.BodyPart.fromPath("data", ContentTypes.`application/octet-stream`, path, chunkSize)
     val body     = FormData(bodyPart) // only one file per upload
     Marshal(body).to[RequestEntity].map { entity => // use marshalling to create multipart/formdata entity

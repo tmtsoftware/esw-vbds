@@ -10,9 +10,8 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.Message
 import akka.stream.Materializer
-import akka.stream.scaladsl.{MergeHub, SourceQueueWithComplete}
+import akka.stream.scaladsl.MergeHub
 import vbds.client.VbdsClient.Subscription
-import vbds.client.WebSocketActor.ReceivedFile
 
 import scala.concurrent.Future
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -89,8 +88,10 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
     val handler: ((Try[HttpResponse], Path)) => Unit = {
       case (Success(response), path) =>
         if (response.status == StatusCodes.Accepted) log.info(s"Result for file: $path was successful")
-        else log.error(s"Publish of $path returned unexpected status code: ${response.status}")
-        response.discardEntityBytes() // don't forget this
+        else {
+          log.error(s"Publish of $path returned unexpected status code: ${response.status}")
+          response.discardEntityBytes() // don't forget this
+        }
       case (Failure(ex), path) =>
         log.error(s"Uploading file $path failed with $ex")
     }
@@ -140,7 +141,7 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
 
     // We need a Source for writing to the websocket, but we want a Sink:
     // This provides a Sink that feeds the Source.
-    val (outSink, outSource) = MergeHub.source[Message].preMaterialize()
+    val (outSink, outSource) = MergeHub.source[Message](1).preMaterialize()
     val receiver   = system.actorOf(WebSocketActor.props(name, streamName, dir, clientActor, outSink, saveFiles))
     val wsListener = new WebSocketListener
     val uri = Uri(s"ws://$host:$port$accessRoute/$streamName")

@@ -121,7 +121,6 @@ class WebSocketActor(name: String,
 
   // Sends a reply on the websocket acknowledging the bytestring, to prevent overflow
   private def sendWsAck(): Unit = {
-    log.info("XXX Client sends ACK")
     Source.single(wsAckMessage).runWith(outSink)
   }
 

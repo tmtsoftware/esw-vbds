@@ -24,6 +24,7 @@ class TransferApiImpl(sharedDataActor: ActorRef, accessApi: AccessApi)(implicit 
     extends TransferApi {
 
   def publish(streamName: String, source: Source[ByteString, Any], dist: Boolean): Future[Done] = {
+    import system.dispatcher
     (sharedDataActor ? Publish(streamName, source, dist)).mapTo[Done]
   }
 }

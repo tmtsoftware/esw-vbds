@@ -117,7 +117,6 @@ class VbdsWebApp {
     xhr.onload = { _: dom.Event =>
       if (xhr.status == 200) {
         val streams = read[List[StreamInfo]](xhr.responseText)
-        println(s"XXX streams = $streams")
         updateStreamOptions(streams)
       }
     }
@@ -126,7 +125,6 @@ class VbdsWebApp {
 
   // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
   private def onloadHandler(p: Promise[Boolean])(): Unit = {
-    println(s"XXX called onload handler")
     p.success(true)
   }
 
@@ -143,14 +141,13 @@ class VbdsWebApp {
       currentImageData = Nil
       JS9.CloseImage(closeProps)
 
-      // --- XXX TEMP XXX
-      val s = new String(buffers.head.toArray.take(6).map(_.asInstanceOf[Char]))
-      if (s != "SIMPLE") println(s"\nXXX INVALID FITS START: $s\n")
+//      // --- XXX TEMP XXX
+//      val s = new String(buffers.head.toArray.take(6).map(_.asInstanceOf[Char]))
+//      if (s != "SIMPLE") println(s"\nXXX INVALID FITS START: $s\n")
       // ---
 
       // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
       val blob = new Blob(js.Array(buffers: _*), getImageProps)
-      println("XXX Loading image")
       val p = Promise[Boolean]
       JS9.Load(blob, loadProps(p))
       dom.window.setTimeout(() => Try(if (!p.isCompleted) p.failure(new RuntimeException("Image load failed"))), 1000)
@@ -192,7 +189,6 @@ class VbdsWebApp {
           try {
             displayImage().onComplete {
               case Success(_)  =>
-                println("XXX Image load succeeded!")
                 sendAck(ws)
                 busyDisplay = false
               case Failure(ex) =>
@@ -204,7 +200,6 @@ class VbdsWebApp {
             case ex: Exception => println("Image load failed!")
           }
         } else {
-          println(s"XXX Received image chunk: size: ${arrayBuffer.byteLength}")
           currentImageData = new Uint8Array(arrayBuffer) :: currentImageData
           sendAck(ws)
         }

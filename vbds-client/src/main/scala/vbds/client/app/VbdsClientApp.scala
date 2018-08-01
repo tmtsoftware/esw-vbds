@@ -19,7 +19,7 @@ import vbds.client.WebSocketActor._
  * A VIZ Bulk Data System HTTP client command line application.
  */
 object VbdsClientApp extends App {
-  implicit val system       = ActorSystem()
+  implicit val system       = ActorSystem("vbdsClient")
   implicit val materializer = ActorMaterializer()
 
   // Command line options
@@ -139,20 +139,20 @@ object VbdsClientApp extends App {
   private object ClientActor {
     def props(options: Options): Props = Props(new ClientActor(options))
 
-    // XXX Temp
-    def checkFits(r: ReceivedFile): Future[Done] = {
-      FileIO
-        .fromPath(r.path)
-        .via(
-          Framing
-            .delimiter(ByteString("\n"), 80, allowTruncation = true)
-            .map(_.utf8String)
-        )
-        .take(1)
-        .runForeach {s =>
-          if (!s.startsWith("SIMPLE")) println(s"XXX $r.path is not a FITS file")
-        }
-    }
+//    // XXX Temp
+//    def checkFits(r: ReceivedFile): Future[Done] = {
+//      FileIO
+//        .fromPath(r.path)
+//        .via(
+//          Framing
+//            .delimiter(ByteString("\n"), 80, allowTruncation = true)
+//            .map(_.utf8String)
+//        )
+//        .take(1)
+//        .runForeach {s =>
+//          if (!s.startsWith("SIMPLE")) println(s"XXX $r.path is not a FITS file")
+//        }
+//    }
   }
 
   private class ClientActor(options: Options) extends Actor with ActorLogging {
@@ -163,8 +163,8 @@ object VbdsClientApp extends App {
         println(s"Received ${r.count} files for stream ${r.streamName}")
         options.action.foreach(doAction(r, _))
 
-        // XXX temp
-        Await.ready(checkFits(r), 5.seconds)
+//        // XXX temp
+//        Await.ready(checkFits(r), 5.seconds)
 
         r.path.toFile.delete()
         sender() ! r
@@ -177,9 +177,7 @@ object VbdsClientApp extends App {
   private def doAction(r: ReceivedFile, action: String): Unit = {
     import sys.process._
     try {
-      println(s"XXX Start $action")
       s"$action ${r.path}".!
-      println(s"XXX Done with $action")
     } catch {
       case ex: Exception => println(s"Error: Action for file ${r.count} of stream ${r.streamName} failed: $ex")
     }
@@ -211,8 +209,6 @@ object VbdsClientApp extends App {
           case Success(_) =>
             System.exit(0)
           case Failure(ex) =>
-//            println("XXX shutdown failed: $ex")
-//            ex.printStackTrace()
             System.exit(0)
         }
       case Failure(ex) =>
