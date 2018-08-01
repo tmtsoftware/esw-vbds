@@ -6,11 +6,9 @@ import akka.Done
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.http.scaladsl.model.HttpResponse
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{FileIO, Framing}
-import akka.util.ByteString
 import vbds.client.VbdsClient
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import scala.concurrent.duration._
 import vbds.client.WebSocketActor._
@@ -156,7 +154,6 @@ object VbdsClientApp extends App {
   }
 
   private class ClientActor(options: Options) extends Actor with ActorLogging {
-    import ClientActor._
 
     def receive: Receive = {
       case r: ReceivedFile =>
@@ -168,8 +165,6 @@ object VbdsClientApp extends App {
 
         r.path.toFile.delete()
         sender() ! r
-
-      case x =>
     }
   }
 
@@ -191,7 +186,7 @@ object VbdsClientApp extends App {
         system.terminate().onComplete {
           case Success(_) =>
             System.exit(0)
-          case Failure(ex) =>
+          case Failure(_) =>
 //            ex.printStackTrace()
             System.exit(0)
         }
@@ -208,7 +203,7 @@ object VbdsClientApp extends App {
         system.terminate().onComplete {
           case Success(_) =>
             System.exit(0)
-          case Failure(ex) =>
+          case Failure(_) =>
             System.exit(0)
         }
       case Failure(ex) =>

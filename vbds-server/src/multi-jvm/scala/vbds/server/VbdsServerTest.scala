@@ -201,12 +201,11 @@ class VbdsServerTest(name: String)
 
     "Allow creating a stream, subscribing and publishing to a stream" in {
       runOn(server1) {
-        import system.dispatcher
         val host = system.settings.config.getString("multinode.host")
         println(s"server1 (seed node) is running on $host")
 
         // Start the first server (the seed node)
-        val (server, bindingF) = VbdsServer.start(
+        val (_, _) = VbdsServer.start(
           host,
           server1HttpPort,
           host,
@@ -225,13 +224,12 @@ class VbdsServerTest(name: String)
       }
 
       runOn(server2) {
-        import system.dispatcher
         val host       = system.settings.config.getString("multinode.host")
         val serverHost = system.settings.config.getString("multinode.server-host")
         println(s"server2 is running on $host (seed node is $serverHost)")
 
         // Start a second server
-        val (server, bindingF) = VbdsServer.start(
+        val (_, _) = VbdsServer.start(
           host,
           server2HttpPort,
           host,

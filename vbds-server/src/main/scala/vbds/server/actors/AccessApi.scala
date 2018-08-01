@@ -15,7 +15,7 @@ import scala.concurrent.duration._
  * Internal API to manage VBDS subscriptions
  */
 trait AccessApi {
-  def addSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef, checkFitsActor: ActorRef): Future[AccessInfo]
+  def addSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef): Future[AccessInfo]
 
   def listSubscriptions(): Future[Set[AccessInfo]]
 
@@ -32,8 +32,8 @@ class AccessApiImpl(sharedDataActor: ActorRef)(implicit system: ActorSystem, tim
   import SharedDataActor._
   import system.dispatcher
 
-  def addSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef, checkFitsActor: ActorRef): Future[AccessInfo] = {
-    (sharedDataActor ? AddSubscription(streamName, id, sink, wsResponseActor, checkFitsActor)).mapTo[AccessInfo]
+  def addSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef): Future[AccessInfo] = {
+    (sharedDataActor ? AddSubscription(streamName, id, sink, wsResponseActor)).mapTo[AccessInfo]
   }
 
   def listSubscriptions(): Future[Set[AccessInfo]] = {

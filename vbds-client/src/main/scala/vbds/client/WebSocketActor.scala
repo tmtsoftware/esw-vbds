@@ -7,11 +7,10 @@ import akka.NotUsed
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.util.{ByteString, Timeout}
-import akka.stream.{Materializer, QueueOfferResult}
-import akka.stream.scaladsl.{Sink, Source, SourceQueueWithComplete}
-import vbds.client.WebSocketActor._
+import akka.stream.Materializer
+import akka.stream.scaladsl.{Sink, Source}
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util._
 import akka.pattern.ask
