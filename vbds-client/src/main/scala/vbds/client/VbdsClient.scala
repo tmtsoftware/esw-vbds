@@ -56,7 +56,9 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
    */
   def createStream(streamName: String, contentType: String): Future[HttpResponse] = {
     if (contentType.nonEmpty)
-      Http().singleRequest(HttpRequest(method = HttpMethods.POST, uri = s"http://$host:$port$adminRoute/$streamName?contentType=$contentType"))
+      Http().singleRequest(
+        HttpRequest(method = HttpMethods.POST, uri = s"http://$host:$port$adminRoute/$streamName?contentType=$contentType")
+      )
     else
       Http().singleRequest(HttpRequest(method = HttpMethods.POST, uri = s"http://$host:$port$adminRoute/$streamName"))
   }
@@ -81,14 +83,36 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
    * @param streamName name of stream
    * @param file       file or directory full of files to publish
    * @param delay      optional delay
+   * @param stats      if true print timing statistics
    * @return future indicating when done
    */
-  def publish(streamName: String, file: File, delay: FiniteDuration = Duration.Zero): Future[Done] = {
+  def publish(streamName: String, file: File, delay: FiniteDuration = Duration.Zero, stats: Boolean = false): Future[Done] = {
+
+    val startTime: Long = System.currentTimeMillis()
+    val printInterval   = 100 // TODO: Make this an option
+    var count           = 0
+
+    // Print timing statistics
+    def logStats(path: Path): Unit = {
+      count = count + 1
+      if (count % printInterval == 0) {
+        val testSecs          = (System.currentTimeMillis() - startTime) / 1000.0
+        val secsPerFile       = testSecs / count
+        val testFileSizeBytes = path.toFile.length()
+        val fileSizeMb        = testFileSizeBytes / 1000000.0
+        val mbPerSec          = (fileSizeMb * count) / testSecs
+        val hz                = 1.0 / secsPerFile
+        log.info(
+          f"$name: $count: Published $count $testFileSizeBytes byte files in $testSecs seconds ($secsPerFile%1.4f secs per file, $hz%1.4f hz, $mbPerSec%1.4f mb/sec)"
+        )
+      }
+    }
 
     val handler: ((Try[HttpResponse], Path)) => Unit = {
       case (Success(response), path) =>
-        if (response.status == StatusCodes.Accepted) log.info(s"Result for file: $path was successful")
-        else {
+        if (response.status == StatusCodes.Accepted) {
+          if (stats) logStats(path) else log.info(s"Result for file: $path was successful")
+        } else {
           log.error(s"Publish of $path returned unexpected status code: ${response.status}")
           response.discardEntityBytes() // don't forget this
         }
@@ -133,18 +157,15 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
 
    * @return the HTTP response
    */
-  def subscribe(streamName: String,
-                dir: File,
-                clientActor: ActorRef,
-                saveFiles: Boolean): Subscription = {
+  def subscribe(streamName: String, dir: File, clientActor: ActorRef, saveFiles: Boolean): Subscription = {
     log.debug(s"subscribe to $streamName")
 
     // We need a Source for writing to the websocket, but we want a Sink:
     // This provides a Sink that feeds the Source.
     val (outSink, outSource) = MergeHub.source[Message](1).preMaterialize()
-    val receiver   = system.actorOf(WebSocketActor.props(name, streamName, dir, clientActor, outSink, saveFiles))
-    val wsListener = new WebSocketListener
-    val uri = Uri(s"ws://$host:$port$accessRoute/$streamName")
+    val receiver             = system.actorOf(WebSocketActor.props(name, streamName, dir, clientActor, outSink, saveFiles))
+    val wsListener           = new WebSocketListener
+    val uri                  = Uri(s"ws://$host:$port$accessRoute/$streamName")
     wsListener.subscribe(uri, receiver, outSource)
   }
 

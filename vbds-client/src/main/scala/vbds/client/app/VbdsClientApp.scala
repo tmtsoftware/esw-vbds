@@ -31,6 +31,7 @@ object VbdsClientApp extends App {
                              dir: Option[String] = None,
                              action: Option[String] = None,
                              list: Boolean = false,
+                             stats: Boolean = false,
                              publish: Option[String] = None,
                              delay: Option[String] = None,
                              data: Option[File] = None,
@@ -67,6 +68,10 @@ object VbdsClientApp extends App {
     opt[Unit]('l', "list") action { (_, c) =>
       c.copy(list = true)
     } text "List the available streams"
+
+    opt[Unit]("stats") action { (_, c) =>
+      c.copy(stats = true)
+    } text "Print timing statistics when publishing files"
 
     opt[String]("subscribe") valueName "<stream name>" action { (x, c) =>
       c.copy(subscribe = Some(x))
@@ -123,7 +128,7 @@ object VbdsClientApp extends App {
 
     val delay = options.delay.map(Duration(_).asInstanceOf[FiniteDuration]).getOrElse(Duration.Zero)
     if (options.publish.isDefined && options.data.isDefined) {
-      options.publish.foreach(s => handlePublishResponse(s"publish $s", client.publish(s, options.data.get, delay)))
+      options.publish.foreach(s => handlePublishResponse(s"publish $s", client.publish(s, options.data.get, delay, options.stats)))
     }
 
     val clientActor = system.actorOf(ClientActor.props(options))

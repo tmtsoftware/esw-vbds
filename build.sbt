@@ -18,7 +18,7 @@ lazy val `web-client` = project.in(file("web/vbds-scala-js"))
     skip in packageJSDependencies := false,
     jsDependencies ++= Dependencies.clientJsDeps.value,
     scalaJSUseMainModuleInitializer := true,
-    // Automatically generate index-dev.html which uses *-fastopt.js
+      // Automatically generate index-dev.html which uses *-fastopt.js
     resourceGenerators in Compile += Def.task {
       val source = (resourceDirectory in Compile).value / "index.html"
       val target = (resourceManaged in Compile).value / "index-dev.html"
