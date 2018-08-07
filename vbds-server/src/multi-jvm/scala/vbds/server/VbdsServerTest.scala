@@ -70,8 +70,10 @@ object VbdsServerTest {
   val testFileSizeBytes =   6 * 1000 * 1000 // 1mb
 //  val testFileSizeBytes = 256*256*2
 //  val testFileSizeBytes = 48*48*2
-  val numFilesToPublish = 100
-  val printInterval     = 10
+
+  val numFilesToPublish = 500
+  val printInterval     = 100
+
   // ---
 
   val testFileSizeMb    = testFileSizeBytes/1000000.0
@@ -80,15 +82,12 @@ object VbdsServerTest {
   val longTimeout  = 10.hours // in case you want to test with lots of files...
 
   // Simulate a slow publisher/subscriber (XXX Not sure simulated slow subscriber is working correctly)
-//    val publisherDelay = 100.millis
-//    val subscriber1Delay = 1000.millis
-//    val subscriber2Delay = 2000.millis
   val publisherDelay   = Duration.Zero
   val subscriber1Delay = Duration.Zero
   val subscriber2Delay = Duration.Zero
 
   // If true, compare files to make sure the file was transferred correctly
-  val doCompareFiles = true
+  val doCompareFiles = false
 
   val testFile = makeFile(testFileSizeBytes, testFileName)
   testFile.deleteOnExit()
@@ -98,19 +97,6 @@ object VbdsServerTest {
     dir.mkdir()
     dir
   }
-
-//  // Returns a queue for the named subscriber that receives the files via websocket and verifies
-//  // that the data is correct (if doCompareFiles is true).
-//  def makeQueue(name: String, promise: Promise[ReceivedFile], log: LoggingAdapter, delay: FiniteDuration)(
-//      implicit mat: Materializer
-//  ): SourceQueueWithComplete[ReceivedFile] = {
-//    println(s"$name: Started timing")
-//    Source
-//      .queue[ReceivedFile](1, OverflowStrategy.backpressure)
-//      .map(receiveFile(name, _, promise, delay))
-//      .to(Sink.ignore)
-//      .run()
-//  }
 
   // Actor to receive and acknowledge files
   private object ClientActor {
@@ -143,11 +129,10 @@ object VbdsServerTest {
       }
 
       if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
+        if (r.count % printInterval == 0) printStats()
         if (r.count >= numFilesToPublish) {
-          printStats()
-          promise.success(r)
+          if (!promise.isCompleted) promise.success(r)
         } else {
-          if (r.count % printInterval == 0) printStats()
           if (delay != Duration.Zero) Thread.sleep(delay.toMillis)
         }
       } else {
@@ -165,8 +150,6 @@ object VbdsServerTest {
       case x => log.warning(s"Unexpected message: $x")
     }
   }
-
-
 
   // Make a temp file with numBytes bytes of data and the given base name
   def makeFile(numBytes: Int, name: String): File = {
@@ -262,7 +245,7 @@ class VbdsServerTest(name: String)
         assert(httpResponse.status == StatusCodes.SwitchingProtocols)
         enterBarrier("subscribedToStream")
         promise.future.await(longTimeout)
-//        subscription.unsubscribe()
+        subscription.unsubscribe()
         within(longTimeout) {
           enterBarrier("receivedFiles")
           println("subscriber1: enterBarrier receivedFiles")
@@ -283,7 +266,7 @@ class VbdsServerTest(name: String)
         assert(httpResponse.status == StatusCodes.SwitchingProtocols)
         enterBarrier("subscribedToStream")
         promise.future.await(longTimeout)
-//        subscription.unsubscribe()
+        subscription.unsubscribe()
         within(longTimeout) {
           enterBarrier("receivedFiles")
           println("subscriber2: enterBarrier receivedFiles")
@@ -302,7 +285,7 @@ class VbdsServerTest(name: String)
         enterBarrier("subscribedToStream")
         // Note: +??? to make sure test completes
         Source(1 to numFilesToPublish+5).runForeach { _ => // XXX might hang unless we add extra files at end?
-          client.publish(streamName, testFile, publisherDelay).await(shortTimeout)
+          client.publish(streamName, testFile, None, publisherDelay).await(shortTimeout)
         }
         within(longTimeout) {
           enterBarrier("receivedFiles")

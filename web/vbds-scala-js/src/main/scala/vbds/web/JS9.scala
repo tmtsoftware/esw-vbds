@@ -18,6 +18,7 @@ object JS9 extends js.Object {
     * @param options optional object or json string containing image parameters
     */
   def Load(input: Blob, options: BlobPropertyBag): Unit = js.native
+
   def Load(input: Blob): Unit = js.native
 
 
@@ -46,7 +47,7 @@ object JS9 extends js.Object {
     *
     * @param mode true (inherit params from currently displayed image) or false
     */
-  def SetImageInherit(mode: String): Unit = js.native
+  def SetImageInherit(mode: Boolean): Unit = js.native
 
 }
 

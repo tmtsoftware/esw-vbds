@@ -124,6 +124,7 @@ class VbdsWebApp {
   }
 
   // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
+  // XXX FIXME: May not be needed, can send ACK message on receiving WS message?
   private def onloadHandler(p: Promise[Boolean])(): Unit = {
     p.success(true)
   }
@@ -139,12 +140,7 @@ class VbdsWebApp {
       busyDisplay = true
       val buffers = currentImageData.reverse
       currentImageData = Nil
-      JS9.CloseImage(closeProps)
-
-//      // --- XXX TEMP XXX
-//      val s = new String(buffers.head.toArray.take(6).map(_.asInstanceOf[Char]))
-//      if (s != "SIMPLE") println(s"\nXXX INVALID FITS START: $s\n")
-      // ---
+      JS9.CloseImage(closeProps) // XXX FIXME: Resets image settings!
 
       // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
       val blob = new Blob(js.Array(buffers: _*), getImageProps)

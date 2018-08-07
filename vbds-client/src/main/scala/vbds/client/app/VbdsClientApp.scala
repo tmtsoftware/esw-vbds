@@ -35,6 +35,7 @@ object VbdsClientApp extends App {
                              publish: Option[String] = None,
                              delay: Option[String] = None,
                              data: Option[File] = None,
+                             suffix: Option[String] = None,
                              chunkSize: Int = 1024 * 1024)
 
   // Parser for the command line options
@@ -97,6 +98,10 @@ object VbdsClientApp extends App {
       c.copy(data = Some(x))
     } text "Specifies the file (or directory full of files) to publish"
 
+    opt[String]("suffix") valueName "<suffix>" action { (x, c) =>
+      c.copy(suffix = Some(x))
+    } text "Optional suffix for files to publish if the file given by --data is a directory"
+
     opt[Int]("chunk-size") valueName "<num-bytes>" action { (x, c) =>
       c.copy(chunkSize = x)
     } text "Optional chunk size (to tune file transfer performance)"
@@ -128,7 +133,9 @@ object VbdsClientApp extends App {
 
     val delay = options.delay.map(Duration(_).asInstanceOf[FiniteDuration]).getOrElse(Duration.Zero)
     if (options.publish.isDefined && options.data.isDefined) {
-      options.publish.foreach(s => handlePublishResponse(s"publish $s", client.publish(s, options.data.get, delay, options.stats)))
+      options.publish.foreach(
+        s => handlePublishResponse(s"publish $s", client.publish(s, options.data.get, options.suffix, delay, options.stats))
+      )
     }
 
     val clientActor = system.actorOf(ClientActor.props(options))

@@ -41,7 +41,7 @@ object WebSocketActor {
    * @param name the name of the client, for logging
    * @param streamName the name of the stream we are subscribed to
    * @param dir the directory in which to save the files received (if saveFiles is true)
-   * @param clientActor an actor to write messages to when a file is received
+   * @param clientActor an actor to write messages to when a file is received (using 'ask', actor should reply to each message)
    * @param outSink a sink to send to server to acknowledge the message, for flow control
    * @param saveFiles if true, save the files in the given dir (Set to false for throughput tests)
    */

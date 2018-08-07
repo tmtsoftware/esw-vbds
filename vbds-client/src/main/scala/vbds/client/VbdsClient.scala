@@ -82,11 +82,12 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
    *
    * @param streamName name of stream
    * @param file       file or directory full of files to publish
+   * @param suffix     optional suffix for files in directory to publish
    * @param delay      optional delay
    * @param stats      if true print timing statistics
    * @return future indicating when done
    */
-  def publish(streamName: String, file: File, delay: FiniteDuration = Duration.Zero, stats: Boolean = false): Future[Done] = {
+  def publish(streamName: String, file: File, suffix: Option[String], delay: FiniteDuration = Duration.Zero, stats: Boolean = false): Future[Done] = {
 
     val startTime: Long = System.currentTimeMillis()
     val printInterval   = 100 // TODO: Make this an option
@@ -122,8 +123,9 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
 
     val uri = s"http://$host:$port$transferRoute/$streamName"
     val paths = if (file.isDirectory) {
+      val filter = suffix.map(s => (f: File) => f.getName.endsWith(s)).getOrElse((f: File) => true)
       // Sort files: Note: Added this to test with extracted video images so they are posted in the correct order
-      file.listFiles().map(_.toPath).toList.sortWith {
+      file.listFiles().filter(filter).map(_.toPath).toList.sortWith {
         case (p1, p2) => comparePaths(p1, p2)
       }
     } else {
@@ -152,7 +154,7 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
    *
    * @param streamName the name of the stream we are subscribed to
    * @param dir the directory in which to save the files received (if saveFiles is true)
-   * @param clientActor an acto to write messages to when a file is received
+   * @param clientActor an actor to write messages to when a file is received (using 'ask', actor should reply to each message)
    * @param saveFiles if true, save the files in the given dir (Set to false for throughput tests)
 
    * @return the HTTP response
