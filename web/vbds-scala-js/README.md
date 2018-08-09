@@ -45,10 +45,6 @@ While testing, it is best to display the web console in the browse to see any er
 
 ## Test Data
 
-If you don't have a sequence of FITS images handy, you can also download a public domain video like "big buck bunny"
-and use `ffmpeg` to extract JPEG images for each frame, and then use `jpegtopnm` and `pnmtofits` to convert the JPEG
-images to FITS format. Using this type of test data makes it easier to visually verify that the display is working.
-Note that `vbds-client --publish` sorts the files in a directory alpha-numerically, so that the images should be
-displayed in the correct order. Note also that the FITS files are much larger than the original JPEG, due to lack
-of compression.
+You can find sequences of FITS files for testing on the web. For example, see http://das.sdss.org/imaging/7150/40/corr/.
+
 
