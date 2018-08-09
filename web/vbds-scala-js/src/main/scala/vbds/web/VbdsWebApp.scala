@@ -9,8 +9,6 @@ import scala.scalajs.js.typedarray.{ArrayBuffer, Uint8Array}
 import VbdsWebApp._
 import upickle.default._
 
-import scala.collection.immutable.Queue
-
 /**
  * A web app that lets you subscribe to vbds images and displays them in a JS9 window on the page.
  */
@@ -19,6 +17,7 @@ object VbdsWebApp {
   // Object returns when listing streams
   private case class StreamInfo(name: String, contentType: String)
 
+  //noinspection ScalaUnusedSymbol
   private object StreamInfo {
     // JSON support
     implicit def rw: ReadWriter[StreamInfo] = macroRW
@@ -27,7 +26,6 @@ object VbdsWebApp {
   // vbds server routes
   private val adminRoute  = "/vbds/admin/streams"
   private val accessRoute = "/vbds/access/streams"
-  //  private val transferRoute             = "/vbds/transfer/streams"
 
   val closeProps = js.Dynamic.literal("clear" -> false).asInstanceOf[BlobPropertyBag]
 }
@@ -45,9 +43,6 @@ class VbdsWebApp {
 
   // Running cout for received files
   private var fileCount = 0
-
-  // Holds images waiting to be displayed
-  private var queue = Queue[Blob]()
 
   private val (hostField, portField) = {
     import scalatags.JsDom.all._
@@ -132,7 +127,7 @@ class VbdsWebApp {
   }
 
   // XXX Might be that onload is not always called...
-  def loadProps() =
+  private def loadProps() =
     js.Dynamic
       .literal(
         "onload"   -> onloadHandler _,
@@ -141,18 +136,15 @@ class VbdsWebApp {
       .asInstanceOf[BlobPropertyBag]
 
   // Combine the image parts and send to the display
-  private def displayImage(): Unit = {
+  private def displayImage(blob: Blob): Unit = {
     if (busyDisplay) {
       println("\n------------- Ignoring image: Display is busy ----------\n")
-    } else if (queue.nonEmpty) {
+    } else {
       busyDisplay = true
-      println(s"XXX Queue size = ${queue.size}")
       try {
         println("\nXXX display image\n")
         val settings = JS9.GetParam("all")
         JS9.CloseImage(closeProps)
-          val (blob, q) = queue.dequeue
-          queue = q
           // Use the first time to set the onload handler, so we know when the image has been displayed.
         if (fileCount == 1)
           JS9.Load(blob, loadProps)
@@ -204,8 +196,7 @@ class VbdsWebApp {
           currentImageData = Nil
           // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
           val blob = new Blob(js.Array(buffers: _*), getImageProps)
-          queue = queue :+ blob
-          displayImage()
+          displayImage(blob)
         } else {
           currentImageData = new Uint8Array(arrayBuffer) :: currentImageData
           sendAck(ws)
