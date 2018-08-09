@@ -1,6 +1,6 @@
 package vbds.web
 
-import org.scalajs.dom.raw.BlobPropertyBag
+import org.scalajs.dom.html.Image
 import org.scalajs.dom.{Blob, BlobPropertyBag}
 
 import scala.scalajs.js
@@ -33,7 +33,11 @@ object JS9 extends js.Object {
   /**
    * Clear the image from the display and mark resources for release.
    *
-   * Each loaded image claims a non-trivial amount of memory from a finite amount of browser heap space. For example, the default 32-bit version of Google Chrome has a memory limit of approximately 500Mb. If you are finished viewing an image, closing it tells the browser that the image's memory can be freed. In principle, this is can help reduce overall memory usage as successive images are loaded and discarded. Note, however, that closing an image only provides a hint to the browser, since this sort of garbage collection is not directly accessible to JavaScript programming.
+   * Each loaded image claims a non-trivial amount of memory from a finite amount of browser heap space. For example,
+   * the default 32-bit version of Google Chrome has a memory limit of approximately 500Mb. If you are finished viewing an image,
+   * closing it tells the browser that the image's memory can be freed. In principle, this is can help reduce overall
+   * memory usage as successive images are loaded and discarded. Note, however, that closing an image only provides a hint
+   * to the browser, since this sort of garbage collection is not directly accessible to JavaScript programming.
    *
    * Some day, all browsers will support full 64-bit addressing and this problem will go away ...
    *
@@ -59,11 +63,8 @@ object JS9 extends js.Object {
    */
   def SetParam(param: String, value: BlobPropertyBag): Unit = js.native
 
-//  // cleanup FITS file by deleting vfile, etc
-//  def cleanupFITSFile(fits: Object = js.native, mode: Boolean = js.native): Unit = js.native
-
   // return the image object for the specified image name or the display id
-  def GetImage(): Object = js.native
+  def GetImage(): Image = js.native
 
   /**
    * Set the image inherit mode.

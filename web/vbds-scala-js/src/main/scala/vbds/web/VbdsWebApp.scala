@@ -9,7 +9,7 @@ import scala.scalajs.js.typedarray.{ArrayBuffer, Uint8Array}
 import VbdsWebApp._
 import upickle.default._
 
-import scala.concurrent.{Future, Promise}
+import scala.collection.immutable.Queue
 
 /**
  * A web app that lets you subscribe to vbds images and displays them in a JS9 window on the page.
@@ -29,8 +29,6 @@ object VbdsWebApp {
   private val accessRoute = "/vbds/access/streams"
   //  private val transferRoute             = "/vbds/transfer/streams"
 
-  val defaultLoadProps = js.Dynamic.literal("type" -> "image/fits").asInstanceOf[BlobPropertyBag]
-
   val closeProps = js.Dynamic.literal("clear" -> false).asInstanceOf[BlobPropertyBag]
 }
 
@@ -44,6 +42,12 @@ class VbdsWebApp {
 
   // WebSocket for current subscription
   private var currentWebSocket: Option[WebSocket] = None
+
+  // Running cout for received files
+  private var fileCount = 0
+
+  // Holds images waiting to be displayed
+  private var queue = Queue[Blob]()
 
   private val (hostField, portField) = {
     import scalatags.JsDom.all._
@@ -86,15 +90,13 @@ class VbdsWebApp {
 
   // Use the content type of the stream to tell the display what kind of image this is.
   private def getImageProps: BlobPropertyBag = {
-    getSelectedStream match {
-      case Some(streamInfo) =>
-        if (streamInfo.contentType.nonEmpty)
-          js.Dynamic.literal("type" -> streamInfo.contentType).asInstanceOf[BlobPropertyBag]
-        else
-          defaultLoadProps
-      case None =>
-        defaultLoadProps
-    }
+    fileCount = fileCount + 1
+    val imageType = getSelectedStream.map(_.contentType).getOrElse("image/fits")
+    js.Dynamic
+      .literal(
+        "type" -> imageType,
+      )
+      .asInstanceOf[BlobPropertyBag]
   }
 
   // Update the streams combobox options
@@ -121,37 +123,45 @@ class VbdsWebApp {
     xhr.send()
   }
 
-//  // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
-//  // XXX FIXME: May not be needed, can send ACK message on receiving WS message?
-//  private def onloadHandler(p: Promise[Boolean])(): Unit = {
-//    println("XXX onload handler")
-//    p.success(true)
-//  }
-//
-//  // XXX Might be that onload is not always called...
-//  def loadProps(p: Promise[Boolean]) = js.Dynamic.literal("onload" -> onloadHandler(p) _).asInstanceOf[BlobPropertyBag]
+  // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
+  // XXX FIXME: May not be needed, can send ACK message on receiving WS message?
+  private def onloadHandler(event: Event): Unit = {
+    println("XXX onload handler")
+    busyDisplay = false
+    currentWebSocket.foreach(sendAck)
+  }
+
+  // XXX Might be that onload is not always called...
+  def loadProps() =
+    js.Dynamic
+      .literal(
+        "onload"   -> onloadHandler _,
+        "filename" -> s"vbds$fileCount"
+      )
+      .asInstanceOf[BlobPropertyBag]
 
   // Combine the image parts and send to the display
   private def displayImage(): Unit = {
     if (busyDisplay) {
       println("\n------------- Ignoring image: Display is busy ----------\n")
-    } else {
+    } else if (queue.nonEmpty) {
       busyDisplay = true
+      println(s"XXX Queue size = ${queue.size}")
       try {
         println("\nXXX display image\n")
         val settings = JS9.GetParam("all")
         JS9.CloseImage(closeProps)
-//        JS9.CloseDisplay("JS9")
-        val buffers = currentImageData.reverse
-        currentImageData = Nil
-        // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
-        val blob = new Blob(js.Array(buffers: _*), getImageProps)
-        JS9.Load(blob, settings)
+          val (blob, q) = queue.dequeue
+          queue = q
+          // Use the first time to set the onload handler, so we know when the image has been displayed.
+        if (fileCount == 1)
+          JS9.Load(blob, loadProps)
+        else
+          JS9.Load(blob, settings)
       } catch {
         case ex: Exception =>
           println(s"Display image failed: $ex")
       } finally {
-        busyDisplay = false
         println("XXX Display image done")
       }
     }
@@ -188,17 +198,21 @@ class VbdsWebApp {
       ws.onmessage = { event: MessageEvent ⇒
         val arrayBuffer = new Uint8Array(event.data.asInstanceOf[ArrayBuffer])
         // End marker is a message with one byte ("\n")
-//        if (arrayBuffer.byteLength == 1 && isEndOfFileMarker(arrayBuffer)) {
         if (arrayBuffer.byteLength == 1) {
           println(s"Received EOF marker")
+          val buffers = currentImageData.reverse
+          currentImageData = Nil
+          // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
+          val blob = new Blob(js.Array(buffers: _*), getImageProps)
+          queue = queue :+ blob
           displayImage()
         } else {
           currentImageData = new Uint8Array(arrayBuffer) :: currentImageData
+          sendAck(ws)
           println(s"Received ${arrayBuffer.byteLength} bytes")
         }
-        sendAck(ws)
       }
-      ws.onclose = { event: Event ⇒
+      ws.onclose = { _: Event ⇒
         println(s"Websocket closed for stream $stream")
       }
     }
