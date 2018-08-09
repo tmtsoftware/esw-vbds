@@ -35,14 +35,14 @@ class VbdsWebApp {
   // Can't save temp files from the browser, so have to keep the image parts in memory...
   private var currentImageData: List[Uint8Array] = Nil
 
-  // Set to true while image is being displayed (XXX TODO FIXME)
+  // Set to true while image is being displayed
   private var busyDisplay = false
 
   // WebSocket for current subscription
   private var currentWebSocket: Option[WebSocket] = None
 
-  // Running cout for received files
-  private var fileCount = 0
+  // Used to set some properties on the first call to JS9.Load
+  private var initialized = false
 
   private val (hostField, portField) = {
     import scalatags.JsDom.all._
@@ -70,7 +70,6 @@ class VbdsWebApp {
   // Combobox listing the available streams
   private val streamsItem = {
     import scalatags.JsDom.all._
-    // XXX TODO: FIXME: deprecated warning: forward usage?
     select(onchange := subscribeToStream _)(
       option(value := "", selected := true)("")
     ).render
@@ -85,7 +84,6 @@ class VbdsWebApp {
 
   // Use the content type of the stream to tell the display what kind of image this is.
   private def getImageProps: BlobPropertyBag = {
-    fileCount = fileCount + 1
     val imageType = getSelectedStream.map(_.contentType).getOrElse("image/fits")
     js.Dynamic
       .literal(
@@ -118,50 +116,45 @@ class VbdsWebApp {
     xhr.send()
   }
 
-  // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
-  // XXX FIXME: May not be needed, can send ACK message on receiving WS message?
+  // Acknowledge the message to prevent overrun
+  // Note: Testing showed that if we don't call sendAck() here and images are streamed at full speed, that JS9.Load will
+  // be called again before the image is loaded, causing errors.
   private def onloadHandler(event: Event): Unit = {
-    println("XXX onload handler")
     busyDisplay = false
     currentWebSocket.foreach(sendAck)
   }
 
-  // XXX Might be that onload is not always called...
+  // Set as inital properties on first call to JS9.Load to
   private def loadProps() =
     js.Dynamic
       .literal(
-        "onload"   -> onloadHandler _,
-        "filename" -> s"vbds$fileCount"
+        "onload" -> onloadHandler _,
       )
       .asInstanceOf[BlobPropertyBag]
 
   // Combine the image parts and send to the display
   private def displayImage(blob: Blob): Unit = {
-    if (busyDisplay) {
-      println("\n------------- Ignoring image: Display is busy ----------\n")
-    } else {
+    if (!busyDisplay) {
       busyDisplay = true
       try {
-        println("\nXXX display image\n")
         val settings = JS9.GetParam("all")
         JS9.CloseImage(closeProps)
-          // Use the first time to set the onload handler, so we know when the image has been displayed.
-        if (fileCount == 1)
-          JS9.Load(blob, loadProps)
-        else
+        // Use the first time to set the onload handler, so we know when the image has been displayed.
+        if (!initialized) {
+          JS9.Load(blob, loadProps())
+          initialized = true
+        } else {
           JS9.Load(blob, settings)
+        }
       } catch {
         case ex: Exception =>
           println(s"Display image failed: $ex")
-      } finally {
-        println("XXX Display image done")
       }
     }
   }
 
   // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
   private def sendAck(ws: WebSocket): Unit = {
-    println("XXX send ACK")
     ws.send("ACK")
   }
 
@@ -191,7 +184,6 @@ class VbdsWebApp {
         val arrayBuffer = new Uint8Array(event.data.asInstanceOf[ArrayBuffer])
         // End marker is a message with one byte ("\n")
         if (arrayBuffer.byteLength == 1) {
-          println(s"Received EOF marker")
           val buffers = currentImageData.reverse
           currentImageData = Nil
           // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
@@ -200,7 +192,6 @@ class VbdsWebApp {
         } else {
           currentImageData = new Uint8Array(arrayBuffer) :: currentImageData
           sendAck(ws)
-          println(s"Received ${arrayBuffer.byteLength} bytes")
         }
       }
       ws.onclose = { _: Event ⇒
@@ -224,5 +215,4 @@ class VbdsWebApp {
 
     dom.document.body.appendChild(layout.render)
   }
-
 }
