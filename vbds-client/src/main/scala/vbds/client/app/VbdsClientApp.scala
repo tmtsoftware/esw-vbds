@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.stream.ActorMaterializer
 import vbds.client.VbdsClient
 
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success}
 import scala.concurrent.duration._
 import vbds.client.WebSocketActor._
@@ -32,6 +32,7 @@ object VbdsClientApp extends App {
                              action: Option[String] = None,
                              list: Boolean = false,
                              stats: Boolean = false,
+                             statsInterval: Int = 1,
                              publish: Option[String] = None,
                              delay: Option[String] = None,
                              data: Option[File] = None,
@@ -73,6 +74,10 @@ object VbdsClientApp extends App {
     opt[Unit]("stats") action { (_, c) =>
       c.copy(stats = true)
     } text "Print timing statistics when publishing files"
+
+    opt[Int]("stats-interval") action { (x, c) =>
+      c.copy(statsInterval = x)
+    } text "If --stats option was given, controls how often statistics are printed (default: 1 = every time)"
 
     opt[String]("subscribe") valueName "<stream name>" action { (x, c) =>
       c.copy(subscribe = Some(x))
@@ -134,7 +139,9 @@ object VbdsClientApp extends App {
     val delay = options.delay.map(Duration(_).asInstanceOf[FiniteDuration]).getOrElse(Duration.Zero)
     if (options.publish.isDefined && options.data.isDefined) {
       options.publish.foreach(
-        s => handlePublishResponse(s"publish $s", client.publish(s, options.data.get, options.suffix, delay, options.stats))
+        s =>
+          handlePublishResponse(s"publish $s",
+                                client.publish(s, options.data.get, options.suffix, delay, options.stats, options.statsInterval))
       )
     }
 
@@ -193,34 +200,29 @@ object VbdsClientApp extends App {
   // Prints the result of the HTTP request and exits
   private def handleHttpResponse(command: String, resp: Future[HttpResponse])(implicit system: ActorSystem): Unit = {
     import system.dispatcher
-    resp.onComplete {
-      case Success(_) =>
-        system.terminate().onComplete {
-          case Success(_) =>
-            System.exit(0)
-          case Failure(_) =>
-//            ex.printStackTrace()
-            System.exit(0)
-        }
-      case Failure(ex) =>
+    val timeout = 3.seconds
+    try {
+      val r = Await.result(resp, timeout)
+      val s = Await.result(r.entity.toStrict(1.second).map(_.data.utf8String), timeout)
+      println(s"${r.status}: $s")
+      System.exit(0)
+    } catch {
+      case ex: Exception =>
         println(s"$command failed: $ex")
-        ex.printStackTrace()
+        System.exit(1)
     }
   }
 
   private def handlePublishResponse(command: String, resp: Future[Done])(implicit system: ActorSystem): Unit = {
     import system.dispatcher
-    resp.onComplete {
-      case Success(_) =>
-        system.terminate().onComplete {
-          case Success(_) =>
-            System.exit(0)
-          case Failure(_) =>
-            System.exit(0)
-        }
-      case Failure(ex) =>
+    val timeout = 10.hours // might be publishing lots of files...
+    try {
+      val r = Await.result(resp, timeout)
+      System.exit(0)
+    } catch {
+      case ex: Exception =>
         println(s"$command failed: $ex")
-        ex.printStackTrace()
+        System.exit(1)
     }
   }
 }

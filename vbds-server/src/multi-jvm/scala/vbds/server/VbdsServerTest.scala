@@ -2,7 +2,7 @@ package vbds.server
 
 import java.io.{BufferedOutputStream, File, FileOutputStream}
 
-import akka.actor.{Actor, ActorLogging, Props}
+import akka.actor.{Actor, ActorLogging, PoisonPill, Props}
 import akka.remote.testkit.MultiNodeConfig
 import vbds.client.VbdsClient
 import vbds.server.app.VbdsServer
@@ -14,7 +14,7 @@ import akka.testkit.ImplicitSender
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.StatusCodes
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.io.FileUtils
 import org.scalatest.BeforeAndAfterAll
@@ -60,23 +60,18 @@ object VbdsServerTest {
   val seedPort        = 8888
   val server1HttpPort = 7777
   val server2HttpPort = server1HttpPort + 1
-  val streamName = "WFS1-RAW"
-  val testFileName = "vbdsTestFile"
+  val streamName      = "WFS1-RAW"
+  val testFile        = new File(s"${getTempDir("vbds")}/vbdsTestFile")
 
   // --- Edit this ---
-//  val testFileSizeBytes = 640 * 1000 * 1000 // 640 mb
-//  val testFileSizeBytes = 1000 * 1000 * 1000 // 1gb (XXX timed out)
-//  val testFileSizeBytes =   75 * 1000 * 1000 // 75mb
-  val testFileSizeBytes =   6 * 1000 * 1000 // 1mb
-//  val testFileSizeBytes = 256*256*2
-//  val testFileSizeBytes = 48*48*2
-
-  val numFilesToPublish = 500
-  val printInterval     = 100
+  // Image dimensions: 128x128, 256x256, 512x512, 1024x1024, 2048x2048, 4096x4096 (x 2)
+  val testFileDims = List(48, 128, 256, 512, 1024, 2048, 4096)
+  // Repeat each test to get warmed up performance data
+  val repeatTests         = 5
+  val numFilesToPublish   = 100
+  val totalFilesToPublish = testFileDims.size * repeatTests * numFilesToPublish
 
   // ---
-
-  val testFileSizeMb    = testFileSizeBytes/1000000.0
 
   val shortTimeout = 60.seconds
   val longTimeout  = 10.hours // in case you want to test with lots of files...
@@ -88,9 +83,6 @@ object VbdsServerTest {
 
   // If true, compare files to make sure the file was transferred correctly
   val doCompareFiles = false
-
-  val testFile = makeFile(testFileSizeBytes, testFileName)
-  testFile.deleteOnExit()
 
   private def getTempDir(name: String): File = {
     val dir = new File(s"${System.getProperty("java.io.tmpdir")}/$name")
@@ -104,34 +96,19 @@ object VbdsServerTest {
       Props(new ClientActor(name, promise, log, delay))
   }
 
-  private class ClientActor(name: String, promise: Promise[ReceivedFile], log: LoggingAdapter, delay: FiniteDuration) extends Actor with ActorLogging {
-    // Time at start of each set of test files (print interval)
-    var startTime: Long = System.currentTimeMillis()
-
+  private class ClientActor(name: String, promise: Promise[ReceivedFile], log: LoggingAdapter, delay: FiniteDuration)
+      extends Actor
+      with ActorLogging {
 
     // Called when a file is received by the named subscriber.
     // Checks the file contents (if doCompareFiles is true) and prints statistics when done.
     // Received (temp) files are deleted.
-    private def receiveFile(name: String,
-                            r: ReceivedFile,
-                            promise: Promise[ReceivedFile],
-                            delay: FiniteDuration): Unit = {
-
-      def printStats() = {
-        val testSecs = (System.currentTimeMillis() - startTime) / 1000.0
-        val secsPerFile = testSecs / printInterval
-        val mbPerSec = (testFileSizeMb * printInterval) / testSecs
-        val hz = 1.0 / secsPerFile
-        println(
-          f"$name: ${r.count}: Received $printInterval $testFileSizeBytes byte files in $testSecs seconds ($secsPerFile%1.4f secs per file, $hz%1.4f hz, $mbPerSec%1.4f mb/sec)"
-        )
-        startTime = System.currentTimeMillis()
-      }
+    private def receiveFile(name: String, r: ReceivedFile, promise: Promise[ReceivedFile], delay: FiniteDuration): Unit = {
 
       if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
-        if (r.count % printInterval == 0) printStats()
-        if (r.count >= numFilesToPublish) {
-          if (!promise.isCompleted) promise.success(r)
+        if (r.count == totalFilesToPublish) {
+          promise.success(r)
+          self ! PoisonPill
         } else {
           if (delay != Duration.Zero) Thread.sleep(delay.toMillis)
         }
@@ -152,12 +129,12 @@ object VbdsServerTest {
   }
 
   // Make a temp file with numBytes bytes of data and the given base name
-  def makeFile(numBytes: Int, name: String): File = {
-    val file = new File(s"${getTempDir("vbds")}/$name")
-    val os   = new BufferedOutputStream(new FileOutputStream(file))
+  def makeFile(numBytes: Int, file: File): Unit = {
+    if (file.exists()) file.delete()
+    val os = new BufferedOutputStream(new FileOutputStream(file))
     (0 to numBytes).foreach(i => os.write(i))
     os.close()
-    file
+    file.deleteOnExit()
   }
 
   implicit class RichFuture[T](val f: Future[T]) extends AnyVal {
@@ -176,124 +153,136 @@ class VbdsServerTest(name: String)
 
   def initialParticipants = roles.size
 
-  "A VbdsServerTest" must {
+  enterBarrier("startup")
 
-    "wait for all server nodes to enter a barrier" in {
-      enterBarrier("startup")
-    }
+  runOn(server1) {
+    import system.dispatcher
+    val host = system.settings.config.getString("multinode.host")
+    println(s"server1 (seed node) is running on $host")
 
-    "Allow creating a stream, subscribing and publishing to a stream" in {
-      runOn(server1) {
-        val host = system.settings.config.getString("multinode.host")
-        println(s"server1 (seed node) is running on $host")
-
-        // Start the first server (the seed node)
-        val (_, _) = VbdsServer.start(
-          host,
-          server1HttpPort,
-          host,
-          seedPort,
-          s"$host:$seedPort"
-        )
-        expectNoMessage(2.seconds)
-        enterBarrier("deployed")
-        enterBarrier("streamCreated")
-        enterBarrier("subscribedToStream")
-        within(longTimeout) {
-          enterBarrier("receivedFiles")
-          println("server1: enterBarrier receivedFiles")
-//          bindingF.foreach(server.stop)
-        }
-      }
-
-      runOn(server2) {
-        val host       = system.settings.config.getString("multinode.host")
-        val serverHost = system.settings.config.getString("multinode.server-host")
-        println(s"server2 is running on $host (seed node is $serverHost)")
-
-        // Start a second server
-        val (_, _) = VbdsServer.start(
-          host,
-          server2HttpPort,
-          host,
-          0,
-          s"$serverHost:$seedPort"
-        )
-
-        expectNoMessage(2.seconds)
-        enterBarrier("deployed")
-        enterBarrier("streamCreated")
-        enterBarrier("subscribedToStream")
-        within(longTimeout) {
-          enterBarrier("receivedFiles")
-          println("server2: enterBarrier receivedFiles")
-//          bindingF.foreach(server.stop)
-        }
-      }
-
-      runOn(subscriber1) {
-        val host = system.settings.config.getString("multinode.host")
-        println(s"subscriber1 is running on $host")
-        implicit val materializer = ActorMaterializer()
-        enterBarrier("deployed")
-        val client = new VbdsClient("subscriber1", host, server1HttpPort)
-        enterBarrier("streamCreated")
-        val promise = Promise[ReceivedFile]
-        val clientActor   = system.actorOf(ClientActor.props("subscriber1", promise, log, subscriber1Delay))
-        val subscription = client.subscribe(streamName, getTempDir("subscriber1"), clientActor, doCompareFiles)
-        val httpResponse = subscription.httpResponse.await(shortTimeout)
-        assert(httpResponse.status == StatusCodes.SwitchingProtocols)
-        enterBarrier("subscribedToStream")
-        promise.future.await(longTimeout)
-        subscription.unsubscribe()
-        within(longTimeout) {
-          enterBarrier("receivedFiles")
-          println("subscriber1: enterBarrier receivedFiles")
-        }
-      }
-
-      runOn(subscriber2) {
-        val host = system.settings.config.getString("multinode.host")
-        println(s"subscriber2 is running on $host")
-        implicit val materializer = ActorMaterializer()
-        enterBarrier("deployed")
-        val client = new VbdsClient("subscriber2", host, server2HttpPort)
-        enterBarrier("streamCreated")
-        val promise = Promise[ReceivedFile]
-        val clientActor   = system.actorOf(ClientActor.props("subscriber2", promise, log, subscriber2Delay))
-        val subscription = client.subscribe(streamName, getTempDir("subscriber2"), clientActor, doCompareFiles)
-        val httpResponse = subscription.httpResponse.await(shortTimeout)
-        assert(httpResponse.status == StatusCodes.SwitchingProtocols)
-        enterBarrier("subscribedToStream")
-        promise.future.await(longTimeout)
-        subscription.unsubscribe()
-        within(longTimeout) {
-          enterBarrier("receivedFiles")
-          println("subscriber2: enterBarrier receivedFiles")
-        }
-      }
-
-      runOn(publisher1) {
-        val host = system.settings.config.getString("multinode.host")
-        println(s"publisher1 is running on $host")
-        implicit val materializer = ActorMaterializer()
-        enterBarrier("deployed")
-        val client         = new VbdsClient("publisher1", host, server1HttpPort)
-        val createResponse = client.createStream(streamName, "").await(shortTimeout)
-        assert(createResponse.status == StatusCodes.OK)
-        enterBarrier("streamCreated")
-        enterBarrier("subscribedToStream")
-        // Note: +??? to make sure test completes
-        Source(1 to numFilesToPublish+5).runForeach { _ => // XXX might hang unless we add extra files at end?
-          client.publish(streamName, testFile, None, publisherDelay).await(shortTimeout)
-        }
-        within(longTimeout) {
-          enterBarrier("receivedFiles")
-          println("publisher1: enterBarrier receivedFiles")
-        }
-      }
-
-      enterBarrier("finished")
+    // Start the first server (the seed node)
+    val (server, bindingF) = VbdsServer.start(
+      host,
+      server1HttpPort,
+      host,
+      seedPort,
+      s"$host:$seedPort"
+    )
+    expectNoMessage(2.seconds)
+    enterBarrier("deployed")
+    enterBarrier("streamCreated")
+    enterBarrier("subscribedToStream")
+    within(longTimeout) {
+      enterBarrier("receivedFiles")
+      println("server1: enterBarrier receivedFiles")
+      bindingF.foreach(server.stop)
     }
   }
+
+  runOn(server2) {
+    import system.dispatcher
+    val host       = system.settings.config.getString("multinode.host")
+    val serverHost = system.settings.config.getString("multinode.server-host")
+    println(s"server2 is running on $host (seed node is $serverHost)")
+
+    // Start a second server
+    val (server, bindingF) = VbdsServer.start(
+      host,
+      server2HttpPort,
+      host,
+      0,
+      s"$serverHost:$seedPort"
+    )
+
+    expectNoMessage(2.seconds)
+    enterBarrier("deployed")
+    enterBarrier("streamCreated")
+    enterBarrier("subscribedToStream")
+    within(longTimeout) {
+      enterBarrier("receivedFiles")
+      println("server2: enterBarrier receivedFiles")
+      bindingF.foreach(server.stop)
+    }
+  }
+
+  runOn(subscriber1) {
+    val host = system.settings.config.getString("multinode.host")
+    println(s"subscriber1 is running on $host")
+    implicit val materializer = ActorMaterializer()
+    enterBarrier("deployed")
+    val client = new VbdsClient("subscriber1", host, server1HttpPort)
+    enterBarrier("streamCreated")
+    val promise      = Promise[ReceivedFile]
+    val clientActor  = system.actorOf(ClientActor.props("subscriber1", promise, log, subscriber1Delay))
+    val subscription = client.subscribe(streamName, getTempDir("subscriber1"), clientActor, doCompareFiles)
+    val httpResponse = subscription.httpResponse.await(shortTimeout)
+    assert(httpResponse.status == StatusCodes.SwitchingProtocols)
+    enterBarrier("subscribedToStream")
+    subscription.unsubscribe()
+    promise.future.await(longTimeout)
+    within(shortTimeout) {
+      enterBarrier("receivedFiles")
+      println("subscriber1: enterBarrier receivedFiles")
+    }
+  }
+
+  runOn(subscriber2) {
+    val host = system.settings.config.getString("multinode.host")
+    println(s"subscriber2 is running on $host")
+    implicit val materializer = ActorMaterializer()
+    enterBarrier("deployed")
+    val client = new VbdsClient("subscriber2", host, server2HttpPort)
+    enterBarrier("streamCreated")
+    val promise      = Promise[ReceivedFile]
+    val clientActor  = system.actorOf(ClientActor.props("subscriber2", promise, log, subscriber2Delay))
+    val subscription = client.subscribe(streamName, getTempDir("subscriber2"), clientActor, doCompareFiles)
+    val httpResponse = subscription.httpResponse.await(shortTimeout)
+    assert(httpResponse.status == StatusCodes.SwitchingProtocols)
+    enterBarrier("subscribedToStream")
+    promise.future.await(longTimeout)
+    within(shortTimeout) {
+      enterBarrier("receivedFiles")
+      println("subscriber2: enterBarrier receivedFiles")
+    }
+  }
+
+  runOn(publisher1) {
+    val host = system.settings.config.getString("multinode.host")
+    println(s"publisher1 is running on $host")
+    implicit val materializer = ActorMaterializer()
+    enterBarrier("deployed")
+    val client         = new VbdsClient("publisher1", host, server1HttpPort)
+    val createResponse = client.createStream(streamName, "").await(shortTimeout)
+    assert(createResponse.status == StatusCodes.OK)
+    enterBarrier("streamCreated")
+    enterBarrier("subscribedToStream")
+
+    (1 to repeatTests).foreach { _ =>
+      testFileDims.foreach { dim =>
+        val testFileSizeBytes = dim * dim * 2
+        makeFile(testFileSizeBytes, testFile)
+
+        val startTime = System.currentTimeMillis()
+
+        Source(1 to numFilesToPublish)
+          .mapAsync(1) { _ =>
+            client.publish(streamName, testFile)
+          }
+          .runWith(Sink.ignore)
+          .await(longTimeout)
+
+        val elapsedTimeSecs = (System.currentTimeMillis() - startTime) / 1000.0
+        val hz              = numFilesToPublish / elapsedTimeSecs
+
+        println(f"Published $numFilesToPublish files of size [$dim x $dim x 2] in $elapsedTimeSecs%1.3f secs ($hz%1.3f hz)")
+      }
+    }
+
+    within(shortTimeout) {
+      enterBarrier("receivedFiles")
+      println("publisher1: enterBarrier receivedFiles")
+    }
+  }
+
+  enterBarrier("finished")
 }

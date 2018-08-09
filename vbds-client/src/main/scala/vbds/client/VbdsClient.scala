@@ -87,10 +87,14 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
    * @param stats      if true print timing statistics
    * @return future indicating when done
    */
-  def publish(streamName: String, file: File, suffix: Option[String], delay: FiniteDuration = Duration.Zero, stats: Boolean = false): Future[Done] = {
+  def publish(streamName: String,
+              file: File,
+              suffix: Option[String] = None,
+              delay: FiniteDuration = Duration.Zero,
+              stats: Boolean = false,
+              printInterval: Int = 1): Future[Done] = {
 
     val startTime: Long = System.currentTimeMillis()
-    val printInterval   = 100 // TODO: Make this an option
     var count           = 0
 
     // Print timing statistics

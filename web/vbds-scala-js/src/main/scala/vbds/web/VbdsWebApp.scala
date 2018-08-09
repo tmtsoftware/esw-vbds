@@ -10,8 +10,6 @@ import VbdsWebApp._
 import upickle.default._
 
 import scala.concurrent.{Future, Promise}
-import scala.util.{Failure, Success, Try}
-import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
  * A web app that lets you subscribe to vbds images and displays them in a JS9 window on the page.
@@ -123,44 +121,53 @@ class VbdsWebApp {
     xhr.send()
   }
 
-  // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
-  // XXX FIXME: May not be needed, can send ACK message on receiving WS message?
-  private def onloadHandler(p: Promise[Boolean])(): Unit = {
-    p.success(true)
-  }
-
-  // XXX Might be that onload is not always called...
-  def loadProps(p: Promise[Boolean]) = js.Dynamic.literal("onload" -> onloadHandler(p) _).asInstanceOf[BlobPropertyBag]
+//  // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
+//  // XXX FIXME: May not be needed, can send ACK message on receiving WS message?
+//  private def onloadHandler(p: Promise[Boolean])(): Unit = {
+//    println("XXX onload handler")
+//    p.success(true)
+//  }
+//
+//  // XXX Might be that onload is not always called...
+//  def loadProps(p: Promise[Boolean]) = js.Dynamic.literal("onload" -> onloadHandler(p) _).asInstanceOf[BlobPropertyBag]
 
   // Combine the image parts and send to the display
-  private def displayImage(): Future[Boolean] = {
+  private def displayImage(): Unit = {
     if (busyDisplay) {
-      Future.failed(new RuntimeException("Display is busy"))
+      println("\n------------- Ignoring image: Display is busy ----------\n")
     } else {
       busyDisplay = true
-      val buffers = currentImageData.reverse
-      currentImageData = Nil
-      JS9.CloseImage(closeProps) // XXX FIXME: Resets image settings!
-
-      // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
-      val blob = new Blob(js.Array(buffers: _*), getImageProps)
-      val p = Promise[Boolean]
-      JS9.Load(blob, loadProps(p))
-      dom.window.setTimeout(() => Try(if (!p.isCompleted) p.failure(new RuntimeException("Image load failed"))), 1000)
-      p.future
+      try {
+        println("\nXXX display image\n")
+        val settings = JS9.GetParam("all")
+        JS9.CloseImage(closeProps)
+//        JS9.CloseDisplay("JS9")
+        val buffers = currentImageData.reverse
+        currentImageData = Nil
+        // JS9 has code to "flatten if necessary", so we can just pass in all the file parts together
+        val blob = new Blob(js.Array(buffers: _*), getImageProps)
+        JS9.Load(blob, settings)
+      } catch {
+        case ex: Exception =>
+          println(s"Display image failed: $ex")
+      } finally {
+        busyDisplay = false
+        println("XXX Display image done")
+      }
     }
   }
 
   // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
   private def sendAck(ws: WebSocket): Unit = {
+    println("XXX send ACK")
     ws.send("ACK")
   }
 
   // Returns true if the array buffer contains the marker for the end of a file stream ("\n")
-  private def isEndOfFileMarker(arrayBuffer: Uint8Array): Boolean = {
-    val s = new String(arrayBuffer.toArray.take(1).map(_.asInstanceOf[Char]))
-    s == "\n"
-  }
+//  private def isEndOfFileMarker(arrayBuffer: Uint8Array): Boolean = {
+//    val s = new String(arrayBuffer.toArray.take(1).map(_.asInstanceOf[Char]))
+//    s == "\n"
+//  }
 
   // Called when a stream is selected: Subscribe to the websocket for the stream
   private def subscribeToStream(event: dom.Event): Unit = {
@@ -181,24 +188,15 @@ class VbdsWebApp {
       ws.onmessage = { event: MessageEvent ⇒
         val arrayBuffer = new Uint8Array(event.data.asInstanceOf[ArrayBuffer])
         // End marker is a message with one byte ("\n")
-        if (arrayBuffer.byteLength == 1 && isEndOfFileMarker(arrayBuffer)) {
-          try {
-            displayImage().onComplete {
-              case Success(_)  =>
-                sendAck(ws)
-                busyDisplay = false
-              case Failure(ex) =>
-                println(s"Load image failed")
-                sendAck(ws)
-                busyDisplay = false
-            }
-          } catch {
-            case ex: Exception => println("Image load failed!")
-          }
+//        if (arrayBuffer.byteLength == 1 && isEndOfFileMarker(arrayBuffer)) {
+        if (arrayBuffer.byteLength == 1) {
+          println(s"Received EOF marker")
+          displayImage()
         } else {
           currentImageData = new Uint8Array(arrayBuffer) :: currentImageData
-          sendAck(ws)
+          println(s"Received ${arrayBuffer.byteLength} bytes")
         }
+        sendAck(ws)
       }
       ws.onclose = { event: Event ⇒
         println(s"Websocket closed for stream $stream")
