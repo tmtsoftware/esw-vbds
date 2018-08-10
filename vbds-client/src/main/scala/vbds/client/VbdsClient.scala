@@ -143,7 +143,7 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
       // Note: Will never end: need to ^C to stop
       while (true) {
         Await.ready(uploader.uploadFiles(streamName, uri, paths, delay, handler), 10.hours)
-        if (delay != Duration.Zer) Thread.sleep(delay.toMillis)
+        if (delay != Duration.Zero) Thread.sleep(delay.toMillis)
       }
       Future.never.map(_ => Done)
     } else {
