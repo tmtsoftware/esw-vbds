@@ -129,6 +129,7 @@ class VbdsWebApp {
     js.Dynamic
       .literal(
         "onload" -> onloadHandler _,
+        "filename" -> s"vbds"
       )
       .asInstanceOf[BlobPropertyBag]
 

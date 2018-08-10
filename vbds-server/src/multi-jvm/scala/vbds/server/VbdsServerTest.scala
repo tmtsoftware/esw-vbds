@@ -68,7 +68,7 @@ object VbdsServerTest {
   val testFileDims = List(48, 128, 256, 512, 1024, 2048, 4096)
   // Repeat each test to get warmed up performance data
   val repeatTests         = 5
-  val numFilesToPublish   = 100
+  val numFilesToPublish   = 1000
   val totalFilesToPublish = testFileDims.size * repeatTests * numFilesToPublish
 
   // ---

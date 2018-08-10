@@ -9,7 +9,6 @@ import akka.stream.ActorMaterializer
 import vbds.client.VbdsClient
 
 import scala.concurrent.{Await, Future}
-import scala.util.{Failure, Success}
 import scala.concurrent.duration._
 import vbds.client.WebSocketActor._
 
@@ -32,6 +31,7 @@ object VbdsClientApp extends App {
                              action: Option[String] = None,
                              list: Boolean = false,
                              stats: Boolean = false,
+                             repeat: Boolean = false,
                              statsInterval: Int = 1,
                              publish: Option[String] = None,
                              delay: Option[String] = None,
@@ -74,6 +74,10 @@ object VbdsClientApp extends App {
     opt[Unit]("stats") action { (_, c) =>
       c.copy(stats = true)
     } text "Print timing statistics when publishing files"
+
+    opt[Unit]("repeat") action { (_, c) =>
+      c.copy(repeat = true)
+    } text "Keep publishing the same files forever, until killed (for testing)"
 
     opt[Int]("stats-interval") action { (x, c) =>
       c.copy(statsInterval = x)
@@ -141,7 +145,7 @@ object VbdsClientApp extends App {
       options.publish.foreach(
         s =>
           handlePublishResponse(s"publish $s",
-                                client.publish(s, options.data.get, options.suffix, delay, options.stats, options.statsInterval))
+                                client.publish(s, options.data.get, options.suffix, delay, options.stats, options.statsInterval, options.repeat))
       )
     }
 

@@ -13,8 +13,8 @@ import akka.stream.Materializer
 import akka.stream.scaladsl.MergeHub
 import vbds.client.VbdsClient.Subscription
 
-import scala.concurrent.Future
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object VbdsClient {
@@ -85,6 +85,8 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
    * @param suffix     optional suffix for files in directory to publish
    * @param delay      optional delay
    * @param stats      if true print timing statistics
+   * @param printInterval if stats is true, only print at this interval
+   * @param repeat if true, keep streaming the same file or files until the process is killed (for testing)
    * @return future indicating when done
    */
   def publish(streamName: String,
@@ -92,7 +94,8 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
               suffix: Option[String] = None,
               delay: FiniteDuration = Duration.Zero,
               stats: Boolean = false,
-              printInterval: Int = 1): Future[Done] = {
+              printInterval: Int = 1,
+              repeat: Boolean = false): Future[Done] = {
 
     val startTime: Long = System.currentTimeMillis()
     var count           = 0
@@ -135,9 +138,17 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
     } else {
       List(file.toPath)
     }
-//    println(s"Publishing ${paths.size} files with delay of $delay")
     val uploader = new FileUploader(chunkSize)
-    uploader.uploadFiles(streamName, uri, paths, delay, handler)
+    if (repeat) {
+      // Note: Will never end: need to ^C to stop
+      while (true) {
+        Await.ready(uploader.uploadFiles(streamName, uri, paths, delay, handler), 10.hours)
+        if (delay != Duration.Zer) Thread.sleep(delay.toMillis)
+      }
+      Future.never.map(_ => Done)
+    } else {
+      uploader.uploadFiles(streamName, uri, paths, delay, handler)
+    }
   }
 
   val fileNamePattern = """\d+""".r
