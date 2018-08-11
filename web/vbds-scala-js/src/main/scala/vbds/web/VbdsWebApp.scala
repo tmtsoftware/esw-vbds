@@ -128,10 +128,16 @@ class VbdsWebApp {
   private def loadProps() =
     js.Dynamic
       .literal(
-        "onload" -> onloadHandler _,
+        "onload"   -> onloadHandler _,
         "filename" -> s"vbds"
       )
       .asInstanceOf[BlobPropertyBag]
+
+  private val regionProps = js.Dynamic
+    .literal(
+      "format" -> "text"
+    )
+    .asInstanceOf[BlobPropertyBag]
 
   // Combine the image parts and send to the display
   private def displayImage(blob: Blob): Unit = {
@@ -139,12 +145,17 @@ class VbdsWebApp {
       busyDisplay = true
       try {
         val settings = JS9.GetParam("all")
+//        val regions  = JS9.GetRegions("all", regionProps)
+//        println(s"XXX regions = $regions")
         JS9.CloseImage(closeProps)
         // Use the first time to set the onload handler, so we know when the image has been displayed.
         if (!initialized) {
           JS9.Load(blob, loadProps())
           initialized = true
         } else {
+//          val mutableSettings = settings.asInstanceOf[js.Dynamic]
+//          mutableSettings.regions = regions
+//          JS9.Load(blob, mutableSettings.asInstanceOf[BlobPropertyBag])
           JS9.Load(blob, settings)
         }
       } catch {

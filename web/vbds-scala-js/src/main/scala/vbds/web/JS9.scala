@@ -63,6 +63,14 @@ object JS9 extends js.Object {
    */
   def SetParam(param: String, value: BlobPropertyBag): Unit = js.native
 
+  /**
+    * Get information about one or more regions
+    * @param region "selected" or "all" for all image regions
+    * @param options supply {format: “text”} to get regions as a text string
+    */
+  def GetRegions(region: String, options: BlobPropertyBag): BlobPropertyBag = js.native
+
+
   // return the image object for the specified image name or the display id
   def GetImage(): Image = js.native
 
