@@ -41,6 +41,12 @@ class VbdsWebApp {
   // WebSocket for current subscription
   private var currentWebSocket: Option[WebSocket] = None
 
+  // Content type of current image stream
+  private var imageType: String = "image/fits"
+
+//  private def isFits = imageType == "image/fits"
+
+
   // Used to set some properties on the first call to JS9.Load
   private var initialized = false
 
@@ -84,7 +90,6 @@ class VbdsWebApp {
 
   // Use the content type of the stream to tell the display what kind of image this is.
   private def getImageProps: BlobPropertyBag = {
-    val imageType = getSelectedStream.map(_.contentType).getOrElse("image/fits")
     js.Dynamic
       .literal(
         "type" -> imageType,
@@ -133,11 +138,11 @@ class VbdsWebApp {
       )
       .asInstanceOf[BlobPropertyBag]
 
-  private val regionProps = js.Dynamic
-    .literal(
-      "format" -> "text"
-    )
-    .asInstanceOf[BlobPropertyBag]
+//  private val regionProps = js.Dynamic
+//    .literal(
+//      "format" -> "text"
+//    )
+//    .asInstanceOf[BlobPropertyBag]
 
   // Combine the image parts and send to the display
   private def displayImage(blob: Blob): Unit = {
@@ -167,6 +172,7 @@ class VbdsWebApp {
 
   // Acknowledge the message to prevent overrun (Allow some buffering, move to start of function?)
   private def sendAck(ws: WebSocket): Unit = {
+    println("XXX send ACK")
     ws.send("ACK")
   }
 
@@ -183,6 +189,7 @@ class VbdsWebApp {
 
     getSelectedStream.foreach { stream =>
       println(s"Subscribe to stream: $stream")
+      imageType = stream.contentType
       val ws = new WebSocket(subscribeUri(stream))
       currentWebSocket = Some(ws)
       ws.binaryType = "arraybuffer"
@@ -194,6 +201,7 @@ class VbdsWebApp {
       }
       ws.onmessage = { event: MessageEvent ⇒
         val arrayBuffer = new Uint8Array(event.data.asInstanceOf[ArrayBuffer])
+        println(s"XXX received message with ${arrayBuffer.byteLength} bytes")
         // End marker is a message with one byte ("\n")
         if (arrayBuffer.byteLength == 1) {
           val buffers = currentImageData.reverse
