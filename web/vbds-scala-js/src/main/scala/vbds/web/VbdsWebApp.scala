@@ -31,7 +31,7 @@ object VbdsWebApp {
   val closeProps = js.Dynamic.literal("clear" -> false).asInstanceOf[BlobPropertyBag]
 
   // XXX: Set to true to test displaying with HTML canvas instead of JS9
-  val useCanvas = false
+//  val useCanvas = false
   val canvasWidth  = 1920
   val canvasHeight = 1080
   val URL          = js.Dynamic.global.window.URL.asInstanceOf[org.scalajs.dom.URL.type]
@@ -87,6 +87,12 @@ class VbdsWebApp {
   private val ctx = cvs.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
 
   private val img = document.createElement("img").asInstanceOf[Image]
+
+  private val useCanvas: Boolean = {
+    val scripts = document.getElementsByTagName("script")
+    val script = scripts(scripts.length - 1)
+    script.getAttribute("data-use-canvas") == "true"
+  }
 
   img.onload = (e: dom.Event) => {
 //    ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight)
