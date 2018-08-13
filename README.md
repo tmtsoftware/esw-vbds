@@ -265,6 +265,6 @@ This is the basic flow of a published data file:
   
 ### Basic VBDS Flow
 
-![Basic Flow](doc/overview.graphml.jpg)
+![Basic Flow](doc/overview.jpg)
 
   
