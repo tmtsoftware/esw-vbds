@@ -174,48 +174,54 @@ there are some issues to consider:
   problems with the cluster.
 
 
-## Performance Test Results
+## Performance Test Results on 10 gigabit AWS Servers
 
-The VBDS was tested with one Publisher, and two subscribers: One subscriber on host A, one subscriber on host B (publisher on host A).
-The tests were performed on two AWS hosts with a 10 gigabit ethernet connection and CPU: Intel(R) Xeon(R) Platinum 8175M CPU @ 2.50GHz:
+The VBDS was tested with one Publisher, two servers and two subscribers: One subscriber on host A, one subscriber on host B (publisher on host A).
+The tests were performed on two AWS hosts with a 10 gigabit ethernet connection and CPU: Intel(R) Xeon(R) Platinum 8175M CPU @ 2.50GHz.
+Note: These tests only measure the throughput: The data is not processed in these tests:
 
-1 gb files:
+| Image Size                   | Images/Sec (hz) |
+| -----------------------------|-----------------|          
+| 48   x   48 x 2              | 270.929         |
+| 128  x  128 x 2              | 306.185         |
+| 256  x  256 x 2              | 233.699         |
+| 512  x  512 x 2              | 149.231         |
+| 1024 x 1024 x 2              | 60.252          |
+| 2048 x 2048 x 2              | 18.916          |
+| 4096 x 4096 x 2              | 5.314           |
 
-    3.7437 secs per file, 0.2671 hz, 267.1154 mb/sec
+# Performance Test Results using an Embedded Instance of JS9
 
-640 mb files:
+These are the results of testing the image display performance using the web app in [web/vbds-scala-js](web/vbds-scala-js)
+running locally on a Linux laptop with an Intel Core i7-6820HQ CPU @ 2.70GHz:
 
-    2.3990 secs per file, 0.4168 hz, 266.7834 mb/sec
+## JS9 FITS Display
 
-75mb files:
+| Image Size                   | Images/Sec (hz) |
+| -----------------------------|---------------- |          
+| 128  x  128 x 2              | 35              |
+| 512  x  512 x 2              | 12              |
+| 1024 x 1024 x 2              | 7               |
+| 2048 x 2048 x 2              | 2               |
 
-    0.2994 secs per file, 3.3395 hz, 250.4625 mb/sec
+## JS9 JPEG Display
 
-256 x 256 x 2 = 131 kb files
+| Image Size                   | Images/Sec (hz) |
+| -----------------------------|---------------- |          
+| 128  x  128 x 2              | 39              |
+| 512  x  512 x 2              | 27              |
+| 1024 x 1024 x 2              | 16              |
+| 2048 x 2048 x 2              | 5.5             |
 
-    0.0037 secs per file, 268.2403 hz, 35.1588 mb/sec
 
-48 x 48 x 2 = 4608 byte files:
+## HTML Canvas JPEG Display
 
-    0.0034 secs per file, 290.4697 hz, 1.3385 mb/sec
-
-For comparison, here are the results on another pair of AWS machines with a slower network connection (1 gigabit ethernet connection and CPU: Intel(R) Xeon(R) CPU E5-2686 v4 @ 2.30GHz):
-
-100 mb files:
-
-    1.012 secs per file, 0.988 hz, 98.790 mb/sec
-
-1 mb files:
-
-    0.028 secs per file, 35.266 hz, 35.266 mb/sec
-
-256 x 256 x 2 = 131 kb files
-
-    0.0063 secs per file, 157.6551 hz, 20.6642 mb/sec
-    
-48 x 48 x 2 = 4608 byte files:
-
-    0.0048 secs per file, 209.9643 hz, 0.9675 mb/sec
+| Image Size                   | Images/Sec (hz) |
+| -----------------------------|---------------- |          
+| 128  x  128 x 2              | 145              |
+| 512  x  512 x 2              | 130              |
+| 1024 x 1024 x 2              | 57               |
+| 2048 x 2048 x 2              | 22               |
 
 
 ### Performance issues: Fast publisher, Fast and Slow Subscribers
@@ -224,13 +230,15 @@ Akka streams are used in the tests on both client and server, with websockets in
 Obviously, if one of the subscribers is too slow, it will either have to buffer the received images, or skip some of them.
 Since the image data is sent in "chunks", just dropping a single websocket message would result in a corrupted image.
 The code would have to be smart enough to drop everything up until the next image. 
-For this reason a client websocket acknowledgement message is currently required.
+For this reason a client websocket acknowledgement message is currently required. This makes it possible to have back-pressure
+from the web-client all the way back to the publisher.
 
 In the current test-client implementation, the received data is saved to temp files, the file names are streamed to the
 receiver and each received file is deleted when done.
 
-Depending on how the client is implemented, a slow client could potentially cause the server to publisher at a slower rate.
-If this turns out to be a problem, it might be necessary to allow the subscribers to specify a slower rate.
+In the current implementation a slow client will cause the publisher to publish at a slower rate.
+If this turns out to be a problem, it might be necessary to allow the subscribers to specify a slower rate, 
+change the publisher to drop images when needed, or make the server smart enough to only drop images for slower subscribers.
 
 ## Implementation Notes
 
@@ -247,4 +255,11 @@ This is the basic flow of a published data file:
 * On the client side, the clients receive multiple websocket messages for each data file, 
   ending with a message containing a single newline, which is not part of the data.
   The clients need to collect the data until the file is complete and then can display it, do calculations, etc.
-  The client also needs to acknowledge each websocket message with a short "ACK" message, for flow control reasons.
+  The client also needs to acknowledge each websocket message with a short "ACK" message, for flow control reasons
+  (to enable back-pressure back to the publisher).
+  
+### Basic VBDS Flow
+
+[Basic Flow](doc/overview.graphml.jpg)
+
+  
