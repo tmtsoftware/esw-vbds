@@ -31,7 +31,6 @@ object VbdsWebApp {
   val closeProps = js.Dynamic.literal("clear" -> false).asInstanceOf[BlobPropertyBag]
 
   // XXX: Set to true to test displaying with HTML canvas instead of JS9
-//  val useCanvas = false
   val canvasWidth  = 1920
   val canvasHeight = 1080
   val URL          = js.Dynamic.global.window.URL.asInstanceOf[org.scalajs.dom.URL.type]
@@ -95,8 +94,7 @@ class VbdsWebApp {
   }
 
   img.onload = (e: dom.Event) => {
-//    ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight)
-    ctx.drawImage(img, 0, 0, img.height, img.width)
+    ctx.drawImage(img, 0, 0, img.naturalHeight, img.naturalWidth)
     URL.revokeObjectURL(img.src)
     println("XXX Loaded canvas image")
     onloadHandler(e)
