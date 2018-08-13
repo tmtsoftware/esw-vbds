@@ -54,6 +54,10 @@ Usage: vbds-client [options]
                            Specifies the content type of the files in the stream
   --delete <stream name>   Deletes the VBDS stream with the given name
   -l, --list               List the available streams
+  --stats                  Print timing statistics when publishing files
+  --repeat                 Keep publishing the same files forever, until killed (for testing)
+  --stats-interval <value>
+                           If --stats option was given, controls how often statistics are printed (default: 1 = every time)
   --subscribe <stream name>
                            Subscribes to the given VBDS stream (see --action option)
   --dir <path>             Directory to hold received data files (default: current directory)
@@ -62,6 +66,7 @@ Usage: vbds-client [options]
   --publish <stream-name>  Publish to the given stream (see --data option)
   --delay <duration>       Delay between publishing files in a directory (see --data)
   --data <file-name>       Specifies the file (or directory full of files) to publish
+  --suffix <suffix>        Optional suffix for files to publish if the file given by --data is a directory
   --chunk-size <num-bytes>
                            Optional chunk size (to tune file transfer performance)
   --help                   
@@ -260,6 +265,6 @@ This is the basic flow of a published data file:
   
 ### Basic VBDS Flow
 
-[Basic Flow](doc/overview.graphml.jpg)
+![Basic Flow](doc/overview.graphml.jpg)
 
   
