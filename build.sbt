@@ -24,6 +24,10 @@ lazy val `web-client` = project.in(file("web/vbds-scala-js"))
       val target = (resourceManaged in Compile).value / "index-dev.html"
       println(s"Generating $target")
 
+      val source2 = (resourceDirectory in Compile).value / "index-with-canvas.html"
+      val target2 = (resourceManaged in Compile).value / "index-with-canvas-dev.html"
+      println(s"Generating $target2")
+
       val fullFileName = (artifactPath in (Compile, fullOptJS)).value.getName
       val fastFileName = (artifactPath in (Compile, fastOptJS)).value.getName
 
@@ -31,6 +35,10 @@ lazy val `web-client` = project.in(file("web/vbds-scala-js"))
         line.replace(fullFileName, fastFileName)
       })
 
-      Seq(target)
+      IO.writeLines(target2, IO.readLines(source2).map { line =>
+        line.replace(fullFileName, fastFileName)
+      })
+
+      Seq(target, target2)
     }.taskValue
   )

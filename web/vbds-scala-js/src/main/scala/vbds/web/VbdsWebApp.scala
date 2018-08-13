@@ -1,12 +1,13 @@
 package vbds.web
 
 import org.scalajs.dom
-import org.scalajs.dom.{BlobPropertyBag, Event, MessageEvent}
+import org.scalajs.dom.{URL => _, _}
 import org.scalajs.dom.raw.{Blob, WebSocket}
 
 import scala.scalajs.js
 import scala.scalajs.js.typedarray.{ArrayBuffer, Uint8Array}
 import VbdsWebApp._
+import org.scalajs.dom.html.Image
 import upickle.default._
 
 /**
@@ -28,6 +29,12 @@ object VbdsWebApp {
   private val accessRoute = "/vbds/access/streams"
 
   val closeProps = js.Dynamic.literal("clear" -> false).asInstanceOf[BlobPropertyBag]
+
+  // XXX: Set to true to test displaying with HTML canvas instead of JS9
+  val useCanvas = false
+  val canvasWidth  = 1920
+  val canvasHeight = 1080
+  val URL          = js.Dynamic.global.window.URL.asInstanceOf[org.scalajs.dom.URL.type]
 }
 
 class VbdsWebApp {
@@ -62,6 +69,34 @@ class VbdsWebApp {
     import scalatags.JsDom.all._
     button(`type` := "submit", onclick := updateStreamsList _)("Update").render
   }
+
+  // Acknowledge the message to prevent overrun
+  // Note: Testing showed that if we don't call sendAck() here and images are streamed at full speed, that JS9.Load will
+  // be called again before the image is loaded, causing errors.
+  private def onloadHandler(event: Event): Unit = {
+    busyDisplay = false
+    currentWebSocket.foreach(sendAck)
+  }
+
+  // --- Canvas to display image ---
+  private val cvs = {
+    import scalatags.JsDom.all._
+    canvas(widthA := canvasWidth, heightA := canvasHeight).render
+  }
+
+  private val ctx = cvs.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+
+  private val img = document.createElement("img").asInstanceOf[Image]
+
+  img.onload = (e: dom.Event) => {
+//    ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight)
+    ctx.drawImage(img, 0, 0, img.height, img.width)
+    URL.revokeObjectURL(img.src)
+    println("XXX Loaded canvas image")
+    onloadHandler(e)
+  }
+
+
 
   // URI to get a list of streams
   private def listStreamsUri = {
@@ -121,14 +156,6 @@ class VbdsWebApp {
     xhr.send()
   }
 
-  // Acknowledge the message to prevent overrun
-  // Note: Testing showed that if we don't call sendAck() here and images are streamed at full speed, that JS9.Load will
-  // be called again before the image is loaded, causing errors.
-  private def onloadHandler(event: Event): Unit = {
-    busyDisplay = false
-    currentWebSocket.foreach(sendAck)
-  }
-
   // Set as inital properties on first call to JS9.Load to
   private def loadProps() =
     js.Dynamic
@@ -148,7 +175,9 @@ class VbdsWebApp {
   private def displayImage(blob: Blob): Unit = {
     if (!busyDisplay) {
       busyDisplay = true
-      try {
+      if (useCanvas) {
+        img.src = URL.createObjectURL(blob)
+      } else try {
         val settings = JS9.GetParam("all")
 //        val regions  = JS9.GetRegions("all", regionProps)
 //        println(s"XXX regions = $regions")
@@ -230,7 +259,8 @@ class VbdsWebApp {
       p("VBDS Server"),
       p("Host: ", hostField),
       p("Port: ", portField),
-      p("Stream name: ", streamsItem, " ", updateStreamsListButton)
+      p("Stream name: ", streamsItem, " ", updateStreamsListButton),
+      if (useCanvas) p("Using Canvas", div(cvs)) else p("Using JS9")
     ).render
 
     dom.document.body.appendChild(layout.render)
