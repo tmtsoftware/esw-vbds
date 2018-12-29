@@ -32,6 +32,7 @@ object VbdsClientApp extends App {
                              list: Boolean = false,
                              stats: Boolean = false,
                              repeat: Boolean = false,
+                             saveFiles: Boolean = false,
                              statsInterval: Int = 1,
                              publish: Option[String] = None,
                              delay: Option[String] = None,
@@ -78,6 +79,10 @@ object VbdsClientApp extends App {
     opt[Unit]("repeat") action { (_, c) =>
       c.copy(repeat = true)
     } text "Keep publishing the same files forever, until killed (for testing)"
+
+    opt[Unit]("saveFiles") action { (_, c) =>
+      c.copy(saveFiles = true)
+    } text "If true, save the files received by the subscription to the current directory with names like <streamName>-<count>"
 
     opt[Int]("stats-interval") action { (x, c) =>
       c.copy(statsInterval = x)
@@ -152,7 +157,7 @@ object VbdsClientApp extends App {
     val clientActor = system.actorOf(ClientActor.props(options))
 
     options.subscribe.foreach(
-      s => client.subscribe(s, new File(options.dir.getOrElse(".")), clientActor, saveFiles = true)
+      s => client.subscribe(s, new File(options.dir.getOrElse(".")), clientActor, saveFiles = options.saveFiles)
     )
   }
 

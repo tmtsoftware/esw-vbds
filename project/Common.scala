@@ -34,6 +34,8 @@ object Common extends AutoPlugin {
 //    resolvers += "twtmt-maven" at "http://dl.bintray.com/twtmt/maven/",
     version := "0.0.1",
 //    fork := true,
+    isSnapshot := true,
+    isSnapshot in ThisBuild := true,
     parallelExecution in Test := false,
     autoCompilerPlugins := true
 //    if (formatOnCompile) scalafmtOnCompile := true else scalafmtOnCompile := false

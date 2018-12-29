@@ -2,6 +2,7 @@ package vbds.client
 
 import java.io.File
 import java.nio.file.Path
+import java.time.Instant
 
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem}
@@ -98,28 +99,40 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
               repeat: Boolean = false): Future[Done] = {
 
     val startTime: Long = System.currentTimeMillis()
-    var count           = 0
+    var count           = -10 // warmup for the first 10 files...
+    var minLatency      = 1000.0
+    var maxLatency      = 0.0
+    var totalLatency    = 0.0
 
-    // Print timing statistics
-    def logStats(path: Path): Unit = {
+    // Print timing statistics. 'start' is the start time of the last publish
+    def logStats(path: Path, start: Instant): Unit = {
       count = count + 1
-      if (count % printInterval == 0) {
-        val testSecs          = (System.currentTimeMillis() - startTime) / 1000.0
-        val secsPerFile       = testSecs / count
-        val testFileSizeBytes = path.toFile.length()
-        val fileSizeMb        = testFileSizeBytes / 1000000.0
-        val mbPerSec          = (fileSizeMb * count) / testSecs
-        val hz                = 1.0 / secsPerFile
-        log.info(
-          f"$name: $count: Published $count $testFileSizeBytes byte files in $testSecs seconds ($secsPerFile%1.4f secs per file, $hz%1.4f hz, $mbPerSec%1.4f mb/sec)"
-        )
+      if (count > 0) {
+        val latency = java.time.Duration.between(start, Instant.now).toNanos / 1000000000.0
+        totalLatency = totalLatency + latency
+
+        if (count % printInterval == 0) {
+          val avgLatency = totalLatency / count
+          minLatency = math.min(latency, minLatency)
+          maxLatency = math.max(latency, maxLatency)
+          val testSecs          = (System.currentTimeMillis() - startTime) / 1000.0
+          val secsPerFile       = testSecs / count
+          val testFileSizeBytes = path.toFile.length()
+          val fileSizeMb        = testFileSizeBytes / 1000000.0
+          val mbPerSec          = (fileSizeMb * count) / testSecs
+          val hz                = 1.0 / secsPerFile
+          log.info(
+            f"$name: $count: Published $count $testFileSizeBytes byte files in $testSecs seconds ($secsPerFile%1.4f secs per file, $hz%1.4f hz, $mbPerSec%1.4f mb/sec, latency: $latency%1.4f sec (min: $minLatency%1.4f, max: $maxLatency%1.4f, avg: $avgLatency%1.4f))"
+          )
+        }
       }
     }
 
-    val handler: ((Try[HttpResponse], Path)) => Unit = {
+    // Called when publishing has completed (all subscribers received the data) with the start time (for calculating the latency, statistics)
+    def handler(start: Instant): ((Try[HttpResponse], Path)) => Unit = {
       case (Success(response), path) =>
         if (response.status == StatusCodes.Accepted) {
-          if (stats) logStats(path) else log.info(s"Result for file: $path was successful")
+          if (stats) logStats(path, start) else log.info(s"Result for file: $path was successful")
         } else {
           log.error(s"Publish of $path returned unexpected status code: ${response.status}")
           response.discardEntityBytes() // don't forget this
@@ -142,12 +155,12 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
     if (repeat) {
       // Note: Will never end: need to ^C to stop
       while (true) {
-        Await.ready(uploader.uploadFiles(streamName, uri, paths, delay, handler), 10.hours)
+        Await.ready(uploader.uploadFiles(streamName, uri, paths, delay, handler(Instant.now)), Duration.Inf)
         if (delay != Duration.Zero) Thread.sleep(delay.toMillis)
       }
       Future.never.map(_ => Done)
     } else {
-      uploader.uploadFiles(streamName, uri, paths, delay, handler)
+      uploader.uploadFiles(streamName, uri, paths, delay, handler(Instant.now))
     }
   }
 
@@ -171,7 +184,6 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
    * @param dir the directory in which to save the files received (if saveFiles is true)
    * @param clientActor an actor to write messages to when a file is received (using 'ask', actor should reply to each message)
    * @param saveFiles if true, save the files in the given dir (Set to false for throughput tests)
-
    * @return the HTTP response
    */
   def subscribe(streamName: String, dir: File, clientActor: ActorRef, saveFiles: Boolean): Subscription = {
