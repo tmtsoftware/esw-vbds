@@ -236,7 +236,7 @@ both on the local host (A Lenovo Thinkpad P70): (Measures the time to publish a 
 ### Average latency in seconds for FITS files on localhost (16 bit short data):
 
 | Image Size  | Min    | Max    | Average |
-| ------------------------------|------- |          
+| ------------|--------|--------|------- |          
 | 128 x 128   | 0.0010 | 0.0520 | 0.0027 |
 | 512 x 512   | 0.0030 | 0.0510 | 0.0055 |
 | 1024 x 1024 | 0.0100 | 0.0650 | 0.0158 |
