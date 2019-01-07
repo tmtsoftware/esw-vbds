@@ -228,6 +228,20 @@ running locally on a Linux laptop with an Intel Core i7-6820HQ CPU @ 2.70GHz:
 | 1024 x 1024 x 2              | 57               |
 | 2048 x 2048 x 2              | 22               |
 
+## Latency
+
+Here are some latency measurements from running VBDS with one server and one client, 
+both on the local host (A Lenovo Thinkpad P70): (Measures the time to publish a file without writing it to disk or displaying it): 
+
+### Average latency in seconds for FITS files on localhost (16 bit short data):
+
+| Image Size  | Min    | Max    | Average |
+| ------------------------------|------- |          
+| 128 x 128   | 0.0010 | 0.0520 | 0.0027 |
+| 512 x 512   | 0.0030 | 0.0510 | 0.0055 |
+| 1024 x 1024 | 0.0100 | 0.0650 | 0.0158 |
+| 2048 x 2048 | 0.0310 | 0.0880 | 0.0394 |
+
 
 ### Performance issues: Fast publisher, Fast and Slow Subscribers
 
