@@ -70,7 +70,7 @@ Here are some latency measurements from running VBDS with one server, one subscr
 | 2048 x 2048 | 0.1760 | 0.2560 | 0.1995 |
 
 
-###### Same latency test with second actual server (a 2008 Mac Pro, via 1000 base-t ethernet)
+##### Same latency test with second actual server (a 2008 Mac Pro, via 1000 base-t ethernet)
 
 | Image Size  | Min    | Max    | Average |
 | ------------|--------|--------|------- |          
