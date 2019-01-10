@@ -14,6 +14,19 @@ Note: These tests only measure the throughput: The data is not processed in thes
 | 2048 x 2048 x 2              | 18.916          |
 | 4096 x 4096 x 2              | 5.314           |
 
+Here are the results of the same test, but with 4 byte FITS data (BITPIX=-32) and 16k header:
+
+
+| Image Size                   | Images/Sec (hz) |
+| -----------------------------|-----------------|          
+| 48   x   48 x 4              | 192.160         |
+| 128  x  128 x 4              | 184.230         |
+| 256  x  256 x 4              | 145.964         |
+| 512  x  512 x 4              | 79.580         |
+| 1024 x 1024 x 4              | 30.297          |
+| 2048 x 2048 x 4              | 9.000          |
+| 4096 x 4096 x 4              | 2.434           |
+
 # Performance Test Results using an Embedded Instance of JS9
 
 These are the results of testing the image display performance using the web app in [web/vbds-scala-js](web/vbds-scala-js)
