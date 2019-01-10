@@ -275,7 +275,7 @@ class VbdsServerTest(name: String)
         val elapsedTimeSecs = (System.currentTimeMillis() - startTime) / 1000.0
         val hz              = numFilesToPublish / elapsedTimeSecs
 
-        println(f"Published $numFilesToPublish files of size [$dim x $dim x 4] in $elapsedTimeSecs%1.3f secs ($hz%1.3f hz)")
+        println(f"Published $numFilesToPublish files of size $testFileSizeBytes [$dim x $dim x 4] in $elapsedTimeSecs%1.3f secs ($hz%1.3f hz)")
       }
     }
 
