@@ -64,7 +64,7 @@ object VbdsServerTest {
   val testFile        = new File(s"${getTempDir("vbds")}/vbdsTestFile")
 
   // --- Edit this ---
-  // Image dimensions: 128x128, 256x256, 512x512, 1024x1024, 2048x2048, 4096x4096 (x 2)
+  // Image dimensions: 128x128, 256x256, 512x512, 1024x1024, 2048x2048, 4096x4096 (x 3)
   val testFileDims = List(48, 128, 256, 512, 1024, 2048, 4096)
   // Repeat each test to get warmed up performance data
   val repeatTests         = 5
@@ -275,7 +275,7 @@ class VbdsServerTest(name: String)
         val elapsedTimeSecs = (System.currentTimeMillis() - startTime) / 1000.0
         val hz              = numFilesToPublish / elapsedTimeSecs
 
-        println(f"Published $numFilesToPublish files of size [$dim x $dim x 2] in $elapsedTimeSecs%1.3f secs ($hz%1.3f hz)")
+        println(f"Published $numFilesToPublish files of size [$dim x $dim x 4] in $elapsedTimeSecs%1.3f secs ($hz%1.3f hz)")
       }
     }
 
