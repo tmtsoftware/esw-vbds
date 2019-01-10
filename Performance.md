@@ -63,7 +63,7 @@ running locally on a Linux laptop with an Intel Core i7-6820HQ CPU @ 2.70GHz:
 ## Latency
 
 Here are some latency measurements from running VBDS on two AWS servers (a two node akka cluster), with one subscriber client and one publisher client (each on a different host). This
-measures the time to publish a FITS file to server1, distribute it to server2 and write it to the subscriber on server2 (without writing any files to disk or displaying any images): 
+measures the time (in __seconds__) to publish a FITS file to server1, distribute it to server2 and write it to the subscriber on server2 (without writing any files to disk or displaying any images): 
 
 
 | Image Size    | Size in Bytes | Min    | Max    | Average |
@@ -73,6 +73,7 @@ measures the time to publish a FITS file to server1, distribute it to server2 an
 | 1024 x 1024 x 4 | 4210560  | 0.0270 | 0.0940 | 0.0355 |
 | 2048 x 2048 x 4 | 16793280 | 0.0970 | 0.2230 | 0.1237 |
 
+ *(All times in seconds)*.
 
 There was no notable difference in performance between Java-8 and Java-11.
 
