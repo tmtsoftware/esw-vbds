@@ -259,7 +259,8 @@ class VbdsServerTest(name: String)
 
     (1 to repeatTests).foreach { _ =>
       testFileDims.foreach { dim =>
-        val testFileSizeBytes = dim * dim * 2
+        // approximate FITS file with BITPIX=-32 + header
+        val testFileSizeBytes = dim * dim * 4 + 16500
         makeFile(testFileSizeBytes, testFile)
 
         val startTime = System.currentTimeMillis()

@@ -23,61 +23,43 @@ running locally on a Linux laptop with an Intel Core i7-6820HQ CPU @ 2.70GHz:
 
 | Image Size                   | Images/Sec (hz) |
 | -----------------------------|---------------- |          
-| 128  x  128 x 2              | 35              |
-| 512  x  512 x 2              | 12              |
-| 1024 x 1024 x 2              | 7               |
-| 2048 x 2048 x 2              | 2               |
+| 128  x  128 x 4              | 35              |
+| 512  x  512 x 4              | 12              |
+| 1024 x 1024 x 4              | 7               |
+| 2048 x 2048 x 4              | 2               |
 
 ## JS9 JPEG Display
 
-| Image Size                   | Images/Sec (hz) |
-| -----------------------------|---------------- |          
-| 128  x  128 x 2              | 39              |
-| 512  x  512 x 2              | 27              |
-| 1024 x 1024 x 2              | 16              |
-| 2048 x 2048 x 2              | 5.5             |
+| Image Size               | Images/Sec (hz) |
+| -------------------------|---------------- |          
+| 128  x  128              | 39              |
+| 512  x  512              | 27              |
+| 1024 x 1024              | 16              |
+| 2048 x 2048              | 5.5             |
 
 
 ## HTML Canvas JPEG Display
 
-| Image Size                   | Images/Sec (hz) |
-| -----------------------------|---------------- |          
-| 128  x  128 x 2              | 145              |
-| 512  x  512 x 2              | 130              |
-| 1024 x 1024 x 2              | 57               |
-| 2048 x 2048 x 2              | 22               |
+| Image Size               | Images/Sec (hz) |
+| -------------------------|---------------- |          
+| 128  x  128              | 145              |
+| 512  x  512              | 130              |
+| 1024 x 1024              | 57               |
+| 2048 x 2048              | 22               |
 
 ## Latency
 
-Here are some latency measurements from running VBDS with one server, one subscriber and one publisher, all on the local host (A 2016 Lenovo Thinkpad P70): (Measures the time to publish a file to the subscriber without writing it to disk or displaying it): 
-
-##### Latency in seconds for FITS files on localhost (16 bit short data):
-
-| Image Size  | Min    | Max    | Average |
-| ------------|--------|--------|------- |          
-| 128 x 128   | 0.0010 | 0.0520 | 0.0027 |
-| 512 x 512   | 0.0030 | 0.0510 | 0.0055 |
-| 1024 x 1024 | 0.0100 | 0.0650 | 0.0158 |
-| 2048 x 2048 | 0.0310 | 0.0880 | 0.0394 |
-
-##### Latency test with subscriber and a second server running under vmware (CentOS) (With publisher and one server on the local host - all times in seconds): 
-
-| Image Size  | Min    | Max    | Average |
-| ------------|--------|--------|------- |          
-| 128 x 128 |0.0060 | 0.0570 | 0.0117 |
-| 512 x 512 | 0.0190 | 0.0750 | 0.0305|
-| 1024 x 1024 | 0.0570 | 0.1040 | 0.0717 |
-| 2048 x 2048 | 0.1760 | 0.2560 | 0.1995 |
+Here are some latency measurements from running VBDS on two AWS servers (a two node akka cluster), with one subscriber client and one publisher client (each on a different host). This
+measures the time to publish a FITS file to server1, distribute it to server2 and write it to the subscriber on server2 (without writing any files to disk or displaying any images): 
 
 
-##### Same latency test with second actual server (a 2008 Mac Pro, via 1000 base-t ethernet)
+| Image Size    | Size in Bytes | Min    | Max    | Average |
+| ----------------|----------|--------|------- |--------|          
+| 128 x 128 x 4   | 80640    | 0.0040 | 0.0680 | 0.0059 |
+| 512 x 512 x 4   | 1065600  | 0.0110 | 0.0820 | 0.0143 |
+| 1024 x 1024 x 4 | 4210560  | 0.0270 | 0.0940 | 0.0355 |
+| 2048 x 2048 x 4 | 16793280 | 0.0970 | 0.2230 | 0.1237 |
 
-| Image Size  | Min    | Max    | Average |
-| ------------|--------|--------|------- |          
-| 128 x 128 | 0.0070 | 0.0420 | 0.0093 |
-| 512 x 512 | 0.0210 | 0.0990 | 0.0268 |
-| 1024 x 1024 | 0.0600 | 0.2070 | 0.0744 |
-| 2048 x 2048 | 0.2330 | 0.5360 | 0.2736 |
 
 There was no notable difference in performance between Java-8 and Java-11.
 
