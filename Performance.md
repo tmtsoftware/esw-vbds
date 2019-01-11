@@ -16,15 +16,14 @@ Note: These tests only measure the throughput: The data is not processed in thes
 
 Here are the results of the same test, but with 4 byte FITS data (BITPIX=-32) and 16k header:
 
-
 | Image Size                   | Images/Sec (hz) |
 | -----------------------------|-----------------|          
-| 48   x   48 x 4              | 192.160         |
-| 128  x  128 x 4              | 184.230         |
-| 256  x  256 x 4              | 145.964         |
-| 512  x  512 x 4              | 79.580         |
-| 1024 x 1024 x 4              | 30.297          |
-| 2048 x 2048 x 4              | 9.000          |
+| 48   x   48 x 4              | 211.461         |
+| 128  x  128 x 4              | 195.198         |
+| 256  x  256 x 4              | 153.163         |
+| 512  x  512 x 4              | 83.174         |
+| 1024 x 1024 x 4              | 29.861          |
+| 2048 x 2048 x 4              | 8.901          |
 | 4096 x 4096 x 4              | 2.434           |
 
 # Performance Test Results using an Embedded Instance of JS9
