@@ -11,12 +11,17 @@ lazy val `vbds-client` = project
     libraryDependencies ++= Dependencies.vbdsClient
   )
 
+  // ScalaJS client JavaScript dependencies
+  val clientJsDeps = Def.setting(Seq(
+    "org.webjars" % "jquery" % "2.2.1" / "jquery.js" minified "jquery.min.js"
+  ))
+
 lazy val `web-client` = project.in(file("web/vbds-scala-js"))
   .enablePlugins(WorkbenchPlugin)
   .settings(
     libraryDependencies ++= Dependencies.webClient.value,
     skip in packageJSDependencies := false,
-    jsDependencies ++= Dependencies.clientJsDeps.value,
+    jsDependencies ++= clientJsDeps.value,
     scalaJSUseMainModuleInitializer := true,
       // Automatically generate index-dev.html which uses *-fastopt.js
     resourceGenerators in Compile += Def.task {

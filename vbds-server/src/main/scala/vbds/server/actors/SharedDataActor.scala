@@ -40,10 +40,7 @@ private[server] object SharedDataActor {
   // Tells the actor the host and port that the http server is listening on
   case class LocalAddress(a: InetSocketAddress) extends SharedDataActorMessages
 
-  case class AddSubscription(streamName: String,
-                             id: String,
-                             sink: Sink[ByteString, NotUsed],
-                             wsResponseActor: ActorRef)
+  case class AddSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef)
       extends SharedDataActorMessages
 
   case class DeleteSubscription(id: String) extends SharedDataActorMessages
@@ -71,8 +68,7 @@ private[server] object SharedDataActor {
    * @param sink            Sink that writes to the subscriber's websocket
    * @param wsResponseActor an Actor that is used to check if the client has processed the last message (to avoid overflow)
    */
-  private[server] case class LocalSubscriberInfo(sink: Sink[ByteString, NotUsed],
-                                                 wsResponseActor: ActorRef)
+  private[server] case class LocalSubscriberInfo(sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef)
 
   // Route used to distribute data to remote HTTP server
   val distRoute = "/vbds/transfer/internal"
@@ -187,8 +183,8 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
   }
 
   /**
-   * Publishes the contents of the given data source to the given set of subscribers and sends a Done message to
-   * the given actor when done.
+   * Publishes the contents of the given data source to the given set of subscribers and returns a future that completes when
+   * done.
    *
    * @param streamName    name of the stream to publish on
    * @param subscriberSet the set of subscribers for the stream
