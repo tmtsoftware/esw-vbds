@@ -31,7 +31,7 @@ object VbdsClient {
  * @param name the name of this client, for logging
  * @param host the HTTP host where the vbds-server is running
  * @param port the HTTP port number to use to access the vbds-server
- * @param chunkSize optional chunk size for exchanging image data
+ * @param chunkSize optional chunk size in bytes for exchanging image data
  * @param system akka actor system
  * @param mat akka actor materializer
  */
@@ -42,7 +42,7 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
   val adminRoute                = "/vbds/admin/streams"
   val accessRoute               = "/vbds/access/streams"
   val transferRoute             = "/vbds/transfer/streams"
-  val maxFrameLengthBytes       = 1024 * 1024
+//  val maxFrameLengthBytes       = 1024 * 1024
 
   implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
     def genString(o: AnyRef): String = o.getClass.getName

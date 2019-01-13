@@ -140,7 +140,7 @@ object VbdsClientApp extends App {
   // Run the application (The actor system is only used locally, no need for remote)
   private def run(options: Options): Unit = {
 
-    val client = new VbdsClient(options.name, options.host, options.port)
+    val client = new VbdsClient(options.name, options.host, options.port, options.chunkSize)
     options.create.foreach(s => handleHttpResponse(s"create $s", client.createStream(s, options.contentType.getOrElse(""))))
     options.delete.foreach(s => handleHttpResponse(s"delete $s", client.deleteStream(s)))
     if (options.list) handleHttpResponse("list", client.listStreams())
@@ -164,21 +164,6 @@ object VbdsClientApp extends App {
   // Actor to receive and acknowledge files
   private object ClientActor {
     def props(options: Options): Props = Props(new ClientActor(options))
-
-//    // XXX Temp
-//    def checkFits(r: ReceivedFile): Future[Done] = {
-//      FileIO
-//        .fromPath(r.path)
-//        .via(
-//          Framing
-//            .delimiter(ByteString("\n"), 80, allowTruncation = true)
-//            .map(_.utf8String)
-//        )
-//        .take(1)
-//        .runForeach {s =>
-//          if (!s.startsWith("SIMPLE")) println(s"XXX $r.path is not a FITS file")
-//        }
-//    }
   }
 
   private class ClientActor(options: Options) extends Actor with ActorLogging {
@@ -187,10 +172,6 @@ object VbdsClientApp extends App {
       case r: ReceivedFile =>
         println(s"Received ${r.count} files for stream ${r.streamName}")
         options.action.foreach(doAction(r, _))
-
-//        // XXX temp
-//        Await.ready(checkFits(r), 5.seconds)
-
         r.path.toFile.delete()
         sender() ! r
     }

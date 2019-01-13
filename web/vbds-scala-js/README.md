@@ -11,13 +11,19 @@ After checking out JS9 and this project from Github, first edit and then run thi
 
 To build and test the web app, run:
 
-    sbt fastOptJS
+        sbt
+        > fastOptJS
 
 and point your browser at:
 
     http://localhost:12345/web/vbds-scala-js/target/scala-2.12/classes/index-dev.html
 
 for the development version, or:
+    
+    sbt
+    > fullOptJS
+
+and then go to:
     
     http://localhost:12345/web/vbds-scala-js/target/scala-2.12/classes/index.html
 
