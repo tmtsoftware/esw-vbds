@@ -25,9 +25,8 @@ class FileUploader(chunkSize: Int = 1024 * 1024)(implicit val system: ActorSyste
 
   private def createUploadRequest(streamName: String, uri: Uri, path: Path): Future[(HttpRequest, Path)] = {
     val bodyPart = FormData.BodyPart.fromPath("data", ContentTypes.`application/octet-stream`, path, chunkSize)
-    val body     = FormData(bodyPart) // only one file per upload
-    Marshal(body).to[RequestEntity].map { entity => // use marshalling to create multipart/formdata entity
-      // build the request and annotate it with the original metadata
+    val body     = FormData(bodyPart)
+    Marshal(body).to[RequestEntity].map { entity =>
       HttpRequest(method = HttpMethods.POST, uri = uri, entity = entity) -> path
     }
   }
