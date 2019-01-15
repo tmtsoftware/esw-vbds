@@ -203,7 +203,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     // Number of broadcast outputs
     val numOut = localSet.size + remoteHostSet.size
-    log.debug(
+    log.info(
       s"Publish dist=$dist, subscribers: $numOut (${localSet.size} local, ${remoteSet.size} remote on ${remoteHostSet.size} hosts)"
     )
 
@@ -228,7 +228,8 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       def websocketFlow(a: AccessInfo) =
         Flow[ByteString]
           .alsoTo(localSubscribers(a).sink)
-          .mapAsync(1) { _ =>
+          .mapAsync(1) { bs =>
+            log.info(s"XXX Sending ${bs.size} bytes to websocket")
             waitForAck(a).map(_ => ByteString.empty)
           }
 
