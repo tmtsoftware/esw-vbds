@@ -280,7 +280,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
     HttpRequest(
       HttpMethods.POST,
       s"http://${serverInfo.host}:${serverInfo.port}$distRoute/$streamName",
-      entity = HttpEntity(ContentTypes.`application/octet-stream`, bs)
+      entity = HttpEntity(ContentTypes.`application/octet-stream`, bs).withoutSizeLimit
     )
   }
 
