@@ -30,6 +30,8 @@ object WebSocketActor {
 
   final case class StreamFailure(ex: Throwable) extends WebSocketActorMessage
 
+  final case class HandleByteString(bs: ByteString)
+
   final case class ReceivedFile(streamName: String, count: Int, path: Path)
 
   // Acknowledge message for received websocket message
@@ -90,7 +92,7 @@ class WebSocketActor(name: String,
 
     case bm: BinaryMessage ⇒
       val replyTo = sender()
-      val f       = bm.dataStream.mapAsync(1)(handleByteString).runWith(Sink.ignore)
+      val f       = bm.dataStream.mapAsync(1)(bs => self ? HandleByteString(bs)).runWith(Sink.ignore)
       f.onComplete {
         case Success(_) =>
           replyTo ! Ack // ack to allow the stream to proceed sending more elements
@@ -110,6 +112,9 @@ class WebSocketActor(name: String,
 
     case StreamFailure(ex) ⇒
       log.error(ex, s"$name: Stream failed!")
+
+    case HandleByteString(bs) =>
+      sender() ! handleByteString(bs)
   }
 
   private def newFile(): Unit = {
@@ -125,7 +130,7 @@ class WebSocketActor(name: String,
 
   // Called when a ByteString is received on the websocket
   private def handleByteString(bs: ByteString): Future[Unit] = {
-    val result = if (bs.size == 1 && bs.utf8String == "\n") {
+    if (bs.size == 1 && bs.utf8String == "\n") {
       if (saveFiles) {
         os.close()
         log.info(s"$name: Wrote $file")
@@ -138,7 +143,6 @@ class WebSocketActor(name: String,
       if (saveFiles) os.write(bs.toArray)
       Future.successful(())
     }
-    result
   }
 
 }

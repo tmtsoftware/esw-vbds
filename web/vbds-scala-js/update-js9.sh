@@ -14,7 +14,7 @@ if test ! -d $js9dir; then
 fi
 
 targetDir=src/main/resources/js9
-test -d || mkdir $targetDir
+test -d $targetDir || mkdir $targetDir
 
 (cd $js9dir; make refresh)
 
