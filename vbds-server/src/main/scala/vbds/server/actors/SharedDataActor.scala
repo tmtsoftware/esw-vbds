@@ -210,9 +210,10 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     // Wait for the client to acknowledge the message
     def waitForAck(a: AccessInfo): Future[Any] = {
-      localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get
+      val f = localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get
+      log.info("Received ACK from WebSocket")
+      f
     }
-    val webSocketAcks = localSet.map(waitForAck)
 
     // Construct a runnable graph that broadcasts the published data to all of the subscribers
     val g = RunnableGraph.fromGraph(GraphDSL.create(Sink.ignore) { implicit builder => out =>
@@ -251,7 +252,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       ClosedShape
     })
 
-    val f = Future.sequence(g.run() :: webSocketAcks.toList) .map(_ => Done)
+    val f = Future.sequence(g.run() :: localSet.map(waitForAck).toList) .map(_ => Done)
     f.onComplete {
       case Success(_)  => log.debug("Publish complete")
       case Failure(ex) => log.error(s"Publish failed with $ex")

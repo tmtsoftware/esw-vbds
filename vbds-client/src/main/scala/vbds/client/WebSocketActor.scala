@@ -79,7 +79,7 @@ class WebSocketActor(name: String,
   var count                = 0
   var file: File           = _
   var os: FileOutputStream = _
-  implicit val askTimeout  = Timeout(6.seconds)
+  implicit val askTimeout  = Timeout(20.seconds)
 
   log.info(s"$name: Started WebSocketActor")
 
