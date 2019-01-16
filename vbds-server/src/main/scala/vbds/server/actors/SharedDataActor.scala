@@ -197,6 +197,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
                       dist: Boolean): Future[Done] = {
 
     // Split subscribers into local and remote
+    implicit val timeout = Timeout(20.seconds)
     val (localSet, remoteSet) = getSubscribers(subscriberSet, dist)
     val remoteHostSet         = remoteSet.map(a => ServerInfo(a.host, a.port))
     if (dist) checkRemoteConnections(remoteHostSet)
@@ -207,10 +208,15 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       s"Publish dist=$dist, subscribers: $numOut (${localSet.size} local, ${remoteSet.size} remote on ${remoteHostSet.size} hosts)"
     )
 
+    // Wait for the client to acknowledge the message
+    def waitForAck(a: AccessInfo): Future[Any] = {
+      localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get
+    }
+    val webSocketAcks = localSet.map(waitForAck)
+
     // Construct a runnable graph that broadcasts the published data to all of the subscribers
     val g = RunnableGraph.fromGraph(GraphDSL.create(Sink.ignore) { implicit builder => out =>
       import GraphDSL.Implicits._
-      implicit val timeout = Timeout(20.seconds)
 
       // Broadcast with an output for each subscriber
       val bcast = builder.add(Broadcast[ByteString](numOut))
@@ -218,20 +224,11 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       // Merge afterwards to get a single output
       val merge = builder.add(Merge[ByteString](numOut))
 
-      // Wait for the client to acknowledge the message
-      def waitForAck(a: AccessInfo): Future[Any] = {
-        localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get
-      }
-
       // Send data for each local subscribers to its websocket.
       // Wait for ws client to respond in order to avoid overflowing the ws input buffer.
       def websocketFlow(a: AccessInfo) =
         Flow[ByteString]
           .alsoTo(localSubscribers(a).sink)
-          .mapAsync(1) { bs =>
-            log.info(s"XXX Sending ${bs.size} bytes to websocket")
-            waitForAck(a).map(_ => ByteString.empty)
-          }
 
       // Set of flows to local subscriber websockets
       val localFlows = localSet.map(websocketFlow)
@@ -254,7 +251,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       ClosedShape
     })
 
-    val f = g.run()
+    val f = Future.sequence(g.run() :: webSocketAcks.toList) .map(_ => Done)
     f.onComplete {
       case Success(_)  => log.debug("Publish complete")
       case Failure(ex) => log.error(s"Publish failed with $ex")
