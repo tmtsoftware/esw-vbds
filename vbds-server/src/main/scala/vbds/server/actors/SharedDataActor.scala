@@ -8,7 +8,7 @@ import akka.cluster.Cluster
 import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.ddata.Replicator._
 import akka.stream.{ActorMaterializer, ClosedShape}
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Merge, RunnableGraph, Sink, Source}
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import vbds.server.models.{AccessInfo, ServerInfo, StreamInfo}
 import akka.pattern.pipe
@@ -72,6 +72,23 @@ private[server] object SharedDataActor {
 
   // Route used to distribute data to remote HTTP server
   val distRoute = "/vbds/transfer/internal"
+
+  /**
+   * Materializes into a sink connected to a source, i.e. the sink pushes into the source:
+   *
+   * +----------+       +----------+
+   * >   Sink   |------>|  Source  >
+   * +----------+       +----------+
+   *
+   * Should be provided by Akka Streams, see https://github.com/akka/akka/issues/24853.
+   */
+  def sinkToSource[M]: RunnableGraph[(Sink[M, NotUsed], Source[M, NotUsed])] =
+    Source
+      .asSubscriber[M]
+      .toMat(Sink.asPublisher[M](fanout = false))(Keep.both)
+      .mapMaterializedValue {
+        case (sub, pub) ⇒ (Sink.fromSubscriber(sub), Source.fromPublisher(pub))
+      }
 }
 
 /**
@@ -102,7 +119,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
   var localSubscribers = Map[AccessInfo, LocalSubscriberInfo]()
 
   // A map with information about remote HTTP servers with subscribers.
-  // The key is from shared cluster data (CRDT) and the value is a flow thaht sends requests to the remote server.
+  // The key is from shared cluster data (CRDT) and the value is a flow that sends requests to the remote server.
   var remoteConnections = Map[ServerInfo, Flow[HttpRequest, HttpResponse, _]]()
 
   // Key for sharing the list of streams in the cluster
@@ -197,7 +214,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
                       dist: Boolean): Future[Done] = {
 
     // Split subscribers into local and remote
-    implicit val timeout = Timeout(20.seconds)
+    implicit val timeout      = Timeout(20.seconds)
     val (localSet, remoteSet) = getSubscribers(subscriberSet, dist)
     val remoteHostSet         = remoteSet.map(a => ServerInfo(a.host, a.port))
     if (dist) checkRemoteConnections(remoteHostSet)
@@ -216,6 +233,23 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       f
     }
 
+    // If dist is true, send data for each remote subscriber as HTTP POST to the server hosting its websocket
+    def remoteFlow(h: ServerInfo) = {
+      val (sink, source) = sinkToSource[ByteString].run
+      Source
+        .single(makeHttpRequest(streamName, h, source))
+        .via(remoteConnections(h))
+        .runWith(Sink.ignore)
+      Flow[ByteString]
+        .alsoTo(sink)
+    }
+
+    // Send data for each local subscribers to its websocket.
+    // Wait for ws client to respond in order to avoid overflowing the ws input buffer.
+    def websocketFlow(a: AccessInfo) =
+      Flow[ByteString]
+        .alsoTo(localSubscribers(a).sink)
+
     // Construct a runnable graph that broadcasts the published data to all of the subscribers
     val g = RunnableGraph.fromGraph(GraphDSL.create(Sink.ignore) { implicit builder => out =>
       import GraphDSL.Implicits._
@@ -226,21 +260,8 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       // Merge afterwards to get a single output
       val merge = builder.add(Merge[ByteString](numOut))
 
-      // Send data for each local subscribers to its websocket.
-      // Wait for ws client to respond in order to avoid overflowing the ws input buffer.
-      def websocketFlow(a: AccessInfo) =
-        Flow[ByteString]
-          .alsoTo(localSubscribers(a).sink)
-
       // Set of flows to local subscriber websockets
       val localFlows = localSet.map(websocketFlow)
-
-      // If dist is true, send data for each remote subscriber as HTTP POST to the server hosting its websocket
-      def remoteFlow(h: ServerInfo) =
-        Flow[ByteString]
-          .map(makeHttpRequest(streamName, h, _))
-          .via(remoteConnections(h))
-          .map(_ => ByteString.empty)
 
       // Set of flows to remote servers containing subscribers
       val remoteFlows = if (dist) remoteHostSet.map(remoteFlow) else Set.empty
@@ -253,7 +274,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       ClosedShape
     })
 
-    val f = Future.sequence(g.run() :: localSet.map(waitForAck).toList) .map(_ => Done)
+    val f = Future.sequence(g.run() :: localSet.map(waitForAck).toList).map(_ => Done)
     f.onComplete {
       case Success(_)  => log.debug("Publish complete")
       case Failure(ex) => log.error(s"Publish failed with $ex")
@@ -275,11 +296,11 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
   /**
    * Makes the HTTP request for the transfer to remote servers with subscribers
    */
-  private def makeHttpRequest(streamName: String, serverInfo: ServerInfo, bs: ByteString): HttpRequest = {
+  private def makeHttpRequest(streamName: String, serverInfo: ServerInfo, data: Source[ByteString, Any]): HttpRequest = {
     HttpRequest(
       HttpMethods.POST,
       s"http://${serverInfo.host}:${serverInfo.port}$distRoute/$streamName",
-      entity = HttpEntity(ContentTypes.`application/octet-stream`, bs)
+      entity = HttpEntity(ContentTypes.`application/octet-stream`, data)
     )
   }
 
