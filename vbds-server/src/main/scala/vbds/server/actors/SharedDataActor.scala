@@ -227,10 +227,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
 
     // Wait for the client to acknowledge the message
     def waitForAck(a: AccessInfo): Future[Any] = {
-      log.info("XXX Waiting for ACK from WebSocket")
-      val f = localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get
-      log.info("XXX Received ACK from WebSocket")
-      f
+      localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get
     }
 
     // If dist is true, send data for each remote subscriber as HTTP POST to the server hosting its websocket
