@@ -79,7 +79,7 @@ class WebSocketActor(name: String,
   var count                = 0
   var file: File           = _
   var os: FileOutputStream = _
-  implicit val askTimeout  = Timeout(20.seconds)
+  implicit val askTimeout  = Timeout(6.seconds)
 
   log.info(s"$name: Started WebSocketActor")
 
@@ -96,6 +96,7 @@ class WebSocketActor(name: String,
       f.onComplete {
         case Success(_) =>
           replyTo ! Ack // ack to allow the stream to proceed sending more elements
+          sendWsAck()
 
         case Failure(ex) =>
           log.error(ex, s"$name: Failed to handle BinaryMessage")
@@ -122,7 +123,7 @@ class WebSocketActor(name: String,
     if (saveFiles) os = new FileOutputStream(file)
   }
 
-  // Sends a reply on the websocket acknowledging that we received the contents of a file, to prevent overflow
+  // Sends a reply on the websocket acknowledging the bytestring, to prevent overflow
   private def sendWsAck(): Unit = {
     Source.single(wsAckMessage).runWith(outSink)
   }
@@ -130,7 +131,6 @@ class WebSocketActor(name: String,
   // Called when a ByteString is received on the websocket
   private def handleByteString(bs: ByteString): Future[Unit] = {
     if (bs.size == 1 && bs.utf8String == "\n") {
-      sendWsAck()
       if (saveFiles) {
         os.close()
         log.info(s"$name: Wrote $file")

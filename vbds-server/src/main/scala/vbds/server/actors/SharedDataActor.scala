@@ -236,12 +236,12 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
     // If dist is true, send data for each remote subscriber as HTTP POST to the server hosting its websocket
     def remoteFlow(h: ServerInfo) = {
       val (sink, source) = sinkToSource[ByteString].run
-      Source
+      val f = Source
         .single(makeHttpRequest(streamName, h, source))
         .via(remoteConnections(h))
         .runWith(Sink.ignore)
-      Flow[ByteString]
-        .alsoTo(sink)
+
+      (f, Flow[ByteString].alsoTo(sink))
     }
 
     // Send data for each local subscribers to its websocket.
@@ -249,6 +249,14 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
     def websocketFlow(a: AccessInfo) =
       Flow[ByteString]
         .alsoTo(localSubscribers(a).sink)
+
+    // Set of flows to local subscriber websockets
+    val localFlows = localSet.map(websocketFlow)
+
+    // Set of flows to remote servers containing subscribers
+    val remoteFlowPairs   = if (dist) remoteHostSet.map(remoteFlow) else Set.empty
+    val remoteFlows       = remoteFlowPairs.map(_._2)
+    val remoteResponses = remoteFlowPairs.map(_._1)
 
     // Construct a runnable graph that broadcasts the published data to all of the subscribers
     val g = RunnableGraph.fromGraph(GraphDSL.create(Sink.ignore) { implicit builder => out =>
@@ -260,12 +268,6 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       // Merge afterwards to get a single output
       val merge = builder.add(Merge[ByteString](numOut))
 
-      // Set of flows to local subscriber websockets
-      val localFlows = localSet.map(websocketFlow)
-
-      // Set of flows to remote servers containing subscribers
-      val remoteFlows = if (dist) remoteHostSet.map(remoteFlow) else Set.empty
-
       // Create the graph
       source ~> bcast
       localFlows.foreach(bcast ~> _ ~> merge)
@@ -274,7 +276,8 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       ClosedShape
     })
 
-    val f = Future.sequence(g.run() :: localSet.map(waitForAck).toList).map(_ => Done)
+    val localResponses = localSet.map(waitForAck)
+    val f = Future.sequence(g.run() :: (localResponses ++ remoteResponses).toList).map(_ => Done)
     f.onComplete {
       case Success(_)  => log.debug("Publish complete")
       case Failure(ex) => log.error(s"Publish failed with $ex")
