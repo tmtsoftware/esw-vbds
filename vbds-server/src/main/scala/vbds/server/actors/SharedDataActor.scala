@@ -296,11 +296,16 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
   /**
    * Makes the HTTP request for the transfer to remote servers with subscribers
    */
-  private def makeHttpRequest(streamName: String, serverInfo: ServerInfo, data: Source[ByteString, Any]): HttpRequest = {
+  private def makeHttpRequest(streamName: String, serverInfo: ServerInfo, source: Source[ByteString, Any]): HttpRequest = {
+    // XXX TODO TEMP
+    val logSource = source.map { bs =>
+      println(s"XXX Send ${bs.size} bytes to remote HTTP server")
+      bs
+    }
     HttpRequest(
       HttpMethods.POST,
       s"http://${serverInfo.host}:${serverInfo.port}$distRoute/$streamName",
-      entity = HttpEntity(ContentTypes.`application/octet-stream`, data)
+      entity = HttpEntity(ContentTypes.`application/octet-stream`, logSource)
     )
   }
 
