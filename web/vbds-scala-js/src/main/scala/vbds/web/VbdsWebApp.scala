@@ -50,8 +50,6 @@ class VbdsWebApp {
   // Content type of current image stream
   private var imageType: String = "image/fits"
 
-//  private def isFits = imageType == "image/fits"
-
 
   // Used to set some properties on the first call to JS9.Load
   private var initialized = false
@@ -99,7 +97,6 @@ class VbdsWebApp {
     println("XXX Loaded canvas image")
     onloadHandler(e)
   }
-
 
 
   // URI to get a list of streams
@@ -184,7 +181,6 @@ class VbdsWebApp {
       } else try {
         val settings = JS9.GetParam("all")
 //        val regions  = JS9.GetRegions("all", regionProps)
-//        println(s"XXX regions = $regions")
         JS9.CloseImage(closeProps)
         // Use the first time to set the onload handler, so we know when the image has been displayed.
         if (!initialized) {
@@ -208,12 +204,6 @@ class VbdsWebApp {
     println("XXX send ACK")
     ws.send("ACK")
   }
-
-  // Returns true if the array buffer contains the marker for the end of a file stream ("\n")
-//  private def isEndOfFileMarker(arrayBuffer: Uint8Array): Boolean = {
-//    val s = new String(arrayBuffer.toArray.take(1).map(_.asInstanceOf[Char]))
-//    s == "\n"
-//  }
 
   // Called when a stream is selected: Subscribe to the websocket for the stream
   private def subscribeToStream(event: dom.Event): Unit = {
@@ -244,7 +234,6 @@ class VbdsWebApp {
           displayImage(blob)
         } else {
           currentImageData = new Uint8Array(arrayBuffer) :: currentImageData
-          sendAck(ws)
         }
       }
       ws.onclose = { _: Event ⇒
