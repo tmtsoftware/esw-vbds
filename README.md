@@ -114,7 +114,7 @@ and of course the HTTP host and port, so we can send requests to it.
 
 Create a FITS stream named `WFS1-RAW`: (Note: The content type is optional, but may be used by image viewers)
 
-    vbds-client --host hostA -p 7777 --create WFS1-RAW --contentType "image/fits"
+    vbds-client --host hostA -p 7777 --create WFS1-RAW --content-type "image/fits"
 
 Subscribe to the stream (`-a` or `--action` takes a shell command that receives a filename argument):
 

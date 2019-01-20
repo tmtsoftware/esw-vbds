@@ -49,7 +49,7 @@ For example, by running each of these commands in different terminal windows:
 
     vbds-server --http-host localhost --http-port 7777 --akka-host localhost --akka-port 8888 -s localhost:8888
     
-    vbds-client --host localhost -p 7777 --create XXX --contentType "image/fits"
+    vbds-client --host localhost -p 7777 --create XXX --content-type "image/fits"
     
     vbds-client --host localhost -p 7777 --publish XXX --data /my/image/directory --delay "500 millis" --stats --repeat
 
@@ -72,12 +72,13 @@ Usage: vbds-client [options]
   --host <host name>       The VBDS HTTP server host name (default: 127.0.0.1)
   -p, --port <number>      The VBDS HTTP server port number (default: 80)
   --create <stream name>   Creates a new VBDS stream with the given name
-  --contentType <content-type>
+  --content-type <content-type>
                            Specifies the content type of the files in the stream
   --delete <stream name>   Deletes the VBDS stream with the given name
   -l, --list               List the available streams
   --stats                  Print timing statistics when publishing files
   --repeat                 Keep publishing the same files forever, until killed (for testing)
+  --save-files             If true, save the files received by the subscription to the current directory with names like <streamName>-<count>
   --stats-interval <value>
                            If --stats option was given, controls how often statistics are printed (default: 1 = every time)
   --subscribe <stream name>

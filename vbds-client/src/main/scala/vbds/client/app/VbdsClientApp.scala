@@ -60,7 +60,7 @@ object VbdsClientApp extends App {
       c.copy(create = Some(x))
     } text "Creates a new VBDS stream with the given name"
 
-    opt[String]("contentType") valueName "<content-type>" action { (x, c) =>
+    opt[String]("content-type") valueName "<content-type>" action { (x, c) =>
       c.copy(contentType = Some(x))
     } text "Specifies the content type of the files in the stream"
 
@@ -80,7 +80,7 @@ object VbdsClientApp extends App {
       c.copy(repeat = true)
     } text "Keep publishing the same files forever, until killed (for testing)"
 
-    opt[Unit]("saveFiles") action { (_, c) =>
+    opt[Unit]("save-files") action { (_, c) =>
       c.copy(saveFiles = true)
     } text "If true, save the files received by the subscription to the current directory with names like <streamName>-<count>"
 

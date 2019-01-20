@@ -129,6 +129,7 @@ class WebSocketActor(name: String,
 
   // Called when a ByteString is received on the websocket
   private def handleByteString(bs: ByteString): Future[Unit] = {
+    log.info(s"XXX Received ${bs.size} bytes from websocket")
     if (bs.size == 1 && bs.utf8String == "\n") {
       sendWsAck()
       if (saveFiles) {
