@@ -17,6 +17,8 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.{ContentTypes, HttpRequest}
 import akka.pattern.ask
+import akka.http.scaladsl.model.HttpEntity.Chunked
+import akka.http.scaladsl.model.HttpEntity.ChunkStreamPart
 
 import scala.concurrent.duration._
 import vbds.server.routes.AccessRoute.WebsocketResponseActor
@@ -230,8 +232,8 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
       localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get
     }
 
-    // If dist is true, send data for each remote subscriber as HTTP POST to the server hosting its websocket
-    def remoteFlow(h: ServerInfo) = {
+    // Send data for a remote subscriber as HTTP POST to the server hosting its websocket
+    def remoteFlow(h: ServerInfo): (Future[Done], Flow[ByteString, ByteString, NotUsed]) = {
       val (sink, source) = sinkToSource[ByteString].run
       val f = Source
         .single(makeHttpRequest(streamName, h, source))
@@ -251,8 +253,8 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
     val localFlows = localSet.map(websocketFlow)
 
     // Set of flows to remote servers containing subscribers
-    val remoteFlowPairs   = if (dist) remoteHostSet.map(remoteFlow) else Set.empty
-    val remoteFlows       = remoteFlowPairs.map(_._2)
+    val remoteFlowPairs = if (dist) remoteHostSet.map(remoteFlow) else Set.empty
+    val remoteFlows     = remoteFlowPairs.map(_._2)
     val remoteResponses = remoteFlowPairs.map(_._1)
 
     // Construct a runnable graph that broadcasts the published data to all of the subscribers
@@ -274,7 +276,7 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
     })
 
     val localResponses = localSet.map(waitForAck)
-    val f = Future.sequence(g.run() :: (localResponses ++ remoteResponses).toList).map(_ => Done)
+    val f              = Future.sequence(g.run() :: (localResponses ++ remoteResponses).toList).map(_ => Done)
     f.onComplete {
       case Success(_)  => log.debug("Publish complete")
       case Failure(ex) => log.error(s"Publish failed with $ex")
@@ -297,15 +299,10 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
    * Makes the HTTP request for the transfer to remote servers with subscribers
    */
   private def makeHttpRequest(streamName: String, serverInfo: ServerInfo, source: Source[ByteString, Any]): HttpRequest = {
-    // XXX TODO TEMP
-    val logSource = source.map { bs =>
-      println(s"XXX Send ${bs.size} bytes to remote HTTP server")
-      bs
-    }
     HttpRequest(
       HttpMethods.POST,
       s"http://${serverInfo.host}:${serverInfo.port}$distRoute/$streamName",
-      entity = HttpEntity(ContentTypes.`application/octet-stream`, logSource)
+      entity = HttpEntity(ContentTypes.`application/octet-stream`, source)
     )
   }
 
