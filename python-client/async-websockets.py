@@ -4,12 +4,21 @@ from photutils.datasets import make_4gaussians_image
 from photutils import centroid_com, centroid_1dg, centroid_2dg
 import matplotlib.pyplot as plt
 from astropy.io import fits
+import argparse
+
+# Example usage: python3 async-websockets.py --host 192.168.178.77 -p 7777 -s XXX
+ap = argparse.ArgumentParser()
+ap.add_argument("--host", required=True, help="VBDS server host")
+ap.add_argument("-p", "--port", required=True, type=int, help="VBDS server port")
+ap.add_argument("-s", "--subscribe", required=True, help="VBDS stream name to subscribe to")
+args = vars(ap.parse_args())
+
 
 # XXX TODO: Get from command line
-host = "192.168.178.77"
-port = 7777
+host = args["host"]
+port = args["port"]
+stream = args["subscribe"]
 route = "/vbds/access/streams"
-stream = "XXX"
 
 uri = f"ws://{host}:{port}{route}/{stream}"
 print(f"URI = {uri}")
@@ -17,7 +26,6 @@ print(f"URI = {uri}")
 # called when an image is received
 def receivedImage(image):
     print(f"Image size is {len(image)}")
-    # data = make_4gaussians_image()[43:79, 76:104]    # extract single object
     hdulist = fits.HDUList(file=image)
     data = hdulist[0].data
     do_centroid(data)
