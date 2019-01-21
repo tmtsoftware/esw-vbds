@@ -91,7 +91,7 @@ This should prevent too many messages from being queued in a browser's websocket
 | Create a stream               | POST      | /vbds/admin/streams/{streamName}?contentType=... | OK (200) – New stream name in JSON; Conflict (409) if stream exists
 | Delete a stream               | DELETE    | /vbds/admin/streams/{streamName} | OK (200) – Deleted stream name in JSON; NotFound (404) if stream does not exist
 | Publish an image to a stream  | POST      | /vbds/transfer/streams/{streamName}/image | Accepted (204) – (no content); Bad Request (400) – for non-existent stream
-| Create a subscription         | POST      | /vbds/access/streams/{streamName} | SwitchingProtocols (101) – Creates a websocket connection for receiving the data
+| Create a subscription         | GET       | ws://host:port/vbds/access/streams/{streamName} | SwitchingProtocols (101) – Creates a websocket connection for receiving the data
 
 To delete a subscription, just close the websocket for it. Subscriptions are automatically deleted if a client disconnects.
 
