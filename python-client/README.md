@@ -5,6 +5,12 @@ of the incoming FITS files.
 
 ## Requirements
 
+The following python packages are required:
+
+* astropy
+* scipy
+* websockets
+
 ## Usage
 
 Start the VBDS server:
