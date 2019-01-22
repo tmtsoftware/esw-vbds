@@ -15,6 +15,8 @@ To build and install the applications, run:
 
 See [web/vbds-scala-js](web/vbds-scala-js) for instructions on how to build the JS9 based web app.
 
+See [python-client](python-client) for information about an example VBDS python client that calculates the centroid of the received images.
+
 ## Applications
 
 The main application is an HTTP server called `vbds-server`:
