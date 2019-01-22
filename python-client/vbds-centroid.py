@@ -41,10 +41,10 @@ async def receive(uri):
         while True:
             bs = await websocket.recv()
             if (len(bs) == 1):
-                await websocket.send("ACK")
                 image = b"".join(chunks)
                 chunks = []
                 receivedImage(image)
+                await websocket.send("ACK")
             else:
                 chunks.append(bs)
 

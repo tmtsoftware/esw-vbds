@@ -10,6 +10,7 @@ The following python packages are required:
 * astropy
 * scipy
 * websockets
+* photutils
 
 ## Usage
 
