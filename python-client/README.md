@@ -12,9 +12,9 @@ The following python packages are required:
 * websockets
 * photutils
 
-## Usage
+## Usage Example
 
-Start the VBDS server:
+Start the VBDS server (Replace the IP address with your hostname or IP address):
 
     vbds-server --http-host 192.168.178.77 --http-port 7777 --akka-host 192.168.178.77 --akka-port 8888 -s 192.168.178.77:8888
 
@@ -24,7 +24,7 @@ Create a stream named MyStream:
 
 Start the example script, which subscribes to the stream:
 
-    python3 async-websockets.py --host 192.168.178.77 -p 7777 -s MyStream
+    python3 vbds-centroid.py --host 192.168.178.77 -p 7777 -s MyStream
 
 Publish a FITS file:
 
