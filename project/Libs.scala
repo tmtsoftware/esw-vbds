@@ -3,7 +3,7 @@ import sbt._
 object Libs {
   val ScalaVersion = "2.12.8"
 
-  val `scalatest` = "org.scalatest" %% "scalatest" % "3.0.5" //Apache License 2.0
+  val `scalatest` = "org.scalatest" %% "scalatest" % "3.0.7" //Apache License 2.0
   val `scala-async` = "org.scala-lang.modules" %% "scala-async" % "0.9.7" //BSD 3-clause "New" or "Revised" License
   val `scopt` = "com.github.scopt" %% "scopt" % "3.7.1" //MIT License
   val `logback-classic` = "ch.qos.logback" % "logback-classic" % "1.2.3" // GNU Lesser General Public License version 2.1
@@ -13,7 +13,7 @@ object Libs {
 }
 
 object Akka {
-  val Version = "2.5.19" //all akka is Apache License 2.0
+  val Version = "2.5.22" //all akka is Apache License 2.0
   val `akka-stream` = "com.typesafe.akka" %% "akka-stream" % Version
   val `akka-remote` = "com.typesafe.akka" %% "akka-remote" % Version
   val `akka-stream-testkit` = "com.typesafe.akka" %% "akka-stream-testkit" % Version
@@ -29,7 +29,7 @@ object Akka {
 }
 
 object AkkaHttp { //ApacheV2
-  val Version = "10.1.7"
+  val Version = "10.1.8"
   val `akka-http` = "com.typesafe.akka" %% "akka-http" % Version
   val `akka-http-core` = "com.typesafe.akka" %% "akka-http-core" % Version
   val `akka-http-testkit` = "com.typesafe.akka" %% "akka-http-testkit" % Version

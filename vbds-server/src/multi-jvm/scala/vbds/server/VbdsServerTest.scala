@@ -65,10 +65,10 @@ object VbdsServerTest {
 
   // --- Edit this ---
   // Image dimensions: 128x128, 256x256, 512x512, 1024x1024, 2048x2048, 4096x4096 (x 3)
-  val testFileDims = List(48, 128, 256, 512, 1024, 2048, 4096)
+  val testFileDims = List(48, 128, 256, 512, 1024, 2048, 4096, 9216)
   // Repeat each test to get warmed up performance data
   val repeatTests         = 5
-  val numFilesToPublish   = 1000
+  val numFilesToPublish   = 50
   val totalFilesToPublish = testFileDims.size * repeatTests * numFilesToPublish
 
   // ---
@@ -259,8 +259,9 @@ class VbdsServerTest(name: String)
 
     (1 to repeatTests).foreach { _ =>
       testFileDims.foreach { dim =>
-        // approximate FITS file with BITPIX=-32 + header
-        val testFileSizeBytes = dim * dim * 4 + 16500
+        val bytesPerPixel = 4
+//        val bytesPerPixel = 2
+        val testFileSizeBytes = dim * dim * bytesPerPixel + 16500
         makeFile(testFileSizeBytes, testFile)
 
         val startTime = System.currentTimeMillis()
@@ -275,7 +276,7 @@ class VbdsServerTest(name: String)
         val elapsedTimeSecs = (System.currentTimeMillis() - startTime) / 1000.0
         val hz              = numFilesToPublish / elapsedTimeSecs
 
-        println(f"Published $numFilesToPublish files of size $testFileSizeBytes [$dim x $dim x 4] in $elapsedTimeSecs%1.3f secs ($hz%1.3f hz)")
+        println(f"Published $numFilesToPublish files of size $testFileSizeBytes [$dim x $dim x $bytesPerPixel] in $elapsedTimeSecs%1.3f secs ($hz%1.3f hz)")
       }
     }
 
