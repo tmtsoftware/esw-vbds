@@ -2,7 +2,8 @@ package vbds.server.routes
 
 import java.util.UUID
 
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
+import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
+import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
 import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message}
@@ -12,43 +13,49 @@ import akka.stream.scaladsl.{Flow, MergeHub, Sink}
 import akka.util.ByteString
 import vbds.server.actors.{AccessApi, AdminApi}
 import vbds.server.models.JsonSupport
+import AccessRoute.WebsocketResponseActor._
 import vbds.server.routes.AccessRoute.WebsocketResponseActor
 
 object AccessRoute {
 
   // Actor to handle ACK responses from websocket clients
   object WebsocketResponseActor {
+
+    sealed trait WebsocketResponseActorMsg
+
     // Responds with Ack if there is a response from the ws client
-    final case object Get
+    final case class Get(replyTo: ActorRef[Ack.type]) extends WebsocketResponseActorMsg
 
     // Says there was a response from the ws client
-    final case object Put
+    final case object Put extends WebsocketResponseActorMsg
 
     // Reponse to Get message
     final case object Ack
 
-    def props(): Props = Props(new WebsocketResponseActor)
+    def apply(): Behavior[WebsocketResponseActorMsg] = Behaviors.setup(ctx => new WebsocketResponseActor(ctx))
   }
 
-  class WebsocketResponseActor extends Actor with ActorLogging {
-    import WebsocketResponseActor._
-    def receive: Receive = receiveResponses(1, Nil)
+  class WebsocketResponseActor(ctx: ActorContext[WebsocketResponseActorMsg]) extends AbstractBehavior[WebsocketResponseActorMsg] {
 
-    def receiveResponses(responses: Int, senders: List[ActorRef]): Receive = {
+    override def onMessage(msg: WebsocketResponseActorMsg): Behavior[WebsocketResponseActorMsg] = {
+      receiveResponses(1, Nil)
+    }
+
+    def receiveResponses(responses: Int, senders: List[ActorRef[Ack.type]]): Behavior[WebsocketResponseActorMsg] = {
       case Put =>
         if (senders.nonEmpty) {
           senders.last ! Ack
-          context.become(receiveResponses(responses, senders.dropRight(1)))
+          receiveResponses(responses, senders.dropRight(1))
         } else {
-          context.become(receiveResponses(responses + 1, Nil))
+          receiveResponses(responses + 1, Nil)
         }
 
-      case Get =>
+      case Get(replyTo) =>
         if (responses > 0) {
-          sender() ! Ack
-          context.become(receiveResponses(responses - 1, senders))
+          replyTo ! Ack
+          receiveResponses(responses - 1, senders)
         } else {
-          context.become(receiveResponses(0, sender() :: senders))
+          receiveResponses(0, replyTo :: senders)
         }
     }
   }
@@ -60,7 +67,7 @@ object AccessRoute {
  *
  * @param adminData used to access the distributed list of streams (using cluster + CRDT)
  */
-class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val system: ActorSystem,
+class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val system: ActorSystem[_],
                                                               implicit val mat: ActorMaterializer)
     extends Directives
     with JsonSupport {
@@ -71,7 +78,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
     override def getClazz(o: AnyRef): Class[_] = o.getClass
   }
 
-  val log = Logging(system, this)
+  import system.log
 
 
   val route =

@@ -4,10 +4,12 @@ import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
 object Dependencies {
 
   val vbdsServer = Seq(
-    Akka.`akka-stream`,
-    Akka.`akka-actor`,
-    Akka.`akka-cluster`,
-    Akka.`akka-distributed-data`,
+    Akka.`akka-stream-typed`,
+//    Akka.`akka-actor`,
+    Akka.`akka-actor-typed`,
+//    Akka.`akka-cluster`,
+    Akka.`akka-cluster-typed`,
+//    Akka.`akka-distributed-data`,
     Akka.`akka-slf4j`,
     Akka.`akka-remote`,
     AkkaHttp.`akka-http`,

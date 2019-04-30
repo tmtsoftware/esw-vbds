@@ -2,18 +2,19 @@ package vbds.server.app
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, ActorSystem}
-import akka.cluster.Cluster
-import akka.cluster.ddata.DistributedData
+import akka.actor.typed._
+import akka.cluster.typed._
+import akka.actor.typed.scaladsl.adapter.UntypedActorSystemOps
+import akka.cluster.ddata.typed.scaladsl.DistributedData
+import akka.stream.typed.scaladsl.ActorMaterializer
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.RouteConcatenation._
-import akka.stream.ActorMaterializer
 import com.typesafe.config.ConfigFactory
-import vbds.server.actors.SharedDataActor.LocalAddress
+import vbds.server.actors.SharedDataActor.{LocalAddress, SharedDataActorMessages}
 import vbds.server.actors.{AccessApiImpl, AdminApiImpl, SharedDataActor, TransferApiImpl}
 import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 object VbdsServer {
 
@@ -60,13 +61,16 @@ object VbdsServer {
                $seedNodes
             """).withFallback(ConfigFactory.load())
 
-    implicit val system = ActorSystem(systemName, config)
+    implicit val system = akka.actor.ActorSystem(systemName, config)
+    implicit val typedSystem: ActorSystem[_] = system.toTyped
+
     implicit val mat    = ActorMaterializer()
     import system.dispatcher
 
     // Initialize the cluster for replicating the data
-    val replicator      = DistributedData(system).replicator
-    implicit val node   = Cluster(system)
+    val replicator      = DistributedData(typedSystem).replicator
+    implicit val node   = Cluster(typedSystem)
+
     val sharedDataActor = system.actorOf(SharedDataActor.props(replicator))
     val server          = new VbdsServer(sharedDataActor)
     val f               = server.start(httpHost, httpPort)
@@ -85,9 +89,9 @@ object VbdsServer {
  * @param system          the cluster actor system
  * @param mat             required for akka streams
  */
-class VbdsServer(sharedDataActor: ActorRef)(implicit system: ActorSystem, mat: ActorMaterializer) {
+class VbdsServer(sharedDataActor: ActorRef[SharedDataActorMessages])(implicit system: ActorSystem[_], mat: ActorMaterializer) {
 
-  import system.dispatcher
+  implicit val ec: ExecutionContext        = system.executionContext
 
   private val adminApi    = new AdminApiImpl(sharedDataActor)
   private val accessApi   = new AccessApiImpl(sharedDataActor)

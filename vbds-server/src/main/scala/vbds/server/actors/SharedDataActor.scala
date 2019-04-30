@@ -3,28 +3,28 @@ package vbds.server.actors
 import java.net.InetSocketAddress
 
 import akka.{Done, NotUsed}
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import akka.cluster.Cluster
-import akka.cluster.ddata.{ORSet, ORSetKey}
-import akka.cluster.ddata.Replicator._
+import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
+import akka.cluster.ddata.typed.scaladsl.Replicator
 import akka.stream.{ActorMaterializer, ClosedShape}
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import vbds.server.models.{AccessInfo, ServerInfo, StreamInfo}
 import akka.pattern.pipe
-import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
-import akka.http.scaladsl.model.{ContentTypes, HttpRequest}
-import akka.pattern.ask
-import akka.http.scaladsl.model.HttpEntity.Chunked
-import akka.http.scaladsl.model.HttpEntity.ChunkStreamPart
+import akka.http.scaladsl.model.{ContentTypes, HttpRequest, HttpResponse}
+import akka.cluster.Cluster
 
 import scala.concurrent.duration._
 import vbds.server.routes.AccessRoute.WebsocketResponseActor
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
+import SharedDataActor._
+import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
+import akka.cluster.ddata.Replicator.WriteLocal
+import akka.cluster.ddata.typed.scaladsl.Replicator.{Changed, Update, UpdateResponse}
+import akka.cluster.ddata.{GCounterKey, ORSet, ORSetKey, SelfUniqueAddress}
+import vbds.server.routes.AccessRoute.WebsocketResponseActor.WebsocketResponseActorMsg
 
 /**
  * Defines messages handled by the actor
@@ -42,7 +42,7 @@ private[server] object SharedDataActor {
   // Tells the actor the host and port that the http server is listening on
   case class LocalAddress(a: InetSocketAddress) extends SharedDataActorMessages
 
-  case class AddSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef)
+  case class AddSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef[WebsocketResponseActorMsg])
       extends SharedDataActorMessages
 
   case class DeleteSubscription(id: String) extends SharedDataActorMessages
@@ -51,9 +51,13 @@ private[server] object SharedDataActor {
 
   case class Publish(streamName: String, source: Source[ByteString, Any], dist: Boolean) extends SharedDataActorMessages
 
-  // Used to create the actor
-  def props(replicator: ActorRef)(implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem): Props =
-    Props(new SharedDataActor(replicator))
+  // Used by adapters to receive and respond to cluster messages
+  private sealed trait InternalMsg extends SharedDataActorMessages
+  private case class StreamInfoChanged(chg: Changed[ORSetKey[StreamInfo]]) extends InternalMsg
+  private case class AccessInfoChanged(chg: Changed[ORSetKey[AccessInfo]]) extends InternalMsg
+  private case class StreamInfoUpdateResponse(rsp: UpdateResponse[ORSetKey[StreamInfo]]) extends InternalMsg
+  private case class AccessInfoUpdateResponse(rsp: UpdateResponse[ORSetKey[AccessInfo]]) extends InternalMsg
+
 
   /**
    * Represents a remote http server that receives data files that it then distributes to its local subscribers
@@ -70,7 +74,7 @@ private[server] object SharedDataActor {
    * @param sink            Sink that writes to the subscriber's websocket
    * @param wsResponseActor an Actor that is used to check if the client has processed the last message (to avoid overflow)
    */
-  private[server] case class LocalSubscriberInfo(sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef)
+  private[server] case class LocalSubscriberInfo(sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef[WebsocketResponseActorMsg])
 
   // Route used to distribute data to remote HTTP server
   val distRoute = "/vbds/transfer/internal"
@@ -91,20 +95,22 @@ private[server] object SharedDataActor {
       .mapMaterializedValue {
         case (sub, pub) ⇒ (Sink.fromSubscriber(sub), Source.fromPublisher(pub))
       }
+
+  // Used to create the actor
+  def apply(replicator: ActorRef[Replicator.Command])(implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem[_], node: SelfUniqueAddress): Behavior[SharedDataActorMessages] =
+    Behaviors.setup(ctx => new SharedDataActor(replicator, ctx))
 }
 
 /**
  * A cluster actor that shares stream and subscription info via CRDT and implements
  * the publish/subscribe features.
  */
-private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cluster,
-                                                            mat: ActorMaterializer,
-                                                            system: ActorSystem)
-    extends Actor
-    with ActorLogging {
+private[server] class SharedDataActor(replicator: ActorRef[Replicator.Command], ctx: ActorContext[SharedDataActorMessages])
+                                     (implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem[_], node: SelfUniqueAddress)
+    extends AbstractBehavior[SharedDataActorMessages] {
 
-  import system.dispatcher
-  import SharedDataActor._
+  implicit val ec: ExecutionContext        = system.executionContext
+  import ctx.log
 
   // The local IP address, set at runtime via a message from the code that starts the HTTP server.
   // This is used to determine which HTTP server has the websocket connection to a client.
@@ -130,76 +136,89 @@ private[server] class SharedDataActor(replicator: ActorRef)(implicit cluster: Cl
   // Key for sharing the subscriber information in the cluster
   val accessDataKey = ORSetKey[AccessInfo]("accessInfo")
 
+  val Key = GCounterKey("counter")
+
+
+  // Adapter used so that typed actor can receive and respond to cluster messages
+  val streamInfoChangedAdapter: ActorRef[Changed[ORSetKey[StreamInfo]]] = ctx.messageAdapter(StreamInfoChanged.apply)
+  val accessInfoChangedAdapter: ActorRef[Changed[ORSetKey[AccessInfo]]] = ctx.messageAdapter(AccessInfoChanged.apply)
+  val streamInfoUpdateResponseAdapter: ActorRef[UpdateResponse[ORSetKey[StreamInfo]]] = ctx.messageAdapter(StreamInfoUpdateResponse.apply)
+  val accessInfoUpdateResponseAdapter: ActorRef[UpdateResponse[ORSetKey[AccessInfo]]] = ctx.messageAdapter(AccessInfoUpdateResponse.apply)
+
   // Subscribe to the shared cluster info (CRDT)
-  replicator ! Subscribe(adminDataKey, self)
-  replicator ! Subscribe(accessDataKey, self)
+  replicator ! Replicator.Subscribe(adminDataKey, streamInfoChangedAdapter)
+  replicator ! Replicator.Subscribe(accessDataKey, accessInfoChangedAdapter)
 
-  def receive = {
-    // Sets the local IP address
-    case LocalAddress(a) =>
-      localAddress = a
+  override def onMessage(msg: SharedDataActorMessages): Behavior[SharedDataActorMessages] = {
+      msg match {
+        // Sets the local IP address
+        case LocalAddress(a) =>
+          localAddress = a
+          Behaviors.same
 
-    case AddStream(name, contentType) =>
-      log.info("Adding: {}: {}", name, contentType)
-      val info = StreamInfo(name, contentType)
-      replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(_ + info)
-      sender() ! info
+        case AddStream(name, contentType) =>
+          log.info("Adding: {}: {}", name, contentType)
+          val info = StreamInfo(name, contentType)
+          replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal, streamInfoUpdateResponseAdapter)(_ + info)
+          sender() ! info
+          Behaviors.same
 
-    case DeleteStream(name) =>
-      log.info("Removing: {}", name)
-      streams.find(_.name == name).foreach { info =>
-        replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal)(_ - info)
-        sender() ! info
+        case DeleteStream(name) =>
+          log.info("Removing: {}", name)
+          streams.find(_.name == name).foreach { info =>
+            replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal, streamInfoUpdateResponseAdapter)(_ - info)
+            sender() ! info
+          }
+
+        // --- Sends a request to get the list of streams (See the following cases for the response) ---
+        case ListStreams =>
+          sender ! streams
+
+        case _: UpdateResponse[_] ⇒ // ignore
+
+        case c@Changed(`adminDataKey`) ⇒
+          val data = c.get(adminDataKey)
+          streams = data.elements
+          log.info("Current streams: {}", streams)
+
+        case AddSubscription(name, id, sink, wsResponseActor) =>
+          log.info(s"Adding Subscription to stream $name with id $id")
+          val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, id)
+          replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal, accessInfoUpdateResponseAdapter)(_ + info)
+          localSubscribers = localSubscribers + (info -> LocalSubscriberInfo(sink, wsResponseActor))
+          sender() ! info
+
+        case DeleteSubscription(id) =>
+          val s = subscriptions.find(_.id == id)
+          s.foreach { info =>
+            log.info("Removing Subscription with id: {}", info)
+            replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal, accessInfoUpdateResponseAdapter)(_ - info)
+          }
+          sender() ! id
+
+        // --- Sends a request to get the list of subscriptions (See the following cases for the response) ---
+        case ListSubscriptions =>
+          sender() ! subscriptions
+
+        case c@Changed(`accessDataKey`) ⇒
+          val data = c.get(accessDataKey)
+          subscriptions = data.elements
+          log.info("Current subscriptions: {}", subscriptions)
+
+        case Publish(streamName, source, dist) =>
+          val subscriberSet = subscriptions.filter(_.streamName == streamName)
+          val f = if (subscriberSet.isEmpty) {
+            // No subscribers, so just ignore
+            source.runWith(Sink.ignore)
+          } else {
+            // Publish to subscribers and
+            publish(streamName, subscriberSet, source, dist)
+          }
+          // reply with Done when done
+          pipe(f) to sender()
+
       }
-
-    // --- Sends a request to get the list of streams (See the following cases for the response) ---
-    case ListStreams =>
-      sender ! streams
-
-    case _: UpdateResponse[_] ⇒ // ignore
-
-    case c @ Changed(`adminDataKey`) ⇒
-      val data = c.get(adminDataKey)
-      streams = data.elements
-      log.info("Current streams: {}", streams)
-
-    case AddSubscription(name, id, sink, wsResponseActor) =>
-      log.info(s"Adding Subscription to stream $name with id $id")
-      val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, id)
-      replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ + info)
-      localSubscribers = localSubscribers + (info -> LocalSubscriberInfo(sink, wsResponseActor))
-      sender() ! info
-
-    case DeleteSubscription(id) =>
-      val s = subscriptions.find(_.id == id)
-      s.foreach { info =>
-        log.info("Removing Subscription with id: {}", info)
-        replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal)(_ - info)
-      }
-      sender() ! id
-
-    // --- Sends a request to get the list of subscriptions (See the following cases for the response) ---
-    case ListSubscriptions =>
-      sender() ! subscriptions
-
-    case c @ Changed(`accessDataKey`) ⇒
-      val data = c.get(accessDataKey)
-      subscriptions = data.elements
-      log.info("Current subscriptions: {}", subscriptions)
-
-    case Publish(streamName, source, dist) =>
-      val subscriberSet = subscriptions.filter(_.streamName == streamName)
-      val f = if (subscriberSet.isEmpty) {
-        // No subscribers, so just ignore
-        source.runWith(Sink.ignore)
-      } else {
-        // Publish to subscribers and
-        publish(streamName, subscriberSet, source, dist)
-      }
-      // reply with Done when done
-      pipe(f) to sender()
-
-  }
+    }
 
   /**
    * Publishes the contents of the given data source to the given set of subscribers and returns a future that completes when
