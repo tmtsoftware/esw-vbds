@@ -1,12 +1,11 @@
 package vbds.server.actors
 
 import akka.Done
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.typed.ActorRef
 import akka.stream.scaladsl.Source
+import akka.stream.typed.scaladsl.ActorMaterializer
 import akka.util.{ByteString, Timeout}
-import akka.pattern.ask
-import akka.stream.Materializer
-import vbds.server.actors.SharedDataActor.Publish
+import vbds.server.actors.SharedDataActor.{Publish, SharedDataActorMessages}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -18,9 +17,9 @@ trait TransferApi {
   def publish(streamName: String, source: Source[ByteString, Any], dist: Boolean): Future[Done]
 }
 
-class TransferApiImpl(sharedDataActor: ActorRef, accessApi: AccessApi)(implicit val system: ActorSystem,
-                                                                       implicit val mat: Materializer,
-                                                                       implicit val timeout: Timeout = 5.minutes)
+class TransferApiImpl(sharedDataActor: ActorRef[SharedDataActorMessages], accessApi: AccessApi)(
+                                                                       implicit val mat: ActorMaterializer,
+                                                                       timeout: Timeout = 5.minutes)
     extends TransferApi {
 
   def publish(streamName: String, source: Source[ByteString, Any], dist: Boolean): Future[Done] = {

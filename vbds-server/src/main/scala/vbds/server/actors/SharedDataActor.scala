@@ -4,27 +4,30 @@ import java.net.InetSocketAddress
 
 import akka.{Done, NotUsed}
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
-import akka.cluster.ddata.typed.scaladsl.Replicator
-import akka.stream.{ActorMaterializer, ClosedShape}
+import akka.cluster.ddata.typed.scaladsl.{DistributedData, Replicator}
+import akka.stream.ClosedShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
 import akka.util.{ByteString, Timeout}
 import vbds.server.models.{AccessInfo, ServerInfo, StreamInfo}
-import akka.pattern.pipe
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{ContentTypes, HttpRequest, HttpResponse}
-import akka.cluster.Cluster
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest, HttpResponse}
 
 import scala.concurrent.duration._
-import vbds.server.routes.AccessRoute.WebsocketResponseActor
+import akka.http.scaladsl.server.RouteConcatenation._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 import SharedDataActor._
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
+import akka.actor.typed.{ActorRef, Behavior}
 import akka.cluster.ddata.Replicator.WriteLocal
 import akka.cluster.ddata.typed.scaladsl.Replicator.{Changed, Update, UpdateResponse}
-import akka.cluster.ddata.{GCounterKey, ORSet, ORSetKey, SelfUniqueAddress}
-import vbds.server.routes.AccessRoute.WebsocketResponseActor.WebsocketResponseActorMsg
+import akka.cluster.ddata.{ORSet, ORSetKey}
+import akka.cluster.typed.Cluster
+import akka.stream.typed.scaladsl.ActorMaterializer
+import akka.actor.typed.scaladsl.AskPattern._
+import vbds.server.routes.WebsocketResponseActor.WebsocketResponseActorMsg
+import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute, WebsocketResponseActor}
+import akka.actor.typed.scaladsl.adapter._
 
 /**
  * Defines messages handled by the actor
@@ -33,31 +36,39 @@ private[server] object SharedDataActor {
 
   sealed trait SharedDataActorMessages
 
-  case class AddStream(streamName: String, contentType: String) extends SharedDataActorMessages
+  case class AddStream(streamName: String, contentType: String, replyTo: ActorRef[StreamInfo]) extends SharedDataActorMessages
 
-  case class DeleteStream(streamName: String) extends SharedDataActorMessages
+  case class DeleteStream(streamName: String, replyTo: ActorRef[StreamInfo]) extends SharedDataActorMessages
 
-  case object ListStreams extends SharedDataActorMessages
+  case class ListStreams(replyTo: ActorRef[Set[StreamInfo]]) extends SharedDataActorMessages
 
   // Tells the actor the host and port that the http server is listening on
   case class LocalAddress(a: InetSocketAddress) extends SharedDataActorMessages
 
-  case class AddSubscription(streamName: String, id: String, sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef[WebsocketResponseActorMsg])
+  case class AddSubscription(streamName: String,
+                             id: String,
+                             sink: Sink[ByteString, NotUsed],
+                             wsResponseActor: ActorRef[WebsocketResponseActorMsg],
+                             replyTo: ActorRef[AccessInfo])
       extends SharedDataActorMessages
 
-  case class DeleteSubscription(id: String) extends SharedDataActorMessages
+  case class DeleteSubscription(id: String, replyTo: ActorRef[String]) extends SharedDataActorMessages
 
-  case object ListSubscriptions extends SharedDataActorMessages
+  case class ListSubscriptions(replyTo: ActorRef[Set[AccessInfo]]) extends SharedDataActorMessages
 
-  case class Publish(streamName: String, source: Source[ByteString, Any], dist: Boolean) extends SharedDataActorMessages
+  case class Publish(streamName: String, source: Source[ByteString, Any], dist: Boolean, replyTo: ActorRef[Done])
+      extends SharedDataActorMessages
 
   // Used by adapters to receive and respond to cluster messages
   private sealed trait InternalMsg extends SharedDataActorMessages
-  private case class StreamInfoChanged(chg: Changed[ORSetKey[StreamInfo]]) extends InternalMsg
-  private case class AccessInfoChanged(chg: Changed[ORSetKey[AccessInfo]]) extends InternalMsg
-  private case class StreamInfoUpdateResponse(rsp: UpdateResponse[ORSetKey[StreamInfo]]) extends InternalMsg
-  private case class AccessInfoUpdateResponse(rsp: UpdateResponse[ORSetKey[AccessInfo]]) extends InternalMsg
 
+  private case class StreamInfoChanged(chg: Changed[ORSetKey[StreamInfo]]) extends InternalMsg
+
+  private case class AccessInfoChanged(chg: Changed[ORSetKey[AccessInfo]]) extends InternalMsg
+
+  private case class StreamInfoUpdateResponse(rsp: UpdateResponse[ORSetKey[StreamInfo]]) extends InternalMsg
+
+  private case class AccessInfoUpdateResponse(rsp: UpdateResponse[ORSetKey[AccessInfo]]) extends InternalMsg
 
   /**
    * Represents a remote http server that receives data files that it then distributes to its local subscribers
@@ -74,7 +85,8 @@ private[server] object SharedDataActor {
    * @param sink            Sink that writes to the subscriber's websocket
    * @param wsResponseActor an Actor that is used to check if the client has processed the last message (to avoid overflow)
    */
-  private[server] case class LocalSubscriberInfo(sink: Sink[ByteString, NotUsed], wsResponseActor: ActorRef[WebsocketResponseActorMsg])
+  private[server] case class LocalSubscriberInfo(sink: Sink[ByteString, NotUsed],
+                                                 wsResponseActor: ActorRef[WebsocketResponseActorMsg])
 
   // Route used to distribute data to remote HTTP server
   val distRoute = "/vbds/transfer/internal"
@@ -97,20 +109,27 @@ private[server] object SharedDataActor {
       }
 
   // Used to create the actor
-  def apply(replicator: ActorRef[Replicator.Command])(implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem[_], node: SelfUniqueAddress): Behavior[SharedDataActorMessages] =
-    Behaviors.setup(ctx => new SharedDataActor(replicator, ctx))
+  def apply(httpHost: String, httpPort: Int): Behavior[SharedDataActorMessages] = {
+    Behaviors.setup(ctx => new SharedDataActor(ctx, httpHost, httpPort))
+  }
 }
 
 /**
  * A cluster actor that shares stream and subscription info via CRDT and implements
  * the publish/subscribe features.
  */
-private[server] class SharedDataActor(replicator: ActorRef[Replicator.Command], ctx: ActorContext[SharedDataActorMessages])
-                                     (implicit cluster: Cluster, mat: ActorMaterializer, system: ActorSystem[_], node: SelfUniqueAddress)
+private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages], httpHost: String, httpPort: Int)
     extends AbstractBehavior[SharedDataActorMessages] {
 
-  implicit val ec: ExecutionContext        = system.executionContext
   import ctx.log
+  implicit val ec: ExecutionContext = ctx.executionContext
+  implicit val scheduler            = ctx.system.scheduler
+
+  implicit val node = DistributedData(ctx.system).selfUniqueAddress
+  implicit val mat  = ActorMaterializer()(ctx.system)
+
+  val replicator = DistributedData(ctx.system).replicator
+  val cluster    = Cluster(ctx.system)
 
   // The local IP address, set at runtime via a message from the code that starts the HTTP server.
   // This is used to determine which HTTP server has the websocket connection to a client.
@@ -136,89 +155,118 @@ private[server] class SharedDataActor(replicator: ActorRef[Replicator.Command], 
   // Key for sharing the subscriber information in the cluster
   val accessDataKey = ORSetKey[AccessInfo]("accessInfo")
 
-  val Key = GCounterKey("counter")
-
-
   // Adapter used so that typed actor can receive and respond to cluster messages
   val streamInfoChangedAdapter: ActorRef[Changed[ORSetKey[StreamInfo]]] = ctx.messageAdapter(StreamInfoChanged.apply)
   val accessInfoChangedAdapter: ActorRef[Changed[ORSetKey[AccessInfo]]] = ctx.messageAdapter(AccessInfoChanged.apply)
-  val streamInfoUpdateResponseAdapter: ActorRef[UpdateResponse[ORSetKey[StreamInfo]]] = ctx.messageAdapter(StreamInfoUpdateResponse.apply)
-  val accessInfoUpdateResponseAdapter: ActorRef[UpdateResponse[ORSetKey[AccessInfo]]] = ctx.messageAdapter(AccessInfoUpdateResponse.apply)
+  val streamInfoUpdateResponseAdapter: ActorRef[UpdateResponse[ORSetKey[StreamInfo]]] =
+    ctx.messageAdapter(StreamInfoUpdateResponse.apply)
+  val accessInfoUpdateResponseAdapter: ActorRef[UpdateResponse[ORSetKey[AccessInfo]]] =
+    ctx.messageAdapter(AccessInfoUpdateResponse.apply)
+
+  startHttpServer()
+
+  private def startHttpServer(): Unit = {
+    val adminApi    = new AdminApiImpl(ctx.self)
+    val accessApi   = new AccessApiImpl(ctx.self)
+    val transferApi = new TransferApiImpl(ctx.self, accessApi)
+
+    val adminRoute    = new AdminRoute(adminApi)
+    val accessRoute   = new AccessRoute(adminApi, accessApi)
+    val transferRoute = new TransferRoute(adminApi, accessApi, transferApi)
+    val route         = adminRoute.route ~ accessRoute.route ~ transferRoute.route
+    Http()(ctx.system.toUntyped).bindAndHandle(route, httpHost, httpPort)
+  }
+
+  //    val f               = server.start(httpHost, httpPort)
+  //    // Need to know this http server's address when subscribing
+  //    f.foreach { binding =>
+  //      sharedDataActor ! LocalAddress(new InetSocketAddress(httpHost, binding.localAddress.getPort))
+  //    }
 
   // Subscribe to the shared cluster info (CRDT)
   replicator ! Replicator.Subscribe(adminDataKey, streamInfoChangedAdapter)
   replicator ! Replicator.Subscribe(accessDataKey, accessInfoChangedAdapter)
 
   override def onMessage(msg: SharedDataActorMessages): Behavior[SharedDataActorMessages] = {
-      msg match {
-        // Sets the local IP address
-        case LocalAddress(a) =>
-          localAddress = a
-          Behaviors.same
+    msg match {
+      // Sets the local IP address
+      case LocalAddress(a) =>
+        localAddress = a
 
-        case AddStream(name, contentType) =>
-          log.info("Adding: {}: {}", name, contentType)
-          val info = StreamInfo(name, contentType)
-          replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal, streamInfoUpdateResponseAdapter)(_ + info)
-          sender() ! info
-          Behaviors.same
+      case AddStream(name, contentType, replyTo) =>
+        log.info("Adding: {}: {}", name, contentType)
+        val info = StreamInfo(name, contentType)
+        replicator ! new Update(adminDataKey, WriteLocal, streamInfoUpdateResponseAdapter, None)(
+          _.getOrElse(ORSet.empty[StreamInfo] :+ info)
+        )
+        replyTo ! info
 
-        case DeleteStream(name) =>
-          log.info("Removing: {}", name)
-          streams.find(_.name == name).foreach { info =>
-            replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal, streamInfoUpdateResponseAdapter)(_ - info)
-            sender() ! info
-          }
+      case DeleteStream(name, replyTo) =>
+        log.info("Removing: {}", name)
+        streams.find(_.name == name).foreach { info =>
+          replicator ! new Update(adminDataKey, WriteLocal, streamInfoUpdateResponseAdapter, None)(
+            _.getOrElse(ORSet.empty[StreamInfo].remove(info))
+          )
+          replyTo ! info
+        }
 
-        // --- Sends a request to get the list of streams (See the following cases for the response) ---
-        case ListStreams =>
-          sender ! streams
+      // --- Sends a request to get the list of streams (See the following cases for the response) ---
+      case ListStreams(replyTo) =>
+        replyTo ! streams
 
-        case _: UpdateResponse[_] ⇒ // ignore
+      case AddSubscription(name, id, sink, wsResponseActor, replyTo) =>
+        log.info(s"Adding Subscription to stream $name with id $id")
+        val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, id)
+        replicator ! new Update(accessDataKey, WriteLocal, accessInfoUpdateResponseAdapter, None)(
+          _.getOrElse(ORSet.empty[AccessInfo] :+ info)
+        )
+        localSubscribers = localSubscribers + (info -> LocalSubscriberInfo(sink, wsResponseActor))
+        replyTo ! info
 
-        case c@Changed(`adminDataKey`) ⇒
-          val data = c.get(adminDataKey)
-          streams = data.elements
-          log.info("Current streams: {}", streams)
+      case DeleteSubscription(id, replyTo) =>
+        val s = subscriptions.find(_.id == id)
+        s.foreach { info =>
+          log.info("Removing Subscription with id: {}", info)
+          replicator ! new Update(accessDataKey, WriteLocal, accessInfoUpdateResponseAdapter, None)(
+            _.getOrElse(ORSet.empty[AccessInfo].remove(info))
+          )
+        }
+        replyTo ! id
 
-        case AddSubscription(name, id, sink, wsResponseActor) =>
-          log.info(s"Adding Subscription to stream $name with id $id")
-          val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, id)
-          replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal, accessInfoUpdateResponseAdapter)(_ + info)
-          localSubscribers = localSubscribers + (info -> LocalSubscriberInfo(sink, wsResponseActor))
-          sender() ! info
+      // --- Sends a request to get the list of subscriptions (See the following cases for the response) ---
+      case ListSubscriptions(replyTo) =>
+        replyTo ! subscriptions
 
-        case DeleteSubscription(id) =>
-          val s = subscriptions.find(_.id == id)
-          s.foreach { info =>
-            log.info("Removing Subscription with id: {}", info)
-            replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal, accessInfoUpdateResponseAdapter)(_ - info)
-          }
-          sender() ! id
+      case Publish(streamName, source, dist, replyTo) =>
+        val subscriberSet = subscriptions.filter(_.streamName == streamName)
+        val f = if (subscriberSet.isEmpty) {
+          // No subscribers, so just ignore
+          source.runWith(Sink.ignore)
+        } else {
+          // Publish to subscribers and
+          publish(streamName, subscriberSet, source, dist)
+        }
+        // reply with Done when done
+        f.foreach(replyTo ! _)
 
-        // --- Sends a request to get the list of subscriptions (See the following cases for the response) ---
-        case ListSubscriptions =>
-          sender() ! subscriptions
+      case internal: InternalMsg =>
+        internal match {
+          case StreamInfoUpdateResponse(_) => Behaviors.same
+          case AccessInfoUpdateResponse(_) => Behaviors.same
 
-        case c@Changed(`accessDataKey`) ⇒
-          val data = c.get(accessDataKey)
-          subscriptions = data.elements
-          log.info("Current subscriptions: {}", subscriptions)
+          case StreamInfoChanged(c) =>
+            val data = c.get(adminDataKey)
+            streams = data.elements
+            log.info("Current streams: {}", streams)
 
-        case Publish(streamName, source, dist) =>
-          val subscriberSet = subscriptions.filter(_.streamName == streamName)
-          val f = if (subscriberSet.isEmpty) {
-            // No subscribers, so just ignore
-            source.runWith(Sink.ignore)
-          } else {
-            // Publish to subscribers and
-            publish(streamName, subscriberSet, source, dist)
-          }
-          // reply with Done when done
-          pipe(f) to sender()
-
-      }
+          case AccessInfoChanged(c) =>
+            val data = c.get(accessDataKey)
+            subscriptions = data.elements
+            log.info("Current subscriptions: {}", subscriptions)
+        }
     }
+    Behaviors.same
+  }
 
   /**
    * Publishes the contents of the given data source to the given set of subscribers and returns a future that completes when
@@ -248,7 +296,7 @@ private[server] class SharedDataActor(replicator: ActorRef[Replicator.Command], 
 
     // Wait for the client to acknowledge the message
     def waitForAck(a: AccessInfo): Future[Any] = {
-      localSubscribers(a).wsResponseActor ? WebsocketResponseActor.Get
+      localSubscribers(a).wsResponseActor.ask(WebsocketResponseActor.Get)
     }
 
     // Send data for a remote subscriber as HTTP POST to the server hosting its websocket
@@ -332,7 +380,7 @@ private[server] class SharedDataActor(replicator: ActorRef[Replicator.Command], 
   private def checkRemoteConnections(remoteHostSet: Set[ServerInfo]): Unit = {
     remoteHostSet.foreach { h =>
       if (!remoteConnections.contains(h)) {
-        remoteConnections = remoteConnections + (h -> Http().outgoingConnection(h.host, h.port))
+        remoteConnections = remoteConnections + (h -> Http()(ctx.system.toUntyped).outgoingConnection(h.host, h.port))
       }
     }
   }

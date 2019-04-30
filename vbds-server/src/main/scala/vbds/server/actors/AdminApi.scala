@@ -1,8 +1,8 @@
 package vbds.server.actors
 
-import akka.actor.{ActorRef, ActorSystem}
-import akka.pattern.ask
+import akka.actor.typed.ActorRef
 import akka.util.Timeout
+import vbds.server.actors.SharedDataActor.SharedDataActorMessages
 import vbds.server.models.StreamInfo
 
 import scala.concurrent.Future
@@ -25,13 +25,10 @@ trait AdminApi {
 /**
   * A wrapper around the admin API of the shared data actor.
   */
-class AdminApiImpl(sharedDataActor: ActorRef)(implicit system: ActorSystem,
-                                              timeout: Timeout = Timeout(
-                                                3.seconds))
+class AdminApiImpl(sharedDataActor: ActorRef[SharedDataActorMessages])(implicit timeout: Timeout = Timeout(3.seconds))
     extends AdminApi {
 
   import SharedDataActor._
-  import system.dispatcher
 
   def listStreams(): Future[Set[StreamInfo]] = {
     (sharedDataActor ? ListStreams).mapTo[Set[StreamInfo]]

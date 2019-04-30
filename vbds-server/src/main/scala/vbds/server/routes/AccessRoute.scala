@@ -2,7 +2,7 @@ package vbds.server.routes
 
 import java.util.UUID
 
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior}
+import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
 import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.model.StatusCodes
@@ -13,53 +13,48 @@ import akka.stream.scaladsl.{Flow, MergeHub, Sink}
 import akka.util.ByteString
 import vbds.server.actors.{AccessApi, AdminApi}
 import vbds.server.models.JsonSupport
-import AccessRoute.WebsocketResponseActor._
-import vbds.server.routes.AccessRoute.WebsocketResponseActor
+import WebsocketResponseActor._
 
-object AccessRoute {
+// Actor to handle ACK responses from websocket clients
+object WebsocketResponseActor {
 
-  // Actor to handle ACK responses from websocket clients
-  object WebsocketResponseActor {
+  sealed trait WebsocketResponseActorMsg
 
-    sealed trait WebsocketResponseActorMsg
+  // Responds with Ack if there is a response from the ws client
+  final case class Get(replyTo: ActorRef[Ack.type]) extends WebsocketResponseActorMsg
 
-    // Responds with Ack if there is a response from the ws client
-    final case class Get(replyTo: ActorRef[Ack.type]) extends WebsocketResponseActorMsg
+  // Says there was a response from the ws client
+  final case object Put extends WebsocketResponseActorMsg
 
-    // Says there was a response from the ws client
-    final case object Put extends WebsocketResponseActorMsg
+  // Reponse to Get message
+  final case object Ack
 
-    // Reponse to Get message
-    final case object Ack
+  def apply(): Behavior[WebsocketResponseActorMsg] = Behaviors.setup(ctx => new WebsocketResponseActor(ctx))
+}
 
-    def apply(): Behavior[WebsocketResponseActorMsg] = Behaviors.setup(ctx => new WebsocketResponseActor(ctx))
+class WebsocketResponseActor(ctx: ActorContext[WebsocketResponseActorMsg]) extends AbstractBehavior[WebsocketResponseActorMsg] {
+
+  override def onMessage(msg: WebsocketResponseActorMsg): Behavior[WebsocketResponseActorMsg] = {
+    receiveResponses(1, Nil)
   }
 
-  class WebsocketResponseActor(ctx: ActorContext[WebsocketResponseActorMsg]) extends AbstractBehavior[WebsocketResponseActorMsg] {
+  def receiveResponses(responses: Int, senders: List[ActorRef[Ack.type]]): Behavior[WebsocketResponseActorMsg] = {
+    case Put =>
+      if (senders.nonEmpty) {
+        senders.last ! Ack
+        receiveResponses(responses, senders.dropRight(1))
+      } else {
+        receiveResponses(responses + 1, Nil)
+      }
 
-    override def onMessage(msg: WebsocketResponseActorMsg): Behavior[WebsocketResponseActorMsg] = {
-      receiveResponses(1, Nil)
-    }
-
-    def receiveResponses(responses: Int, senders: List[ActorRef[Ack.type]]): Behavior[WebsocketResponseActorMsg] = {
-      case Put =>
-        if (senders.nonEmpty) {
-          senders.last ! Ack
-          receiveResponses(responses, senders.dropRight(1))
-        } else {
-          receiveResponses(responses + 1, Nil)
-        }
-
-      case Get(replyTo) =>
-        if (responses > 0) {
-          replyTo ! Ack
-          receiveResponses(responses - 1, senders)
-        } else {
-          receiveResponses(0, replyTo :: senders)
-        }
-    }
+    case Get(replyTo) =>
+      if (responses > 0) {
+        replyTo ! Ack
+        receiveResponses(responses - 1, senders)
+      } else {
+        receiveResponses(0, replyTo :: senders)
+      }
   }
-
 }
 
 /**
@@ -67,8 +62,7 @@ object AccessRoute {
  *
  * @param adminData used to access the distributed list of streams (using cluster + CRDT)
  */
-class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val system: ActorSystem[_],
-                                                              implicit val mat: ActorMaterializer)
+class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit mat: ActorMaterializer)
     extends Directives
     with JsonSupport {
 
@@ -78,8 +72,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val syste
     override def getClazz(o: AnyRef): Class[_] = o.getClass
   }
 
-  import system.log
-
+  val log = Logging(system, this)
 
   val route =
     pathPrefix("vbds" / "access" / "streams") {

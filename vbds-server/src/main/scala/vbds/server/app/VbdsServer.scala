@@ -42,13 +42,13 @@ object VbdsServer {
    * @param akkaHost     akka ActorSystem bind host
    * @param akkaPort     akka ActorSystem port (0 for random)
    * @param clusterSeeds list of cluster seeds in the form host:port,host:port,... (Required even for seed node)
-   * @return a pair of the server instance, which can be used to stop the server, and http server binding
+   * @return the root actor system
    */
   def start(httpHost: String,
             httpPort: Int,
             akkaHost: String,
             akkaPort: Int,
-            clusterSeeds: String): (VbdsServer, Future[Http.ServerBinding]) = {
+            clusterSeeds: String): ActorSystem[SharedDataActorMessages] = {
 
     val seedNodes = getSeedNodes(clusterSeeds)
 
@@ -61,61 +61,42 @@ object VbdsServer {
                $seedNodes
             """).withFallback(ConfigFactory.load())
 
-    implicit val system = akka.actor.ActorSystem(systemName, config)
-    implicit val typedSystem: ActorSystem[_] = system.toTyped
-
-    implicit val mat    = ActorMaterializer()
-    import system.dispatcher
-
-    // Initialize the cluster for replicating the data
-    val replicator      = DistributedData(typedSystem).replicator
-    implicit val node   = Cluster(typedSystem)
-
-    val sharedDataActor = system.actorOf(SharedDataActor.props(replicator))
-    val server          = new VbdsServer(sharedDataActor)
-    val f               = server.start(httpHost, httpPort)
-    // Need to know this http server's address when subscribing
-    f.foreach { binding =>
-      sharedDataActor ! LocalAddress(new InetSocketAddress(httpHost, binding.localAddress.getPort))
-    }
-    (server, f)
+    ActorSystem(SharedDataActor(httpHost, httpPort), systemName, config)
   }
 }
 
-/**
- * Top level class for the VIZ Bulk Data System (VBDS).
- *
- * @param sharedDataActor the cluster actor that shares data on streams and subscribers
- * @param system          the cluster actor system
- * @param mat             required for akka streams
- */
-class VbdsServer(sharedDataActor: ActorRef[SharedDataActorMessages])(implicit system: ActorSystem[_], mat: ActorMaterializer) {
+///**
+// * Top level class for the VIZ Bulk Data System (VBDS).
+// *
+// * @param sharedDataActor the cluster actor that shares data on streams and subscribers
+// */
+//class VbdsServer(sharedDataActor: ActorRef[SharedDataActorMessages]) {
+//
+//  implicit val ec: ExecutionContext = system.executionContext
+//
+//  private val adminApi    = new AdminApiImpl(sharedDataActor)
+//  private val accessApi   = new AccessApiImpl(sharedDataActor)
+//  private val transferApi = new TransferApiImpl(sharedDataActor, accessApi)
+//
+//  private val adminRoute    = new AdminRoute(adminApi)
+//  private val accessRoute   = new AccessRoute(adminApi, accessApi)
+//  private val transferRoute = new TransferRoute(adminApi, accessApi, transferApi)
+//  private val route         = adminRoute.route ~ accessRoute.route ~ transferRoute.route
 
-  implicit val ec: ExecutionContext        = system.executionContext
+//  /**
+//   * Starts the server on the given host and port
+//   *
+//   * @return the future server binding
+//   */
+//  private def start(host: String, port: Int): Future[Http.ServerBinding] =
+//    Http().bindAndHandle(route, host, port)
 
-  private val adminApi    = new AdminApiImpl(sharedDataActor)
-  private val accessApi   = new AccessApiImpl(sharedDataActor)
-  private val transferApi = new TransferApiImpl(sharedDataActor, accessApi)
-
-  private val adminRoute    = new AdminRoute(adminApi)
-  private val accessRoute   = new AccessRoute(adminApi, accessApi)
-  private val transferRoute = new TransferRoute(adminApi, accessApi, transferApi)
-  private val route         = adminRoute.route ~ accessRoute.route ~ transferRoute.route
-
-  /**
-   * Starts the server on the given host and port
-   *
-   * @return the future server binding
-   */
-  private def start(host: String, port: Int): Future[Http.ServerBinding] =
-    Http().bindAndHandle(route, host, port)
-
-  /**
-   * Stops the server
-   *
-   * @param binding the return value from start()
-   */
-  def stop(binding: Http.ServerBinding): Unit =
-    binding.unbind().onComplete(_ => system.terminate())
-
-}
+//  /**
+//   * Stops the server
+//   *
+//   * @param binding the return value from start()
+//   */
+//  def stop(binding: Http.ServerBinding): Unit =
+//    binding.unbind().onComplete(_ => system.terminate())
+//
+//}

@@ -4,11 +4,10 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives
 import vbds.server.actors.{AccessApi, AdminApi, TransferApi}
 import vbds.server.models.JsonSupport
-import akka.actor.ActorSystem
 import akka.event.{LogSource, Logging}
 import vbds.server.marshalling.BinaryMarshallers
-import akka.stream.Materializer
 import akka.stream.scaladsl.Source
+import akka.stream.typed.scaladsl.ActorMaterializer
 import akka.util.ByteString
 
 /**
@@ -16,8 +15,7 @@ import akka.util.ByteString
  *
  * @param adminApi used to access the distributed list of streams (using cluster + CRDT)
  */
-class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: TransferApi)(implicit val system: ActorSystem,
-                                                                                        implicit val mat: Materializer)
+class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: TransferApi)(implicit val mat: ActorMaterializer)
     extends Directives
     with JsonSupport
     with BinaryMarshallers {
