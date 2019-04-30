@@ -1,12 +1,14 @@
 package vbds.server.actors
 
+import akka.actor.Scheduler
 import akka.actor.typed.ActorRef
 import akka.util.Timeout
 import vbds.server.actors.SharedDataActor.SharedDataActorMessages
 import vbds.server.models.StreamInfo
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import akka.actor.typed.scaladsl.AskPattern._
 
 /**
   * Internal Admin API
@@ -25,13 +27,13 @@ trait AdminApi {
 /**
   * A wrapper around the admin API of the shared data actor.
   */
-class AdminApiImpl(sharedDataActor: ActorRef[SharedDataActorMessages])(implicit timeout: Timeout = Timeout(3.seconds))
+class AdminApiImpl(sharedDataActor: ActorRef[SharedDataActorMessages])(implicit scheduler: Scheduler, ec: ExecutionContext, timeout: Timeout = Timeout(3.seconds))
     extends AdminApi {
 
   import SharedDataActor._
 
   def listStreams(): Future[Set[StreamInfo]] = {
-    (sharedDataActor ? ListStreams).mapTo[Set[StreamInfo]]
+    sharedDataActor.ask(ListStreams)
   }
 
   def streamExists(name: String): Future[Boolean] = {
@@ -39,10 +41,10 @@ class AdminApiImpl(sharedDataActor: ActorRef[SharedDataActorMessages])(implicit 
   }
 
   def addStream(name: String, contentType: String): Future[StreamInfo] = {
-    (sharedDataActor ? AddStream(name, contentType)).mapTo[StreamInfo]
+    sharedDataActor.ask(AddStream(name, contentType, _))
   }
 
   def deleteStream(name: String): Future[StreamInfo] = {
-    (sharedDataActor ? DeleteStream(name)).mapTo[StreamInfo]
+    sharedDataActor.ask(DeleteStream(name, _))
   }
 }

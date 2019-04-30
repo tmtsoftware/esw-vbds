@@ -1,20 +1,9 @@
 package vbds.server.app
 
-import java.net.InetSocketAddress
-
 import akka.actor.typed._
-import akka.cluster.typed._
-import akka.actor.typed.scaladsl.adapter.UntypedActorSystemOps
-import akka.cluster.ddata.typed.scaladsl.DistributedData
-import akka.stream.typed.scaladsl.ActorMaterializer
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.RouteConcatenation._
 import com.typesafe.config.ConfigFactory
-import vbds.server.actors.SharedDataActor.{LocalAddress, SharedDataActorMessages}
-import vbds.server.actors.{AccessApiImpl, AdminApiImpl, SharedDataActor, TransferApiImpl}
-import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute}
-
-import scala.concurrent.{ExecutionContext, Future}
+import vbds.server.actors.SharedDataActor.SharedDataActorMessages
+import vbds.server.actors.SharedDataActor
 
 object VbdsServer {
 
@@ -64,39 +53,3 @@ object VbdsServer {
     ActorSystem(SharedDataActor(httpHost, httpPort), systemName, config)
   }
 }
-
-///**
-// * Top level class for the VIZ Bulk Data System (VBDS).
-// *
-// * @param sharedDataActor the cluster actor that shares data on streams and subscribers
-// */
-//class VbdsServer(sharedDataActor: ActorRef[SharedDataActorMessages]) {
-//
-//  implicit val ec: ExecutionContext = system.executionContext
-//
-//  private val adminApi    = new AdminApiImpl(sharedDataActor)
-//  private val accessApi   = new AccessApiImpl(sharedDataActor)
-//  private val transferApi = new TransferApiImpl(sharedDataActor, accessApi)
-//
-//  private val adminRoute    = new AdminRoute(adminApi)
-//  private val accessRoute   = new AccessRoute(adminApi, accessApi)
-//  private val transferRoute = new TransferRoute(adminApi, accessApi, transferApi)
-//  private val route         = adminRoute.route ~ accessRoute.route ~ transferRoute.route
-
-//  /**
-//   * Starts the server on the given host and port
-//   *
-//   * @return the future server binding
-//   */
-//  private def start(host: String, port: Int): Future[Http.ServerBinding] =
-//    Http().bindAndHandle(route, host, port)
-
-//  /**
-//   * Stops the server
-//   *
-//   * @param binding the return value from start()
-//   */
-//  def stop(binding: Http.ServerBinding): Unit =
-//    binding.unbind().onComplete(_ => system.terminate())
-//
-//}

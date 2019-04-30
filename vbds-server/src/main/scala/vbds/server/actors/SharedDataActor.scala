@@ -124,7 +124,6 @@ private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages]
   import ctx.log
   implicit val ec: ExecutionContext = ctx.executionContext
   implicit val scheduler            = ctx.system.scheduler
-
   implicit val node = DistributedData(ctx.system).selfUniqueAddress
   implicit val mat  = ActorMaterializer()(ctx.system)
 
@@ -150,12 +149,12 @@ private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages]
   var remoteConnections = Map[ServerInfo, Flow[HttpRequest, HttpResponse, _]]()
 
   // Key for sharing the list of streams in the cluster
-  val adminDataKey = ORSetKey[StreamInfo]("streamInfo")
+  val adminDataKey: ORSetKey[StreamInfo] = ORSetKey[StreamInfo]("streamInfo")
 
   // Key for sharing the subscriber information in the cluster
   val accessDataKey = ORSetKey[AccessInfo]("accessInfo")
 
-  // Adapter used so that typed actor can receive and respond to cluster messages
+  // Adapters used so that typed actor can receive and respond to cluster messages
   val streamInfoChangedAdapter: ActorRef[Changed[ORSetKey[StreamInfo]]] = ctx.messageAdapter(StreamInfoChanged.apply)
   val accessInfoChangedAdapter: ActorRef[Changed[ORSetKey[AccessInfo]]] = ctx.messageAdapter(AccessInfoChanged.apply)
   val streamInfoUpdateResponseAdapter: ActorRef[UpdateResponse[ORSetKey[StreamInfo]]] =
@@ -164,24 +163,6 @@ private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages]
     ctx.messageAdapter(AccessInfoUpdateResponse.apply)
 
   startHttpServer()
-
-  private def startHttpServer(): Unit = {
-    val adminApi    = new AdminApiImpl(ctx.self)
-    val accessApi   = new AccessApiImpl(ctx.self)
-    val transferApi = new TransferApiImpl(ctx.self, accessApi)
-
-    val adminRoute    = new AdminRoute(adminApi)
-    val accessRoute   = new AccessRoute(adminApi, accessApi)
-    val transferRoute = new TransferRoute(adminApi, accessApi, transferApi)
-    val route         = adminRoute.route ~ accessRoute.route ~ transferRoute.route
-    Http()(ctx.system.toUntyped).bindAndHandle(route, httpHost, httpPort)
-  }
-
-  //    val f               = server.start(httpHost, httpPort)
-  //    // Need to know this http server's address when subscribing
-  //    f.foreach { binding =>
-  //      sharedDataActor ! LocalAddress(new InetSocketAddress(httpHost, binding.localAddress.getPort))
-  //    }
 
   // Subscribe to the shared cluster info (CRDT)
   replicator ! Replicator.Subscribe(adminDataKey, streamInfoChangedAdapter)
@@ -266,6 +247,29 @@ private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages]
         }
     }
     Behaviors.same
+  }
+
+  // Starts the HTTP server, which is the public API
+  // TODO: Provide a clean way to shutdown the server
+  private def startHttpServer(): Unit = {
+    val adminApi    = new AdminApiImpl(ctx.self)
+    val accessApi   = new AccessApiImpl(ctx.self)
+    val transferApi = new TransferApiImpl(ctx.self, accessApi)
+
+    val adminRoute    = new AdminRoute(adminApi)
+    val accessRoute   = new AccessRoute(adminApi, accessApi, ctx)
+    val transferRoute = new TransferRoute(adminApi, accessApi, transferApi, ctx)
+    val route         = adminRoute.route ~ accessRoute.route ~ transferRoute.route
+    val bindingF      = Http()(ctx.system.toUntyped).bindAndHandle(route, httpHost, httpPort)
+    // Need to know this http server's address when subscribing
+    bindingF.onComplete {
+      case Success(binding) =>
+        println(s"HTTP Server running on: http:/${binding.localAddress}")
+        ctx.self ! LocalAddress(new InetSocketAddress(httpHost, binding.localAddress.getPort))
+      case Failure(error) =>
+        println(error)
+        System.exit(1)
+    }
   }
 
   /**

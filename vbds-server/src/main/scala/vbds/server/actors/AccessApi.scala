@@ -1,15 +1,17 @@
 package vbds.server.actors
 
 import akka.NotUsed
-import akka.actor.typed.{ActorRef, ActorSystem}
+import akka.actor.Scheduler
+import akka.actor.typed.ActorRef
 import akka.stream.scaladsl.Sink
 import akka.util.ByteString
 import akka.util.Timeout
 import vbds.server.actors.SharedDataActor.SharedDataActorMessages
 import vbds.server.models.AccessInfo
-import vbds.server.routes.AccessRoute.WebsocketResponseActor.WebsocketResponseActorMsg
+import akka.actor.typed.scaladsl.AskPattern._
+import vbds.server.routes.WebsocketResponseActor.WebsocketResponseActorMsg
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
 
 /**
@@ -31,7 +33,7 @@ trait AccessApi {
 /**
  * Uses the sharedDataActor to distribute subscription info, while saving the associated subscriber sinks locally in a map.
  */
-class AccessApiImpl(sharedDataActor: ActorRef[SharedDataActorMessages])(implicit timeout: Timeout = Timeout(3.seconds))
+class AccessApiImpl(sharedDataActor: ActorRef[SharedDataActorMessages])(implicit scheduler: Scheduler, ec: ExecutionContext, timeout: Timeout = Timeout(3.seconds))
     extends AccessApi {
   import SharedDataActor._
 
@@ -39,11 +41,11 @@ class AccessApiImpl(sharedDataActor: ActorRef[SharedDataActorMessages])(implicit
                       id: String,
                       sink: Sink[ByteString, NotUsed],
                       wsResponseActor: ActorRef[WebsocketResponseActorMsg]): Future[AccessInfo] = {
-    (sharedDataActor ? AddSubscription(streamName, id, sink, wsResponseActor)).mapTo[AccessInfo]
+    sharedDataActor.ask(AddSubscription(streamName, id, sink, wsResponseActor, _))
   }
 
   def listSubscriptions(): Future[Set[AccessInfo]] = {
-    (sharedDataActor ? ListSubscriptions).mapTo[Set[AccessInfo]]
+    sharedDataActor.ask(ListSubscriptions)
   }
 
   def subscriptionExists(id: String): Future[Boolean] = {
@@ -51,6 +53,6 @@ class AccessApiImpl(sharedDataActor: ActorRef[SharedDataActorMessages])(implicit
   }
 
   def deleteSubscription(id: String): Future[Unit] = {
-    (sharedDataActor ? DeleteSubscription(id)).map(_ => ())
+    sharedDataActor.ask(DeleteSubscription(id, _)).map(_ => ())
   }
 }

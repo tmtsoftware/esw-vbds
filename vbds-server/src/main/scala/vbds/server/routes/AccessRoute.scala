@@ -14,6 +14,8 @@ import akka.util.ByteString
 import vbds.server.actors.{AccessApi, AdminApi}
 import vbds.server.models.JsonSupport
 import WebsocketResponseActor._
+import akka.actor.typed.scaladsl.adapter._
+import vbds.server.actors.SharedDataActor.SharedDataActorMessages
 
 // Actor to handle ACK responses from websocket clients
 object WebsocketResponseActor {
@@ -62,8 +64,9 @@ class WebsocketResponseActor(ctx: ActorContext[WebsocketResponseActorMsg]) exten
  *
  * @param adminData used to access the distributed list of streams (using cluster + CRDT)
  */
-class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit mat: ActorMaterializer)
-    extends Directives
+class AccessRoute(adminData: AdminApi, accessData: AccessApi, ctx: ActorContext[SharedDataActorMessages])(
+    implicit mat: ActorMaterializer
+) extends Directives
     with JsonSupport {
 
   implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
@@ -72,7 +75,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit mat: Acto
     override def getClazz(o: AnyRef): Class[_] = o.getClass
   }
 
-  val log = Logging(system, this)
+  val log = Logging(ctx.system.toUntyped, this)
 
   val route =
     pathPrefix("vbds" / "access" / "streams") {
@@ -92,7 +95,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit mat: Acto
               // This provides a Sink that feeds the Source.
               val (sink, source)  = MergeHub.source[ByteString](1).preMaterialize()
               val id              = UUID.randomUUID().toString
-              val wsResponseActor = system.actorOf(WebsocketResponseActor.props())
+              val wsResponseActor = ctx.spawnAnonymous(WebsocketResponseActor())
 
               // Input from client ws
               val inSink = Flow[Message]
@@ -104,7 +107,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit mat: Acto
                 .to(Sink.onComplete[Message] { _ =>
                   log.info(s"Deleting subscription with id $id after client closed websocket connection")
                   accessData.deleteSubscription(id)
-                  system.stop(wsResponseActor)
+                  ctx.stop(wsResponseActor)
                 })
 
               onSuccess(accessData.addSubscription(name, id, sink, wsResponseActor)) { _ =>

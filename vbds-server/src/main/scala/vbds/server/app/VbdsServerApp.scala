@@ -1,8 +1,5 @@
 package vbds.server.app
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Failure, Success}
-
 /**
  * VIZ Bulk Data System HTTP server and Akka cluster.
  * This is the command line app used to start the server.
@@ -71,13 +68,6 @@ object VbdsServerApp extends App {
       System.exit(1)
     }
 
-    val (server, bindingF) = VbdsServer.start(httpHost, httpPort, akkaHost, akkaPort, clusterSeeds)
-    bindingF.onComplete {
-      case Success(binding) =>
-        println(s"HTTP Server running on: http:/${binding.localAddress}")
-      case Failure(error) =>
-        println(error)
-        System.exit(1)
-    }
+    VbdsServer.start(httpHost, httpPort, akkaHost, akkaPort, clusterSeeds)
   }
 }
