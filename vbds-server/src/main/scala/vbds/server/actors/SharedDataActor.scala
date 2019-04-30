@@ -15,7 +15,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest, HttpResponse}
 
 import scala.concurrent.duration._
-import akka.http.scaladsl.server.RouteConcatenation._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -28,6 +27,7 @@ import akka.actor.typed.scaladsl.AskPattern._
 import vbds.server.routes.WebsocketResponseActor.WebsocketResponseActorMsg
 import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute, WebsocketResponseActor}
 import akka.actor.typed.scaladsl.adapter._
+import akka.http.scaladsl.server.Directives._
 
 /**
  * Defines messages handled by the actor
@@ -257,7 +257,8 @@ private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages]
     val accessRoute   = new AccessRoute(adminApi, accessApi, ctx)
     val transferRoute = new TransferRoute(adminApi, accessApi, transferApi, ctx)
     val route         = adminRoute.route ~ accessRoute.route ~ transferRoute.route
-    val bindingF      = Http()(ctx.system.toUntyped).bindAndHandle(route, httpHost, httpPort)
+    implicit val untypedSystem = ctx.system.toUntyped
+    val bindingF      = Http().bindAndHandle(route, httpHost, httpPort)
     // Need to know this http server's address when subscribing
     bindingF.onComplete {
       case Success(binding) =>
