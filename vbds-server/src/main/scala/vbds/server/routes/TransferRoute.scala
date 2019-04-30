@@ -18,7 +18,10 @@ import vbds.server.actors.SharedDataActor.SharedDataActorMessages
  *
  * @param adminApi used to access the distributed list of streams (using cluster + CRDT)
  */
-class TransferRoute(adminApi: AdminApi, accessApi: AccessApi, transferApi: TransferApi, ctx: ActorContext[SharedDataActorMessages])(implicit val mat: ActorMaterializer)
+class TransferRoute(adminApi: AdminApi,
+                    accessApi: AccessApi,
+                    transferApi: TransferApi,
+                    ctx: ActorContext[SharedDataActorMessages])(implicit val mat: ActorMaterializer)
     extends Directives
     with JsonSupport
     with BinaryMarshallers {

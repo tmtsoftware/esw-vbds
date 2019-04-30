@@ -40,23 +40,26 @@ class WebsocketResponseActor(ctx: ActorContext[WebsocketResponseActorMsg]) exten
     receiveResponses(1, Nil)
   }
 
-  def receiveResponses(responses: Int, senders: List[ActorRef[Ack.type]]): Behavior[WebsocketResponseActorMsg] = {
-    case Put =>
-      if (senders.nonEmpty) {
-        senders.last ! Ack
-        receiveResponses(responses, senders.dropRight(1))
-      } else {
-        receiveResponses(responses + 1, Nil)
-      }
+  def receiveResponses(responses: Int, senders: List[ActorRef[Ack.type]]): Behavior[WebsocketResponseActorMsg] =
+    Behaviors.receive { (_, message) =>
+      message match {
+        case Put =>
+          if (senders.nonEmpty) {
+            senders.last ! Ack
+            receiveResponses(responses, senders.dropRight(1))
+          } else {
+            receiveResponses(responses + 1, Nil)
+          }
 
-    case Get(replyTo) =>
-      if (responses > 0) {
-        replyTo ! Ack
-        receiveResponses(responses - 1, senders)
-      } else {
-        receiveResponses(0, replyTo :: senders)
+        case Get(replyTo) =>
+          if (responses > 0) {
+            replyTo ! Ack
+            receiveResponses(responses - 1, senders)
+          } else {
+            receiveResponses(0, replyTo :: senders)
+          }
       }
-  }
+    }
 }
 
 /**

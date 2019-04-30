@@ -4,7 +4,9 @@ import java.net.InetSocketAddress
 
 import akka.{Done, NotUsed}
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
-import akka.cluster.ddata.typed.scaladsl.{DistributedData, Replicator}
+import akka.cluster.ddata.typed.scaladsl.DistributedData
+import akka.cluster.ddata.typed.scaladsl.Replicator._
+
 import akka.stream.ClosedShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
 import akka.util.{ByteString, Timeout}
@@ -19,8 +21,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 import SharedDataActor._
 import akka.actor.typed.{ActorRef, Behavior}
-import akka.cluster.ddata.Replicator.WriteLocal
-import akka.cluster.ddata.typed.scaladsl.Replicator.{Changed, Update, UpdateResponse}
 import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.typed.Cluster
 import akka.stream.typed.scaladsl.ActorMaterializer
@@ -62,13 +62,13 @@ private[server] object SharedDataActor {
   // Used by adapters to receive and respond to cluster messages
   private sealed trait InternalMsg extends SharedDataActorMessages
 
-  private case class StreamInfoChanged(chg: Changed[ORSetKey[StreamInfo]]) extends InternalMsg
+  private case class StreamInfoChanged(chg: Changed[ORSet[StreamInfo]]) extends InternalMsg
 
-  private case class AccessInfoChanged(chg: Changed[ORSetKey[AccessInfo]]) extends InternalMsg
+  private case class AccessInfoChanged(chg: Changed[ORSet[AccessInfo]]) extends InternalMsg
 
-  private case class StreamInfoUpdateResponse(rsp: UpdateResponse[ORSetKey[StreamInfo]]) extends InternalMsg
+  private case class StreamInfoUpdateResponse(rsp: UpdateResponse[ORSet[StreamInfo]]) extends InternalMsg
 
-  private case class AccessInfoUpdateResponse(rsp: UpdateResponse[ORSetKey[AccessInfo]]) extends InternalMsg
+  private case class AccessInfoUpdateResponse(rsp: UpdateResponse[ORSet[AccessInfo]]) extends InternalMsg
 
   /**
    * Represents a remote http server that receives data files that it then distributes to its local subscribers
@@ -155,18 +155,16 @@ private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages]
   val accessDataKey = ORSetKey[AccessInfo]("accessInfo")
 
   // Adapters used so that typed actor can receive and respond to cluster messages
-  val streamInfoChangedAdapter: ActorRef[Changed[ORSetKey[StreamInfo]]] = ctx.messageAdapter(StreamInfoChanged.apply)
-  val accessInfoChangedAdapter: ActorRef[Changed[ORSetKey[AccessInfo]]] = ctx.messageAdapter(AccessInfoChanged.apply)
-  val streamInfoUpdateResponseAdapter: ActorRef[UpdateResponse[ORSetKey[StreamInfo]]] =
-    ctx.messageAdapter(StreamInfoUpdateResponse.apply)
-  val accessInfoUpdateResponseAdapter: ActorRef[UpdateResponse[ORSetKey[AccessInfo]]] =
-    ctx.messageAdapter(AccessInfoUpdateResponse.apply)
+  val streamInfoChangedAdapter = ctx.messageAdapter(StreamInfoChanged.apply)
+  val accessInfoChangedAdapter = ctx.messageAdapter(AccessInfoChanged.apply)
+  val streamInfoUpdateResponseAdapter = ctx.messageAdapter(StreamInfoUpdateResponse.apply)
+  val accessInfoUpdateResponseAdapter = ctx.messageAdapter(AccessInfoUpdateResponse.apply)
 
   startHttpServer()
 
   // Subscribe to the shared cluster info (CRDT)
-  replicator ! Replicator.Subscribe(adminDataKey, streamInfoChangedAdapter)
-  replicator ! Replicator.Subscribe(accessDataKey, accessInfoChangedAdapter)
+  replicator ! Subscribe(adminDataKey, streamInfoChangedAdapter)
+  replicator ! Subscribe(accessDataKey, accessInfoChangedAdapter)
 
   override def onMessage(msg: SharedDataActorMessages): Behavior[SharedDataActorMessages] = {
     msg match {
@@ -250,7 +248,6 @@ private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages]
   }
 
   // Starts the HTTP server, which is the public API
-  // TODO: Provide a clean way to shutdown the server
   private def startHttpServer(): Unit = {
     val adminApi    = new AdminApiImpl(ctx.self)
     val accessApi   = new AccessApiImpl(ctx.self)
