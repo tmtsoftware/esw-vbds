@@ -6,7 +6,6 @@ import akka.{Done, NotUsed}
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
 import akka.cluster.ddata.typed.scaladsl.DistributedData
 import akka.cluster.ddata.typed.scaladsl.Replicator._
-
 import akka.stream.ClosedShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
 import akka.util.{ByteString, Timeout}
@@ -15,12 +14,11 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest, HttpResponse}
 
 import scala.concurrent.duration._
-
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 import SharedDataActor._
 import akka.actor.typed.{ActorRef, Behavior}
-import akka.cluster.ddata.{ORSet, ORSetKey}
+import akka.cluster.ddata.{Key, ORSet, ORSetKey}
 import akka.cluster.typed.Cluster
 import akka.stream.typed.scaladsl.ActorMaterializer
 import akka.actor.typed.scaladsl.AskPattern._
@@ -175,17 +173,20 @@ private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages]
       case AddStream(name, contentType, replyTo) =>
         log.info("Adding: {}: {}", name, contentType)
         val info = StreamInfo(name, contentType)
-        replicator ! new Update(adminDataKey, WriteLocal, streamInfoUpdateResponseAdapter, None)(
-          _.getOrElse(ORSet.empty[StreamInfo] :+ info)
-        )
+        replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal, streamInfoUpdateResponseAdapter)(_ :+ info)
+
+//        replicator ! new Update(adminDataKey, WriteLocal, streamInfoUpdateResponseAdapter, None)(
+//          _.getOrElse(ORSet.empty[StreamInfo] :+ info)
+//        )
         replyTo ! info
 
       case DeleteStream(name, replyTo) =>
         log.info("Removing: {}", name)
         streams.find(_.name == name).foreach { info =>
-          replicator ! new Update(adminDataKey, WriteLocal, streamInfoUpdateResponseAdapter, None)(
-            _.getOrElse(ORSet.empty[StreamInfo].remove(info))
-          )
+          replicator ! Update(adminDataKey, ORSet.empty[StreamInfo], WriteLocal, streamInfoUpdateResponseAdapter)(_.remove(info))
+//          replicator ! new Update(adminDataKey, WriteLocal, streamInfoUpdateResponseAdapter, None)(
+//            _.getOrElse(ORSet.empty[StreamInfo].remove(info))
+//          )
           replyTo ! info
         }
 
@@ -196,9 +197,10 @@ private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages]
       case AddSubscription(name, id, sink, wsResponseActor, replyTo) =>
         log.info(s"Adding Subscription to stream $name with id $id")
         val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, id)
-        replicator ! new Update(accessDataKey, WriteLocal, accessInfoUpdateResponseAdapter, None)(
-          _.getOrElse(ORSet.empty[AccessInfo] :+ info)
-        )
+        replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal, accessInfoUpdateResponseAdapter)(_ :+ info)
+        //        replicator ! new Update(accessDataKey, WriteLocal, accessInfoUpdateResponseAdapter, None)(
+//          _.getOrElse(ORSet.empty[AccessInfo] :+ info)
+//        )
         localSubscribers = localSubscribers + (info -> LocalSubscriberInfo(sink, wsResponseActor))
         replyTo ! info
 
@@ -206,9 +208,10 @@ private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages]
         val s = subscriptions.find(_.id == id)
         s.foreach { info =>
           log.info("Removing Subscription with id: {}", info)
-          replicator ! new Update(accessDataKey, WriteLocal, accessInfoUpdateResponseAdapter, None)(
-            _.getOrElse(ORSet.empty[AccessInfo].remove(info))
-          )
+          replicator ! Update(accessDataKey, ORSet.empty[AccessInfo], WriteLocal, accessInfoUpdateResponseAdapter)(_.remove(info))
+          //          replicator ! new Update(accessDataKey, WriteLocal, accessInfoUpdateResponseAdapter, None)(
+//            _.getOrElse(ORSet.empty[AccessInfo].remove(info))
+//          )
         }
         replyTo ! id
 
@@ -233,12 +236,12 @@ private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages]
           case StreamInfoUpdateResponse(_) => Behaviors.same
           case AccessInfoUpdateResponse(_) => Behaviors.same
 
-          case StreamInfoChanged(c) =>
+          case StreamInfoChanged(c@Changed(`adminDataKey`)) =>
             val data = c.get(adminDataKey)
             streams = data.elements
             log.info("Current streams: {}", streams)
 
-          case AccessInfoChanged(c) =>
+          case AccessInfoChanged(c@Changed(`accessDataKey`)) =>
             val data = c.get(accessDataKey)
             subscriptions = data.elements
             log.info("Current subscriptions: {}", subscriptions)

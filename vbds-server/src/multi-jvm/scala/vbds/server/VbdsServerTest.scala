@@ -161,7 +161,7 @@ class VbdsServerTest(name: String)
     println(s"server1 (seed node) is running on $host")
 
     // Start the first server (the seed node)
-    val (server, bindingF) = VbdsServer.start(
+    val vbdsSystem = VbdsServer.start(
       host,
       server1HttpPort,
       host,
@@ -175,7 +175,7 @@ class VbdsServerTest(name: String)
     within(longTimeout) {
       enterBarrier("receivedFiles")
       println("server1: enterBarrier receivedFiles")
-      bindingF.foreach(server.stop)
+      vbdsSystem.terminate()
     }
   }
 
@@ -186,7 +186,7 @@ class VbdsServerTest(name: String)
     println(s"server2 is running on $host (seed node is $serverHost)")
 
     // Start a second server
-    val (server, bindingF) = VbdsServer.start(
+    val vbdsSystem = VbdsServer.start(
       host,
       server2HttpPort,
       host,
@@ -201,7 +201,7 @@ class VbdsServerTest(name: String)
     within(longTimeout) {
       enterBarrier("receivedFiles")
       println("server2: enterBarrier receivedFiles")
-      bindingF.foreach(server.stop)
+      vbdsSystem.terminate()
     }
   }
 
