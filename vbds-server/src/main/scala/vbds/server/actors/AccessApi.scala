@@ -9,7 +9,7 @@ import akka.util.Timeout
 import vbds.server.actors.SharedDataActor.SharedDataActorMessages
 import vbds.server.models.AccessInfo
 import akka.actor.typed.scaladsl.AskPattern._
-import vbds.server.routes.WebsocketResponseActor.WebsocketResponseActorMsg
+import vbds.server.routes.AccessRoute.WebsocketResponseActorMsg
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._

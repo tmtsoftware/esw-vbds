@@ -22,10 +22,10 @@ import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.typed.Cluster
 import akka.stream.typed.scaladsl.ActorMaterializer
 import akka.actor.typed.scaladsl.AskPattern._
-import vbds.server.routes.WebsocketResponseActor.WebsocketResponseActorMsg
-import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute, WebsocketResponseActor}
+import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute}
 import akka.actor.typed.scaladsl.adapter._
 import akka.http.scaladsl.server.Directives._
+import vbds.server.routes.AccessRoute.WebsocketResponseActorMsg
 
 /**
  * Defines messages handled by the actor
@@ -285,7 +285,7 @@ private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages]
 
     // Wait for the client to acknowledge the message
     def waitForAck(a: AccessInfo): Future[Any] = {
-      localSubscribers(a).wsResponseActor.ask(WebsocketResponseActor.Get)
+      localSubscribers(a).wsResponseActor.ask(AccessRoute.Get)
     }
 
     // Send data for a remote subscriber as HTTP POST to the server hosting its websocket
