@@ -1,0 +1,6 @@
+.idea
+/python-client/python-client.iml
+target
+/venv/
+/web/target/universal/
+/vbds.iml
