@@ -22,7 +22,7 @@ object Common extends AutoPlugin {
       "-unchecked",
       "-deprecation",
       "-Xlint",
-      "-Yno-adapted-args",
+//      "-Yno-adapted-args",
       "-Ywarn-dead-code",
       "-Xfuture"
     ),
@@ -31,11 +31,9 @@ object Common extends AutoPlugin {
       // show full stack traces and test case durations
       Tests.Argument("-oDF")
     ),
-//    resolvers += "twtmt-maven" at "http://dl.bintray.com/twtmt/maven/",
     version := "0.0.1",
-//    fork := true,
     isSnapshot := true,
-    isSnapshot in ThisBuild := true,
+//    isSnapshot in ThisBuild := true,
     parallelExecution in Test := false,
     autoCompilerPlugins := true
 //    if (formatOnCompile) scalafmtOnCompile := true else scalafmtOnCompile := false
