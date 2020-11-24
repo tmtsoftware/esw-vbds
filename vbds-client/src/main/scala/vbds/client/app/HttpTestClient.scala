@@ -4,7 +4,6 @@
 //import akka.actor.ActorSystem
 //import akka.http.scaladsl.Http
 //import akka.http.scaladsl.model.{HttpRequest, Uri}
-//import akka.stream.ActorMaterializer
 //import akka.stream.scaladsl.{Sink, Source}
 //
 //import scala.util.{Failure, Success}
@@ -12,7 +11,6 @@
 //// XXX Temp Test
 //object HttpTestClient {
 //  implicit val system: ActorSystem = ActorSystem("http-pool-test")
-//  implicit val mat: ActorMaterializer = ActorMaterializer()
 //
 //  val connection = Http().cachedHostConnectionPool[Int]("localhost", 4000)
 //

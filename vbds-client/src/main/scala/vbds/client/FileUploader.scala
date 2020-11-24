@@ -8,14 +8,14 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model.Multipart.FormData
 import akka.http.scaladsl.model._
-import akka.stream.{Materializer, ThrottleMode}
+import akka.stream.ThrottleMode
 import akka.stream.scaladsl._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Try
 
-class FileUploader(chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem, implicit val materializer: Materializer) {
+class FileUploader(chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem) {
 
   import system.dispatcher
 

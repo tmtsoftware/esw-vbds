@@ -20,7 +20,6 @@ import SharedDataActor._
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.cluster.ddata.{ORSet, ORSetKey}
 import akka.cluster.typed.Cluster
-import akka.stream.typed.scaladsl.ActorMaterializer
 import akka.actor.typed.scaladsl.AskPattern._
 import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute}
 import akka.actor.typed.scaladsl.adapter._
@@ -115,13 +114,12 @@ private[server] object SharedDataActor {
  * the publish/subscribe features.
  */
 private[server] class SharedDataActor(ctx: ActorContext[SharedDataActorMessages], httpHost: String, httpPort: Int)
-    extends AbstractBehavior[SharedDataActorMessages] {
+    extends AbstractBehavior(ctx) {
 
   import ctx.log
   implicit val ec: ExecutionContext = ctx.executionContext
   implicit val scheduler            = ctx.system.scheduler
   implicit val node = DistributedData(ctx.system).selfUniqueAddress
-  implicit val mat  = ActorMaterializer()(ctx.system)
 
   val replicator = DistributedData(ctx.system).replicator
   val cluster    = Cluster(ctx.system)

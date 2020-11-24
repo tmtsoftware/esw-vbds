@@ -5,7 +5,6 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.ws.{Message, WebSocketRequest}
 import akka.http.scaladsl.model.{HttpResponse, Uri}
-import akka.stream.Materializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import vbds.client.WebSocketListener.SubscribeResult
 
@@ -28,7 +27,7 @@ object WebSocketListener {
 /**
   * Implements client subscription, which opens a websocket to the server
   */
-class WebSocketListener(implicit val system: ActorSystem, implicit val materializer: Materializer) {
+class WebSocketListener(implicit val system: ActorSystem) {
 
   import system.dispatcher
 

@@ -61,9 +61,7 @@ object AccessRoute {
  *
  * @param adminData used to access the distributed list of streams (using cluster + CRDT)
  */
-class AccessRoute(adminData: AdminApi, accessData: AccessApi, ctx: ActorContext[SharedDataActorMessages])(
-    implicit mat: ActorMaterializer
-) extends Directives
+class AccessRoute(adminData: AdminApi, accessData: AccessApi, ctx: ActorContext[SharedDataActorMessages]) extends Directives
     with JsonSupport {
 
   implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {

@@ -7,7 +7,6 @@ import akka.NotUsed
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.util.{ByteString, Timeout}
-import akka.stream.Materializer
 import akka.stream.scaladsl.{Sink, Source}
 
 import scala.concurrent.Future
@@ -53,8 +52,7 @@ object WebSocketActor {
             clientActor: ActorRef,
             outSink: Sink[Message, NotUsed],
             saveFiles: Boolean)(
-      implicit system: ActorSystem,
-      mat: Materializer
+      implicit system: ActorSystem
   ): Props =
     Props(new WebSocketActor(name, streamName, dir, clientActor, outSink, saveFiles))
 }
@@ -68,8 +66,7 @@ class WebSocketActor(name: String,
                      clientActor: ActorRef,
                      outSink: Sink[Message, NotUsed],
                      saveFiles: Boolean)(
-    implicit val system: ActorSystem,
-    implicit val mat: Materializer
+    implicit val system: ActorSystem
 ) extends Actor
     with ActorLogging {
 

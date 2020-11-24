@@ -5,7 +5,6 @@ import java.io.File
 import akka.Done
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.http.scaladsl.model.HttpResponse
-import akka.stream.ActorMaterializer
 import vbds.client.VbdsClient
 
 import scala.concurrent.{Await, Future}
@@ -17,7 +16,6 @@ import vbds.client.WebSocketActor._
  */
 object VbdsClientApp extends App {
   implicit val system       = ActorSystem("vbdsClient")
-  implicit val materializer = ActorMaterializer()
 
   // Command line options
   private case class Options(name: String = "vbds",

@@ -13,7 +13,6 @@ import akka.remote.testkit.MultiNodeSpec
 import akka.testkit.ImplicitSender
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.StatusCodes
-import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.io.FileUtils
@@ -208,7 +207,6 @@ class VbdsServerTest(name: String)
   runOn(subscriber1) {
     val host = system.settings.config.getString("multinode.host")
     println(s"subscriber1 is running on $host")
-    implicit val materializer = ActorMaterializer()
     enterBarrier("deployed")
     val client = new VbdsClient("subscriber1", host, server1HttpPort)
     enterBarrier("streamCreated")
@@ -229,7 +227,6 @@ class VbdsServerTest(name: String)
   runOn(subscriber2) {
     val host = system.settings.config.getString("multinode.host")
     println(s"subscriber2 is running on $host")
-    implicit val materializer = ActorMaterializer()
     enterBarrier("deployed")
     val client = new VbdsClient("subscriber2", host, server2HttpPort)
     enterBarrier("streamCreated")
@@ -249,7 +246,6 @@ class VbdsServerTest(name: String)
   runOn(publisher1) {
     val host = system.settings.config.getString("multinode.host")
     println(s"publisher1 is running on $host")
-    implicit val materializer = ActorMaterializer()
     enterBarrier("deployed")
     val client         = new VbdsClient("publisher1", host, server1HttpPort)
     val createResponse = client.createStream(streamName, "").await(shortTimeout)

@@ -10,7 +10,6 @@ import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.ws.Message
-import akka.stream.Materializer
 import akka.stream.scaladsl.MergeHub
 import vbds.client.VbdsClient.Subscription
 
@@ -33,10 +32,8 @@ object VbdsClient {
  * @param port the HTTP port number to use to access the vbds-server
  * @param chunkSize optional chunk size in bytes for exchanging image data
  * @param system akka actor system
- * @param mat akka actor materializer
  */
-class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem,
-                                                                                      implicit val mat: Materializer) {
+class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem) {
 
   implicit val executionContext = system.dispatcher
   val adminRoute                = "/vbds/admin/streams"

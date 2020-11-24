@@ -4,7 +4,6 @@
 //import akka.actor.ActorSystem
 //import akka.http.scaladsl.Http
 //import akka.http.scaladsl.model.{StatusCodes, Uri}
-//import akka.stream.ActorMaterializer
 //import akka.http.scaladsl.server.Directives._
 //import scala.concurrent.blocking
 //
@@ -14,7 +13,6 @@
 //// XXX Temp Test
 //object HttpTestServer {
 //  implicit val system: ActorSystem = ActorSystem("http-slow-server")
-//  implicit val mat: ActorMaterializer = ActorMaterializer()
 //  import system.dispatcher
 //
 //  def main(args: Array[String]): Unit = {

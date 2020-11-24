@@ -8,7 +8,6 @@ import vbds.server.models.JsonSupport
 import akka.event.{LogSource, Logging}
 import vbds.server.marshalling.BinaryMarshallers
 import akka.stream.scaladsl.Source
-import akka.stream.typed.scaladsl.ActorMaterializer
 import akka.util.ByteString
 import akka.actor.typed.scaladsl.adapter._
 import vbds.server.actors.SharedDataActor.SharedDataActorMessages
@@ -21,7 +20,7 @@ import vbds.server.actors.SharedDataActor.SharedDataActorMessages
 class TransferRoute(adminApi: AdminApi,
                     accessApi: AccessApi,
                     transferApi: TransferApi,
-                    ctx: ActorContext[SharedDataActorMessages])(implicit val mat: ActorMaterializer)
+                    ctx: ActorContext[SharedDataActorMessages])
     extends Directives
     with JsonSupport
     with BinaryMarshallers {
