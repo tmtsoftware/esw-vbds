@@ -40,17 +40,13 @@ class WebSocketListener(implicit val system: ActorSystem) {
   def subscribe(uri: Uri, actorRef: ActorRef, outSource: Source[Message, NotUsed]): VbdsClient.Subscription = {
 
     // A sink that sends messages to the actor, with back pressure
-    val inSink: Sink[Message, NotUsed] = Sink.actorRefWithAck(
+    val inSink: Sink[Message, NotUsed] = Sink.actorRefWithBackpressure(
       actorRef,
       onInitMessage = WebSocketActor.StreamInitialized,
       ackMessage = WebSocketActor.Ack,
       onCompleteMessage = WebSocketActor.StreamCompleted,
-      onFailureMessage = (ex: Throwable) ⇒ WebSocketActor.StreamFailure(ex)
+      onFailureMessage = (ex: Throwable) => WebSocketActor.StreamFailure(ex)
     )
-
-    // Using Source.maybe materializes into a promise which will allow us to complete the source later
-//    val flow: Flow[Message, Message, Promise[Option[Message]]] =
-//      Flow.fromSinkAndSourceMat(inSink, Source.maybe[Message])(Keep.right)
 
     // Creates a Flow from a Sink and a Source where the Flow's input will be sent to the Sink and
     // the Flow's output will come from the Source.

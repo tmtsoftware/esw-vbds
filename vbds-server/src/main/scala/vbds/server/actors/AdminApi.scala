@@ -1,7 +1,6 @@
 package vbds.server.actors
 
-import akka.actor.Scheduler
-import akka.actor.typed.ActorRef
+import akka.actor.typed.{ActorRef, Scheduler}
 import akka.util.Timeout
 import vbds.server.actors.SharedDataActor.SharedDataActorMessages
 import vbds.server.models.StreamInfo

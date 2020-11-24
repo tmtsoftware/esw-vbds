@@ -8,13 +8,11 @@ import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message}
 import akka.http.scaladsl.server.Directives
-import akka.stream._
-import akka.stream.scaladsl.{Flow, MergeHub, Sink}
 import akka.util.ByteString
 import vbds.server.actors.{AccessApi, AdminApi}
 import vbds.server.models.JsonSupport
 import AccessRoute._
-import akka.actor.typed.scaladsl.adapter._
+import akka.stream.scaladsl.{Flow, MergeHub, Sink}
 import vbds.server.actors.SharedDataActor.SharedDataActorMessages
 
 // Actor to handle ACK responses from websocket clients
@@ -64,13 +62,15 @@ object AccessRoute {
 class AccessRoute(adminData: AdminApi, accessData: AccessApi, ctx: ActorContext[SharedDataActorMessages]) extends Directives
     with JsonSupport {
 
+  implicit val actorSystem = ctx.system
+
   implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
     def genString(o: AnyRef): String = o.getClass.getName
 
     override def getClazz(o: AnyRef): Class[_] = o.getClass
   }
 
-  val log = Logging(ctx.system.toUntyped, this)
+  val log = Logging(ctx.system.classicSystem, this)
 
   val route =
     pathPrefix("vbds" / "access" / "streams") {
@@ -106,7 +106,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi, ctx: ActorContext[
                 })
 
               onSuccess(accessData.addSubscription(name, id, sink, wsResponseActor)) { _ =>
-                extractUpgradeToWebSocket { upgrade =>
+                extractWebSocketUpgrade { upgrade =>
                   Cors.cors(complete(upgrade.handleMessagesWithSinkSource(inSink, source.map(BinaryMessage(_)))))
                 }
               }

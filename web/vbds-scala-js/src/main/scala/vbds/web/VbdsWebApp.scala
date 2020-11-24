@@ -216,13 +216,13 @@ class VbdsWebApp {
       val ws = new WebSocket(subscribeUri(stream))
       currentWebSocket = Some(ws)
       ws.binaryType = "arraybuffer"
-      ws.onopen = { _: Event ⇒
+      ws.onopen = { _: Event =>
         println(s"Opened websocket for stream $stream")
       }
-      ws.onerror = { event: Event ⇒
+      ws.onerror = { event: Event =>
         println(s"Error for stream $stream websocket: $event")
       }
-      ws.onmessage = { event: MessageEvent ⇒
+      ws.onmessage = { event: MessageEvent =>
         val arrayBuffer = new Uint8Array(event.data.asInstanceOf[ArrayBuffer])
         println(s"XXX received message with ${arrayBuffer.byteLength} bytes")
         // End marker is a message with one byte ("\n")
@@ -236,7 +236,7 @@ class VbdsWebApp {
           currentImageData = new Uint8Array(arrayBuffer) :: currentImageData
         }
       }
-      ws.onclose = { _: Event ⇒
+      ws.onclose = { _: Event =>
         println(s"Websocket closed for stream $stream")
       }
     }

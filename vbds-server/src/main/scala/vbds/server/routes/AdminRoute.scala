@@ -23,7 +23,7 @@ class AdminRoute(adminData: AdminApi) extends Directives with JsonSupport {
       // Create a stream, Response: OK: Stream name returned as JSON, or 409: Conflict stream exists
       post {
         path(Remaining) { name =>
-          parameters('contentType.?) { contentType =>
+          parameters(Symbol("contentType").?) { contentType =>
             onSuccess(adminData.streamExists(name)) { exists =>
               if (exists) {
                 Cors.cors(complete(Conflict -> s"The stream $name already exists"))

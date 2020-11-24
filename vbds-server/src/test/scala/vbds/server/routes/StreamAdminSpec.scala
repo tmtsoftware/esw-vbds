@@ -1,11 +1,12 @@
 package vbds.server.routes
 
 import akka.http.scaladsl.model.StatusCodes
-import org.scalatest.{Matchers, WordSpec}
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.matchers.should.Matchers
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import vbds.server.models.{JsonSupport, StreamInfo}
 
-class StreamAdminSpec extends WordSpec with Matchers with ScalatestRouteTest with JsonSupport {
+class StreamAdminSpec extends AnyWordSpec with Matchers with ScalatestRouteTest with JsonSupport {
 
   val route = new AdminRoute(new LocalAdminApi(system)).route
 

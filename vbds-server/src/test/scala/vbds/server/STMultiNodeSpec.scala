@@ -3,14 +3,15 @@ package vbds.server
 import akka.remote.testkit.{MultiNodeSpec, MultiNodeSpecCallbacks}
 
 import scala.language.implicitConversions
-import org.scalatest.{BeforeAndAfterAll, WordSpecLike}
-import org.scalatest.Matchers
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.wordspec.AnyWordSpecLike
+import org.scalatest.matchers.should.Matchers
 
 /**
  * Hooks up MultiNodeSpec with ScalaTest
  */
-trait STMultiNodeSpec extends MultiNodeSpecCallbacks with WordSpecLike with Matchers with BeforeAndAfterAll {
-  self: MultiNodeSpec ⇒
+trait STMultiNodeSpec extends MultiNodeSpecCallbacks with AnyWordSpecLike with Matchers with BeforeAndAfterAll {
+  self: MultiNodeSpec =>
 
   override def beforeAll() = multiNodeSpecBeforeAll()
 

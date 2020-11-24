@@ -81,13 +81,13 @@ class WebSocketActor(name: String,
   log.info(s"$name: Started WebSocketActor")
 
   def receive: Receive = {
-    case StreamInitialized ⇒
+    case StreamInitialized =>
       log.info(s"$name: Initialized stream for $streamName")
       count = 0
       newFile()
       sender() ! Ack
 
-    case bm: BinaryMessage ⇒
+    case bm: BinaryMessage =>
       val replyTo = sender()
       val f       = bm.dataStream.mapAsync(1)(bs => self ? HandleByteString(bs)).runWith(Sink.ignore)
       f.onComplete {
@@ -103,10 +103,10 @@ class WebSocketActor(name: String,
     case tm: TextMessage =>
       log.error(s"$name: Wrong message type: $tm")
 
-    case StreamCompleted ⇒
+    case StreamCompleted =>
       log.info(s"$name: Stream completed")
 
-    case StreamFailure(ex) ⇒
+    case StreamFailure(ex) =>
       log.error(ex, s"$name: Stream failed!")
 
     case HandleByteString(bs) =>

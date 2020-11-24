@@ -3,13 +3,12 @@ package vbds.server.routes
 import akka.actor.typed.scaladsl.ActorContext
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives
-import vbds.server.actors.{AccessApi, AdminApi, TransferApi}
+import vbds.server.actors.{AdminApi, TransferApi}
 import vbds.server.models.JsonSupport
 import akka.event.{LogSource, Logging}
 import vbds.server.marshalling.BinaryMarshallers
 import akka.stream.scaladsl.Source
 import akka.util.ByteString
-import akka.actor.typed.scaladsl.adapter._
 import vbds.server.actors.SharedDataActor.SharedDataActorMessages
 
 /**
@@ -18,12 +17,13 @@ import vbds.server.actors.SharedDataActor.SharedDataActorMessages
  * @param adminApi used to access the distributed list of streams (using cluster + CRDT)
  */
 class TransferRoute(adminApi: AdminApi,
-                    accessApi: AccessApi,
                     transferApi: TransferApi,
                     ctx: ActorContext[SharedDataActorMessages])
     extends Directives
     with JsonSupport
     with BinaryMarshallers {
+
+  implicit val actorSystem = ctx.system
 
   implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
     def genString(o: AnyRef): String = o.getClass.getName
@@ -31,7 +31,7 @@ class TransferRoute(adminApi: AdminApi,
     override def getClazz(o: AnyRef): Class[_] = o.getClass
   }
 
-  val log = Logging(ctx.system.toUntyped, this)
+  val log = Logging(ctx.system.classicSystem, this)
 
   val route =
   pathPrefix("vbds" / "transfer" / "streams") {

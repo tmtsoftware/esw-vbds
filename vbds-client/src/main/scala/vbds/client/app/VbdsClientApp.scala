@@ -201,11 +201,10 @@ object VbdsClientApp extends App {
     }
   }
 
-  private def handlePublishResponse(command: String, resp: Future[Done])(implicit system: ActorSystem): Unit = {
-    import system.dispatcher
+  private def handlePublishResponse(command: String, resp: Future[Done]): Unit = {
     val timeout = 10.hours // might be publishing lots of files...
     try {
-      val r = Await.result(resp, timeout)
+      Await.ready(resp, timeout)
       System.exit(0)
     } catch {
       case ex: Exception =>

@@ -155,7 +155,6 @@ class VbdsServerTest(name: String)
   enterBarrier("startup")
 
   runOn(server1) {
-    import system.dispatcher
     val host = system.settings.config.getString("multinode.host")
     println(s"server1 (seed node) is running on $host")
 
@@ -179,7 +178,6 @@ class VbdsServerTest(name: String)
   }
 
   runOn(server2) {
-    import system.dispatcher
     val host       = system.settings.config.getString("multinode.host")
     val serverHost = system.settings.config.getString("multinode.server-host")
     println(s"server2 is running on $host (seed node is $serverHost)")
@@ -210,7 +208,7 @@ class VbdsServerTest(name: String)
     enterBarrier("deployed")
     val client = new VbdsClient("subscriber1", host, server1HttpPort)
     enterBarrier("streamCreated")
-    val promise      = Promise[ReceivedFile]
+    val promise      = Promise[ReceivedFile]()
     val clientActor  = system.actorOf(ClientActor.props("subscriber1", promise, log, subscriber1Delay))
     val subscription = client.subscribe(streamName, getTempDir("subscriber1"), clientActor, doCompareFiles)
     val httpResponse = subscription.httpResponse.await(shortTimeout)
@@ -230,7 +228,7 @@ class VbdsServerTest(name: String)
     enterBarrier("deployed")
     val client = new VbdsClient("subscriber2", host, server2HttpPort)
     enterBarrier("streamCreated")
-    val promise      = Promise[ReceivedFile]
+    val promise      = Promise[ReceivedFile]()
     val clientActor  = system.actorOf(ClientActor.props("subscriber2", promise, log, subscriber2Delay))
     val subscription = client.subscribe(streamName, getTempDir("subscriber2"), clientActor, doCompareFiles)
     val httpResponse = subscription.httpResponse.await(shortTimeout)

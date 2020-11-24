@@ -21,10 +21,13 @@ object Common extends AutoPlugin {
       "-feature",
       "-unchecked",
       "-deprecation",
-      "-Xlint",
-//      "-Yno-adapted-args",
-      "-Ywarn-dead-code",
-      "-Xfuture"
+      //-W Options
+      "-Wdead-code",
+      //-X Options
+      "-Xlint:_,-missing-interpolator",
+      "-Xsource:3",
+      "-Xcheckinit",
+      "-Xasync"
     ),
     javacOptions in (Compile, doc) ++= Seq("-Xdoclint:none"),
     testOptions in Test ++= Seq(
@@ -40,7 +43,7 @@ object Common extends AutoPlugin {
   )
 
 //  private def formatOnCompile = sys.props.get("format.on.compile") match {
-//    case Some("false") ⇒ false
-//    case _             ⇒ true
+//    case Some("false") => false
+//    case _             => true
 //  }
 }

@@ -17,7 +17,7 @@ object VbdsServer {
     if (clusterSeeds.nonEmpty) {
       val seeds = clusterSeeds
         .split(",")
-        .map(s => s""""akka.tcp://$systemName@$s"""")
+        .map(s => s""""akka://$systemName@$s"""")
         .mkString(",")
       s"akka.cluster.seed-nodes=[$seeds]"
     } else throw new IllegalArgumentException("Missing required seed nodes")
