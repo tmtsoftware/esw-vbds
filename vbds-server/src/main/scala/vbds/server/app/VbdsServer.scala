@@ -2,22 +2,22 @@ package vbds.server.app
 
 import akka.actor.typed._
 import com.typesafe.config.ConfigFactory
-import vbds.server.actors.SharedDataActor.SharedDataActorMessages
 import vbds.server.actors.SharedDataActor
+import vbds.server.actors.AkkaTypedExtension.UserActorFactory
 
 object VbdsServer {
 
   /**
    * VBDS ActorSystem name
    */
-  val systemName = "vbds-system"
+  val clusterName = "vbds-system"
 
   // Gets the akka seed nodes config line
   private def getSeedNodes(clusterSeeds: String): String = {
     if (clusterSeeds.nonEmpty) {
       val seeds = clusterSeeds
         .split(",")
-        .map(s => s""""akka://$systemName@$s"""")
+        .map(s => s""""akka://$clusterName@$s"""")
         .mkString(",")
       s"akka.cluster.seed-nodes=[$seeds]"
     } else throw new IllegalArgumentException("Missing required seed nodes")
@@ -37,7 +37,7 @@ object VbdsServer {
             httpPort: Int,
             akkaHost: String,
             akkaPort: Int,
-            clusterSeeds: String): ActorSystem[SharedDataActorMessages] = {
+            clusterSeeds: String): ActorSystem[SpawnProtocol.Command] = {
 
     val seedNodes = getSeedNodes(clusterSeeds)
 
@@ -50,6 +50,8 @@ object VbdsServer {
                $seedNodes
             """).withFallback(ConfigFactory.load())
 
-    ActorSystem(SharedDataActor(httpHost, httpPort), systemName, config)
+    implicit val system = ActorSystem(SpawnProtocol(), clusterName, config)
+    system.spawn(SharedDataActor(httpHost, httpPort), "SharedDataActor")
+    system
   }
 }

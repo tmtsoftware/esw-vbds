@@ -2,19 +2,19 @@ package vbds.server
 
 import java.io.{BufferedOutputStream, File, FileOutputStream}
 
+import akka.actor.typed.{ActorSystem, SpawnProtocol}
 import akka.actor.{Actor, ActorLogging, PoisonPill, Props}
-import akka.remote.testkit.MultiNodeConfig
 import vbds.client.VbdsClient
 import vbds.server.app.VbdsServer
 
 import scala.concurrent.duration.{Duration, DurationLong, FiniteDuration}
 import scala.concurrent.{Await, Future, Promise}
-import akka.remote.testkit.MultiNodeSpec
+import akka.remote.testkit.{MultiNodeConfig, MultiNodeSpec}
 import akka.testkit.ImplicitSender
 import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.StatusCodes
 import akka.stream.scaladsl.{Sink, Source}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import org.apache.commons.io.FileUtils
 import org.scalatest.BeforeAndAfterAll
 import vbds.client.WebSocketActor.ReceivedFile
@@ -41,6 +41,7 @@ object VbdsServerTestConfig extends MultiNodeConfig {
       | akka.testconductor.barrier-timeout = 30m
     """))
 
+  def makeSystem(config: Config): akka.actor.ActorSystem = ActorSystem(SpawnProtocol(), VbdsServer.clusterName, config).classicSystem
 }
 
 class VbdsServerSpecMultiJvmServer1 extends VbdsServerTest("server1")
@@ -142,7 +143,7 @@ object VbdsServerTest {
 }
 
 class VbdsServerTest(name: String)
-    extends MultiNodeSpec(VbdsServerTestConfig)
+    extends MultiNodeSpec(VbdsServerTestConfig, VbdsServerTestConfig.makeSystem)
     with STMultiNodeSpec
     with ImplicitSender
     with BeforeAndAfterAll {

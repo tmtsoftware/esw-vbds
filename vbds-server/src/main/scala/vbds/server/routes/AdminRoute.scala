@@ -10,6 +10,7 @@ import vbds.server.models.JsonSupport
  *
  * @param adminData used to access the distributed list of streams (using cluster + CRDT)
  */
+//noinspection DuplicatedCode
 class AdminRoute(adminData: AdminApi) extends Directives with JsonSupport {
 
   val route =

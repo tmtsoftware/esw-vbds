@@ -2,9 +2,8 @@ package vbds.server.routes
 
 import java.util.UUID
 
-import akka.actor.typed.{ActorRef, Behavior}
-import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
-import akka.event.{LogSource, Logging}
+import akka.actor.typed.{ActorRef, ActorSystem, Behavior, SpawnProtocol}
+import akka.actor.typed.scaladsl.Behaviors
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message}
 import akka.http.scaladsl.server.Directives
@@ -13,7 +12,7 @@ import vbds.server.actors.{AccessApi, AdminApi}
 import vbds.server.models.JsonSupport
 import AccessRoute._
 import akka.stream.scaladsl.{Flow, MergeHub, Sink}
-import vbds.server.actors.SharedDataActor.SharedDataActorMessages
+import vbds.server.actors.AkkaTypedExtension.UserActorFactory
 
 // Actor to handle ACK responses from websocket clients
 object AccessRoute {
@@ -26,12 +25,17 @@ object AccessRoute {
   // Says there was a response from the ws client
   final case object Put extends WebsocketResponseActorMsg
 
+  // Stops the actor
+  final case object Stop extends WebsocketResponseActorMsg
+
   // Reponse to Get message
   final case object Ack
 
   // Actor that handles responses from the websocket
-  private def websocketResponseBehavior(responses: Int = 1,
-                                senders: List[ActorRef[Ack.type]] = Nil): Behavior[WebsocketResponseActorMsg] = {
+  private def websocketResponseBehavior(
+      responses: Int = 1,
+      senders: List[ActorRef[Ack.type]] = Nil
+  ): Behavior[WebsocketResponseActorMsg] = {
     Behaviors.receive { (_, message) =>
       message match {
         case Put =>
@@ -49,6 +53,9 @@ object AccessRoute {
           } else {
             websocketResponseBehavior(0, replyTo :: senders)
           }
+
+        case Stop =>
+          Behaviors.stopped
       }
     }
   }
@@ -59,18 +66,10 @@ object AccessRoute {
  *
  * @param adminData used to access the distributed list of streams (using cluster + CRDT)
  */
-class AccessRoute(adminData: AdminApi, accessData: AccessApi, ctx: ActorContext[SharedDataActorMessages]) extends Directives
-    with JsonSupport {
-
-  implicit val actorSystem = ctx.system
-
-  implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
-    def genString(o: AnyRef): String = o.getClass.getName
-
-    override def getClazz(o: AnyRef): Class[_] = o.getClass
-  }
-
-  val log = Logging(ctx.system.classicSystem, this)
+class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val actorSystem: ActorSystem[SpawnProtocol.Command])
+    extends Directives
+    with JsonSupport
+    with LoggingSupport {
 
   val route =
     pathPrefix("vbds" / "access" / "streams") {
@@ -90,7 +89,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi, ctx: ActorContext[
               // This provides a Sink that feeds the Source.
               val (sink, source)  = MergeHub.source[ByteString](1).preMaterialize()
               val id              = UUID.randomUUID().toString
-              val wsResponseActor = ctx.spawnAnonymous(websocketResponseBehavior())
+              val wsResponseActor = actorSystem.spawn(websocketResponseBehavior(), "wsResponseActor")
 
               // Input from client ws
               val inSink = Flow[Message]
@@ -102,7 +101,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi, ctx: ActorContext[
                 .to(Sink.onComplete[Message] { _ =>
                   log.info(s"Deleting subscription with id $id after client closed websocket connection")
                   accessData.deleteSubscription(id)
-                  ctx.stop(wsResponseActor)
+                  wsResponseActor ! AccessRoute.Stop
                 })
 
               onSuccess(accessData.addSubscription(name, id, sink, wsResponseActor)) { _ =>

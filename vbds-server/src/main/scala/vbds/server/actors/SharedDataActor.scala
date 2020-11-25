@@ -17,9 +17,10 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 import SharedDataActor._
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior, Scheduler}
+import akka.actor.typed.{ActorRef, ActorSystem, Behavior, Scheduler, SpawnProtocol}
 import akka.cluster.ddata.{ORSet, ORSetKey, SelfUniqueAddress}
 import akka.actor.typed.scaladsl.AskPattern._
+import akka.event.Logging.{DebugLevel, ErrorLevel, InfoLevel, LogLevel, WarningLevel}
 import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute}
 import akka.http.scaladsl.server.Directives._
 import vbds.server.routes.AccessRoute.WebsocketResponseActorMsg
@@ -55,12 +56,14 @@ private[server] object SharedDataActor {
   case class Publish(streamName: String, source: Source[ByteString, Any], dist: Boolean, replyTo: ActorRef[Done])
       extends SharedDataActorMessages
 
+  case class LogMessage(logLevel: LogLevel, msg: String) extends SharedDataActorMessages
+
   // Used by adapters to receive and respond to cluster messages
   // Note: Due to type erasure, it seems that it is not possible to use the full type of ORSet below.
   // It is necessary to match on the key later.
   private sealed trait InternalMsg extends SharedDataActorMessages
 
-  private case class InfoChanged(chg: Changed[ORSet[_]]) extends InternalMsg
+//  private case class InfoChanged(chg: Changed[ORSet[_]]) extends InternalMsg
 
   private case class InfoUpdateResponse(rsp: UpdateResponse[ORSet[_]]) extends InternalMsg
 
@@ -113,7 +116,9 @@ private[server] object SharedDataActor {
   val accessDataKey = ORSetKey[AccessInfo]("accessInfo")
 
   // Used to create the actor
-  def apply(httpHost: String, httpPort: Int): Behavior[SharedDataActorMessages] = {
+  def apply(httpHost: String, httpPort: Int)(
+      implicit actorSystem: ActorSystem[SpawnProtocol.Command]
+  ): Behavior[SharedDataActorMessages] = {
     Behaviors.setup { ctx =>
       DistributedData.withReplicatorMessageAdapter[SharedDataActorMessages, ORSet[_]] { replicatorAdapter =>
         // Subscribe to changes of the given keys
@@ -134,13 +139,13 @@ private[server] class SharedDataActor(
     httpHost: String,
     httpPort: Int,
     replicatorAdapter: ReplicatorMessageAdapter[SharedDataActorMessages, ORSet[_]]
-) extends AbstractBehavior(ctx) {
+)(implicit actorSystem: ActorSystem[SpawnProtocol.Command])
+    extends AbstractBehavior(ctx) {
 
   import ctx.log
-  implicit val actorSystem: ActorSystem[Nothing] = ctx.system
-  implicit val ec: ExecutionContext              = ctx.executionContext
-  implicit val scheduler: Scheduler              = actorSystem.scheduler
-  implicit val node: SelfUniqueAddress           = DistributedData(actorSystem).selfUniqueAddress
+  implicit val ec: ExecutionContext    = ctx.executionContext
+  implicit val scheduler: Scheduler    = actorSystem.scheduler
+  implicit val node: SelfUniqueAddress = DistributedData(actorSystem).selfUniqueAddress
 
   // The local IP address, set at runtime via a message from the code that starts the HTTP server.
   // This is used to determine which HTTP server has the websocket connection to a client.
@@ -240,19 +245,37 @@ private[server] class SharedDataActor(
         // reply with Done when done
         f.foreach(replyTo ! _)
 
+      case LogMessage(level, msg) =>
+        level match {
+          case DebugLevel => log.debug(msg)
+          case InfoLevel => log.info(msg)
+          case WarningLevel => log.warn(msg)
+          case ErrorLevel => log.error(msg)
+          case _ =>
+        }
       case internal: InternalMsg =>
         internal match {
           case InfoUpdateResponse(_) => Behaviors.same
 
-          case InfoChanged(c @ Changed(`adminDataKey`)) =>
+//          case InfoChanged(c @ Changed(`adminDataKey`)) =>
+//            val data = c.get(adminDataKey)
+//            streams = data.elements
+//            log.info("Current streams: {}", streams)
+//
+//          case InfoChanged(c @ Changed(`accessDataKey`)) =>
+//            val data = c.get(accessDataKey)
+//            subscriptions = data.elements
+//            log.info("Current subscriptions: {}", subscriptions)
+
+          case InternalSubscribeResponse(c @ Changed(`adminDataKey`)) =>
             val data = c.get(adminDataKey)
             streams = data.elements
-            log.info("Current streams: {}", streams)
+            log.info("Subscribe response: Current streams: {}", streams)
 
-          case InfoChanged(c @ Changed(`accessDataKey`)) =>
+          case InternalSubscribeResponse(c @ Changed(`accessDataKey`)) =>
             val data = c.get(accessDataKey)
             subscriptions = data.elements
-            log.info("Current subscriptions: {}", subscriptions)
+            log.info("Subscribe response: Current subscriptions: {}", streams)
 
           case x => log.error(s"XXX Unexpected internal message: $x")
         }
@@ -267,8 +290,8 @@ private[server] class SharedDataActor(
     val transferApi = new TransferApiImpl(ctx.self)(scheduler)
 
     val adminRoute    = new AdminRoute(adminApi)
-    val accessRoute   = new AccessRoute(adminApi, accessApi, ctx)
-    val transferRoute = new TransferRoute(adminApi, transferApi, ctx)
+    val accessRoute   = new AccessRoute(adminApi, accessApi)
+    val transferRoute = new TransferRoute(adminApi, transferApi)
     val route         = adminRoute.route ~ accessRoute.route ~ transferRoute.route
     val bindingF      = Http().newServerAt(httpHost, httpPort).bind(route)
 
@@ -362,8 +385,8 @@ private[server] class SharedDataActor(
     val localResponses = localSet.map(waitForAck)
     val f              = Future.sequence(g.run() :: (localResponses ++ remoteResponses).toList).map(_ => Done)
     f.onComplete {
-      case Success(_)  => log.debug("Publish complete")
-      case Failure(ex) => log.error(s"Publish failed with $ex")
+      case Success(_)  => context.self ! LogMessage(DebugLevel, "Publish complete")
+      case Failure(ex) => context.self ! LogMessage(ErrorLevel, s"Publish failed with $ex")
     }
     f
   }

@@ -8,7 +8,7 @@ object Dependencies {
     Akka.`akka-actor-typed`,
     Akka.`akka-cluster-typed`,
     Akka.`akka-slf4j`,
-    Akka.`akka-remote`,
+//    Akka.`akka-remote`,
     AkkaHttp.`akka-http`,
     AkkaHttp.`akka-http-spray-json`,
     Libs.`scopt`,
