@@ -17,7 +17,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 import SharedDataActor._
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior, Scheduler, SpawnProtocol}
+import akka.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop, Scheduler, Signal, SpawnProtocol}
 import akka.cluster.ddata.{ORSet, ORSetKey, SelfUniqueAddress}
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.event.Logging.{DebugLevel, ErrorLevel, InfoLevel, LogLevel, WarningLevel}
@@ -39,7 +39,7 @@ private[server] object SharedDataActor {
   case class ListStreams(replyTo: ActorRef[Set[StreamInfo]]) extends SharedDataActorMessages
 
   // Tells the actor the host and port that the http server is listening on
-  case class LocalAddress(a: InetSocketAddress) extends SharedDataActorMessages
+  case class LocalAddress(a: InetSocketAddress, binding: Http.ServerBinding) extends SharedDataActorMessages
 
   case class AddSubscription(
       streamName: String,
@@ -150,6 +150,7 @@ private[server] class SharedDataActor(
   // The local IP address, set at runtime via a message from the code that starts the HTTP server.
   // This is used to determine which HTTP server has the websocket connection to a client.
   var localAddress: InetSocketAddress = _
+  var binding: Http.ServerBinding = _
 
   // Cache of shared subscription info
   var subscriptions = Set[AccessInfo]()
@@ -170,8 +171,9 @@ private[server] class SharedDataActor(
   override def onMessage(msg: SharedDataActorMessages): Behavior[SharedDataActorMessages] = {
     msg match {
       // Sets the local IP address
-      case LocalAddress(a) =>
+      case LocalAddress(a, b) =>
         localAddress = a
+        binding = b
 
       case AddStream(name, contentType, replyTo) =>
         log.info("Adding: {}: {}", name, contentType)
@@ -247,25 +249,15 @@ private[server] class SharedDataActor(
 
       case LogMessage(level, msg) =>
         level match {
-          case DebugLevel => log.debug(msg)
-          case InfoLevel => log.info(msg)
+          case DebugLevel   => log.debug(msg)
+          case InfoLevel    => log.info(msg)
           case WarningLevel => log.warn(msg)
-          case ErrorLevel => log.error(msg)
-          case _ =>
+          case ErrorLevel   => log.error(msg)
+          case _            =>
         }
       case internal: InternalMsg =>
         internal match {
           case InfoUpdateResponse(_) => Behaviors.same
-
-//          case InfoChanged(c @ Changed(`adminDataKey`)) =>
-//            val data = c.get(adminDataKey)
-//            streams = data.elements
-//            log.info("Current streams: {}", streams)
-//
-//          case InfoChanged(c @ Changed(`accessDataKey`)) =>
-//            val data = c.get(accessDataKey)
-//            subscriptions = data.elements
-//            log.info("Current subscriptions: {}", subscriptions)
 
           case InternalSubscribeResponse(c @ Changed(`adminDataKey`)) =>
             val data = c.get(adminDataKey)
@@ -281,6 +273,13 @@ private[server] class SharedDataActor(
         }
     }
     Behaviors.same
+  }
+
+  override def onSignal: PartialFunction[Signal, Behavior[SharedDataActorMessages]] = {
+    case signal if signal == PostStop =>
+      log.info(s"XXX Terminating")
+      binding.terminate(60.seconds)
+      Behaviors.stopped
   }
 
   // Starts the HTTP server, which is the public API
@@ -299,7 +298,7 @@ private[server] class SharedDataActor(
     bindingF.onComplete {
       case Success(binding) =>
         println(s"HTTP Server running on: http:/${binding.localAddress}")
-        ctx.self ! LocalAddress(new InetSocketAddress(httpHost, binding.localAddress.getPort))
+        ctx.self ! LocalAddress(new InetSocketAddress(httpHost, binding.localAddress.getPort), binding)
       case Failure(error) =>
         println(error)
         System.exit(1)

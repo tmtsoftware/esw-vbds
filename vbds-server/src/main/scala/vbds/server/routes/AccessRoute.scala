@@ -110,6 +110,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val actor
                 }
               }
             } else {
+              log.error(s"The stream $name does not exists")
               Cors.cors(complete(StatusCodes.NotFound -> s"The stream $name does not exists"))
             }
           }
