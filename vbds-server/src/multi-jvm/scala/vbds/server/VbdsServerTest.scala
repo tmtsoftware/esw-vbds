@@ -73,13 +73,13 @@ object VbdsServerTest {
 
   // --- Edit this ---
   // Image dimensions: 128x128, 256x256, 512x512, 1024x1024, 2048x2048, 4096x4096 (x 3)
-//  val testFileDims = List(48, 128, 256, 512, 1024, 2048, 4096, 9216)
-  val testFileDims = List(48, 128, 256, 512)
+  val testFileDims = List(48, 128, 256, 512, 1024, 2048, 4096, 9216)
+//  val testFileDims = List(48, 128, 256, 512)
   // Repeat each test to get warmed up performance data
-//  val repeatTests         = 5
-  val repeatTests = 1
-//  val numFilesToPublish   = 50
-  val numFilesToPublish   = 10
+  val repeatTests         = 5
+//  val repeatTests = 1
+  val numFilesToPublish   = 50
+//  val numFilesToPublish   = 10
   val totalFilesToPublish = testFileDims.size * repeatTests * numFilesToPublish
   val bytesPerPixel       = 4
   //        val bytesPerPixel = 2
@@ -118,7 +118,7 @@ object VbdsServerTest {
     // Received (temp) files are deleted.
     private def receiveFile(name: String, r: ReceivedFile, promise: Promise[ReceivedFile], delay: FiniteDuration): Unit = {
       if (!doCompareFiles || FileUtils.contentEquals(r.path.toFile, testFile)) {
-        log.info(s"XXX receiveFile: $name: ${r.count} == $totalFilesToPublish, delay = $delay")
+//        log.debug(s"XXX receiveFile: $name: ${r.count} == $totalFilesToPublish, delay = $delay")
         if (r.count == totalFilesToPublish) {
           promise.success(r)
           self ! PoisonPill
@@ -170,7 +170,7 @@ class VbdsServerTest
 
   runOn(server1) {
     val host = system.settings.config.getString("multinode.host")
-    log.info(s"server1 (seed node) is running on $host")
+    log.debug(s"server1 (seed node) is running on $host")
 
     // Start the first server (the seed node)
     val vbdsSystem = VbdsServer.start(
@@ -185,14 +185,14 @@ class VbdsServerTest
     enterBarrier("streamCreated")
     enterBarrier("subscribedToStream")
     enterBarrier("receivedFiles")
-    log.info("server1: enterBarrier receivedFiles")
+    log.debug("server1: enterBarrier receivedFiles")
     vbdsSystem.terminate()
   }
 
   runOn(server2) {
     val host       = system.settings.config.getString("multinode.host")
     val serverHost = system.settings.config.getString("multinode.server-host")
-    log.info(s"server2 is running on $host (seed node is $serverHost)")
+    log.debug(s"server2 is running on $host (seed node is $serverHost)")
 
     // Start a second server
     val vbdsSystem = VbdsServer.start(
@@ -208,37 +208,37 @@ class VbdsServerTest
     enterBarrier("streamCreated")
     enterBarrier("subscribedToStream")
     enterBarrier("receivedFiles")
-    log.info("server2: enterBarrier receivedFiles")
+    log.debug("server2: enterBarrier receivedFiles")
     vbdsSystem.terminate()
   }
 
   runOn(subscriber1) {
     val host = system.settings.config.getString("multinode.host")
-    log.info(s"subscriber1 is running on $host")
+    log.debug(s"subscriber1 is running on $host")
     enterBarrier("deployed")
     val client = new VbdsClient("subscriber1", host, server1HttpPort)
     enterBarrier("streamCreated")
-    log.info("subscriber1: enterBarrier streamCreated")
+    log.debug("subscriber1: enterBarrier streamCreated")
     val promise      = Promise[ReceivedFile]()
     val clientActor  = system.actorOf(ClientActor.props("subscriber1", promise, log, subscriber1Delay))
     val subscription = client.subscribe(streamName, getTempDir("subscriber1"), clientActor, doCompareFiles)
     val httpResponse = subscription.httpResponse.await(shortTimeout)
     assert(httpResponse.status == StatusCodes.SwitchingProtocols)
     enterBarrier("subscribedToStream")
-    log.info("subscriber1: enterBarrier subscribedToStream")
+    log.debug("subscriber1: enterBarrier subscribedToStream")
     subscription.unsubscribe()
     promise.future.await(longTimeout)
     enterBarrier("receivedFiles")
-    log.info("subscriber1: enterBarrier receivedFiles")
+    log.debug("subscriber1: enterBarrier receivedFiles")
   }
 
   runOn(subscriber2) {
     val host = system.settings.config.getString("multinode.host")
-    log.info(s"subscriber2 is running on $host")
+    log.debug(s"subscriber2 is running on $host")
     enterBarrier("deployed")
     val client = new VbdsClient("subscriber2", host, server2HttpPort)
     enterBarrier("streamCreated")
-    log.info("subscriber2: enterBarrier streamCreated")
+    log.debug("subscriber2: enterBarrier streamCreated")
     val promise     = Promise[ReceivedFile]()
     val clientActor = system.actorOf(ClientActor.props("subscriber2", promise, log, subscriber2Delay))
 
@@ -250,10 +250,10 @@ class VbdsServerTest
       val httpResponse = subscription.httpResponse.await(shortTimeout)
       if (httpResponse.status == StatusCodes.SwitchingProtocols) {
         enterBarrier("subscribedToStream")
-        log.info("subscriber2: enterBarrier subscribedToStream")
+        log.debug("subscriber2: enterBarrier subscribedToStream")
         promise.future.await(longTimeout)
         enterBarrier("receivedFiles")
-        log.info("subscriber2: enterBarrier receivedFiles")
+        log.debug("subscriber2: enterBarrier receivedFiles")
       } else {
         subscribe()
       }
@@ -263,15 +263,15 @@ class VbdsServerTest
 
   runOn(publisher1) {
     val host = system.settings.config.getString("multinode.host")
-    log.info(s"publisher1 is running on $host")
+    log.debug(s"publisher1 is running on $host")
     enterBarrier("deployed")
     val client         = new VbdsClient("publisher1", host, server1HttpPort)
     val createResponse = client.createStream(streamName, "").await(shortTimeout)
     assert(createResponse.status == StatusCodes.OK)
     enterBarrier("streamCreated")
-    log.info("publisher1: enterBarrier streamCreated")
+    log.debug("publisher1: enterBarrier streamCreated")
     enterBarrier("subscribedToStream")
-    log.info("publisher1: enterBarrier subscribedToStream")
+    log.debug("publisher1: enterBarrier subscribedToStream")
     // Give the subscribers and other servers time to connect
     Thread.sleep(1000)
 
@@ -299,9 +299,9 @@ class VbdsServerTest
     }
 
     enterBarrier("receivedFiles")
-    log.info("publisher1: enterBarrier receivedFiles")
+    log.debug("publisher1: enterBarrier receivedFiles")
   }
 
   enterBarrier("finished")
-  log.info(s"enterBarrier finished")
+  log.debug(s"enterBarrier finished")
 }

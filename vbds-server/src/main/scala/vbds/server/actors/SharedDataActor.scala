@@ -176,7 +176,7 @@ private[server] class SharedDataActor(
         binding = b
 
       case AddStream(name, contentType, replyTo) =>
-        log.info("Adding: {}: {}", name, contentType)
+        log.debug("Adding: {}: {}", name, contentType)
         val info = StreamInfo(name, contentType)
         replicatorAdapter.askUpdate(
           askReplyTo =>
@@ -188,7 +188,7 @@ private[server] class SharedDataActor(
         replyTo ! info
 
       case DeleteStream(name, replyTo) =>
-        log.info("Removing: {}", name)
+        log.debug("Removing: {}", name)
         streams.find(_.name == name).foreach { info =>
           replicatorAdapter.askUpdate(
             askReplyTo =>
@@ -205,7 +205,7 @@ private[server] class SharedDataActor(
         replyTo ! streams
 
       case AddSubscription(name, id, sink, wsResponseActor, replyTo) =>
-        log.info(s"Adding Subscription to stream $name with id $id")
+        log.debug(s"Adding Subscription to stream $name with id $id")
         val info = AccessInfo(name, localAddress.getAddress.getHostAddress, localAddress.getPort, id)
         replicatorAdapter.askUpdate(
           askReplyTo =>
@@ -220,7 +220,7 @@ private[server] class SharedDataActor(
       case DeleteSubscription(id, replyTo) =>
         val s = subscriptions.find(_.id == id)
         s.foreach { info =>
-          log.info("Removing Subscription with id: {}", info)
+          log.debug("Removing Subscription with id: {}", info)
           replicatorAdapter.askUpdate(
             askReplyTo =>
               Update(accessDataKey, ORSet.empty[StreamInfo], WriteLocal, askReplyTo)(
@@ -250,7 +250,7 @@ private[server] class SharedDataActor(
       case LogMessage(level, msg) =>
         level match {
           case DebugLevel   => log.debug(msg)
-          case InfoLevel    => log.info(msg)
+          case InfoLevel    => log.debug(msg)
           case WarningLevel => log.warn(msg)
           case ErrorLevel   => log.error(msg)
           case _            =>
@@ -262,12 +262,12 @@ private[server] class SharedDataActor(
           case InternalSubscribeResponse(c @ Changed(`adminDataKey`)) =>
             val data = c.get(adminDataKey)
             streams = data.elements
-            log.info("Subscribe response: Current streams: {}", streams)
+            log.debug("Subscribe response: Current streams: {}", streams)
 
           case InternalSubscribeResponse(c @ Changed(`accessDataKey`)) =>
             val data = c.get(accessDataKey)
             subscriptions = data.elements
-            log.info("Subscribe response: Current subscriptions: {}", streams)
+            log.debug("Subscribe response: Current subscriptions: {}", streams)
 
           case x => log.error(s"XXX Unexpected internal message: $x")
         }
@@ -277,7 +277,7 @@ private[server] class SharedDataActor(
 
   override def onSignal: PartialFunction[Signal, Behavior[SharedDataActorMessages]] = {
     case signal if signal == PostStop =>
-      log.info(s"XXX Terminating")
+      log.debug(s"XXX Terminating")
       binding.terminate(60.seconds)
       Behaviors.stopped
   }
@@ -329,7 +329,7 @@ private[server] class SharedDataActor(
 
     // Number of broadcast outputs
     val numOut = localSet.size + remoteHostSet.size
-    log.info(
+    log.debug(
       s"Publish dist=$dist, subscribers: $numOut (${localSet.size} local, ${remoteSet.size} remote on ${remoteHostSet.size} hosts)"
     )
 

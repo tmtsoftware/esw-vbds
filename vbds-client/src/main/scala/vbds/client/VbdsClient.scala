@@ -118,7 +118,7 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
           val fileSizeMb        = testFileSizeBytes / 1000000.0
           val mbPerSec          = (fileSizeMb * count) / testSecs
           val hz                = 1.0 / secsPerFile
-          log.info(
+          log.debug(
             f"$name: $count: Published $count $testFileSizeBytes byte files in $testSecs seconds ($secsPerFile%1.4f secs per file, $hz%1.4f hz, $mbPerSec%1.4f mb/sec, latency: $latency%1.4f sec (min: $minLatency%1.4f, max: $maxLatency%1.4f, avg: $avgLatency%1.4f))"
           )
         }
@@ -129,7 +129,7 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
     def handler(start: Instant): ((Try[HttpResponse], Path)) => Unit = {
       case (Success(response), path) =>
         if (response.status == StatusCodes.Accepted) {
-          if (stats) logStats(path, start) else log.info(s"Result for file: $path was successful")
+          if (stats) logStats(path, start) else log.debug(s"Result for file: $path was successful")
         } else {
           log.error(s"Publish of $path returned unexpected status code: ${response.status}")
           response.discardEntityBytes() // don't forget this

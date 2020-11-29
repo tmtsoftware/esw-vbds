@@ -99,7 +99,7 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val actor
                   msg
                 }
                 .to(Sink.onComplete[Message] { _ =>
-                  log.info(s"Deleting subscription with id $id after client closed websocket connection")
+                  log.debug(s"Deleting subscription with id $id after client closed websocket connection")
                   accessData.deleteSubscription(id)
                   wsResponseActor ! AccessRoute.Stop
                 })

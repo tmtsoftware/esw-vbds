@@ -78,11 +78,11 @@ class WebSocketActor(name: String,
   var os: FileOutputStream = _
   implicit val askTimeout  = Timeout(20.seconds)
 
-  log.info(s"$name: Started WebSocketActor")
+  log.debug(s"$name: Started WebSocketActor")
 
   def receive: Receive = {
     case StreamInitialized =>
-      log.info(s"$name: Initialized stream for $streamName")
+      log.debug(s"$name: Initialized stream for $streamName")
       count = 0
       newFile()
       sender() ! Ack
@@ -104,7 +104,7 @@ class WebSocketActor(name: String,
       log.error(s"$name: Wrong message type: $tm")
 
     case StreamCompleted =>
-      log.info(s"$name: Stream completed")
+      log.debug(s"$name: Stream completed")
 
     case StreamFailure(ex) =>
       log.error(ex, s"$name: Stream failed!")
@@ -130,7 +130,7 @@ class WebSocketActor(name: String,
       sendWsAck()
       if (saveFiles) {
         os.close()
-        log.info(s"$name: Wrote $file")
+        log.debug(s"$name: Wrote $file")
       }
       val rf = ReceivedFile(streamName, count, file.toPath)
       val f  = clientActor ? rf
