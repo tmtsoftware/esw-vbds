@@ -16,7 +16,7 @@ To build and test the web app, run:
 
 and point your browser at:
 
-    http://localhost:12345/web/vbds-scala-js/target/scala-2.12/classes/index-dev.html
+    http://localhost:12345/web/vbds-scala-js/target/scala-2.13/classes/index-dev.html
 
 for the development version, or:
     
@@ -25,7 +25,7 @@ for the development version, or:
 
 and then go to:
     
-    http://localhost:12345/web/vbds-scala-js/target/scala-2.12/classes/index.html
+    http://localhost:12345/web/vbds-scala-js/target/scala-2.13/classes/index.html
 
 for the optimized Javascript.
 
@@ -33,11 +33,11 @@ Displaying the received images in a simple HTML canvas is much faster than displ
 there are a lot of additional calculations being made for WCS, grids, toolbars, etc. To use the canvas version,
 the URLs would be:
 
-    http://localhost:12345/web/vbds-scala-js/target/scala-2.12/classes/index-with-canvas-dev.html
+    http://localhost:12345/web/vbds-scala-js/target/scala-2.13/classes/index-with-canvas-dev.html
 
 for the development version, or:
     
-    http://localhost:12345/web/vbds-scala-js/target/scala-2.12/classes/index-with-canvas.html
+    http://localhost:12345/web/vbds-scala-js/target/scala-2.13/classes/index-with-canvas.html
 
 Note that the web app needs to be run via an http server to avoid cross-site scripting errors when accessing the VBDS server.
 The sbt workbench plugin starts an http server on localhost:12345 for testing.
