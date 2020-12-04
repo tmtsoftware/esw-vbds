@@ -16,7 +16,7 @@ fi
 targetDir=src/main/resources/js9
 test -d $targetDir || mkdir $targetDir
 
-(cd $js9dir; make refresh)
+(cd $js9dir; make)
 
 cp $js9dir/favicon.ico \
     $js9dir/js9support.css \
