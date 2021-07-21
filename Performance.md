@@ -26,6 +26,18 @@ Here are the results of the same test, but with 4 byte FITS data (BITPIX=-32) an
 | 2048 x 2048 x 4              | 8.901          |
 | 4096 x 4096 x 4              | 2.434           |
 
+# Large File Transfer Tests on a Faster Network
+
+We tested VBDS file transfer performance for large files
+with one publisher and one local and one remote subscriber:
+
+| File Size    | Files/Sec (hz) | Seconds per File |
+| --------------|-----------------|  -----------------|        
+| 1 GB          | 0.2671          | 3.7437            |
+| 640 MB        | 0.4168          | 2.3990            |
+| 75 MB         | 3.3395          | 0.2994            |
+
+
 # Performance Test Results using an Embedded Instance of JS9
 
 These are the results of testing the image display performance using the web app in [web/vbds-scala-js](web/vbds-scala-js)
