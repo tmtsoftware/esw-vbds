@@ -29,15 +29,15 @@ object Common extends AutoPlugin {
       "-Xcheckinit",
       "-Xasync"
     ),
-    javacOptions in (Compile, doc) ++= Seq("-Xdoclint:none"),
-    testOptions in Test ++= Seq(
+    Compile / doc / javacOptions ++= Seq("-Xdoclint:none"),
+    Test / testOptions ++= Seq(
       // show full stack traces and test case durations
       Tests.Argument("-oDF")
     ),
     version := "0.0.1",
     isSnapshot := true,
-//    isSnapshot in ThisBuild := true,
-    parallelExecution in Test := false,
+//    ThisBuild / isSnapshot := true,
+    Test / parallelExecution := false,
     autoCompilerPlugins := true
 //    if (formatOnCompile) scalafmtOnCompile := true else scalafmtOnCompile := false
   )

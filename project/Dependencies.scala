@@ -36,12 +36,12 @@ object Dependencies {
   // ScalaJS web client scala dependencies
   val webClient = Def.setting(Seq(
     "org.scala-js" %%% "scalajs-dom" % "1.1.0",
-    "com.lihaoyi" %%% "scalatags" % "0.8.2",
+    "com.lihaoyi" %%% "scalatags" % "0.9.4",
 //    "org.querki" %%% "jquery-facade" % "2.0",
-    "com.github.japgolly.scalacss" %%% "core" % "0.6.1",
-    "com.github.japgolly.scalacss" %%% "ext-scalatags" % "0.6.1",
-    "com.lihaoyi" %%% "upickle" % "0.9.5",
-    "org.scalatest" %%% "scalatest" % "3.1.4" % "test"
+    "com.github.japgolly.scalacss" %%% "core" % "0.7.0",
+    "com.github.japgolly.scalacss" %%% "ext-scalatags" % "0.7.0",
+    "com.lihaoyi" %%% "upickle" % "1.4.0",
+    "org.scalatest" %%% "scalatest" % "3.2.9" % "test"
   ))
 
 }
