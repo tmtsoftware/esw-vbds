@@ -8,6 +8,9 @@ addSbtPlugin("org.portable-scala" % "sbt-scalajs-crossproject" % "1.1.0")
 
 // web client
 addSbtPlugin("org.scala-js"     % "sbt-scalajs"        % "1.6.0")
-addSbtPlugin("com.vmunier" % "sbt-web-scalajs" % "1.2.0")
+
+// Requires local plugin build and publishLocal, since existing plugin was abandoned
+addSbtPlugin("com.lihaoyi"      % "workbench"          % "0.4.2")
+
 addSbtPlugin("org.scala-js"     % "sbt-jsdependencies" % "1.0.2")
 addSbtPlugin("com.timushev.sbt" % "sbt-updates"        % "0.5.3")
