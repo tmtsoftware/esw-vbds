@@ -1,7 +1,6 @@
 package vbds.server.actors
 
 import java.net.InetSocketAddress
-
 import akka.{Done, NotUsed}
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
 import akka.cluster.ddata.typed.scaladsl.{DistributedData, ReplicatorMessageAdapter}
@@ -21,7 +20,7 @@ import akka.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop, Scheduler, S
 import akka.cluster.ddata.{ORSet, ORSetKey, SelfUniqueAddress}
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.event.Logging.{DebugLevel, ErrorLevel, InfoLevel, LogLevel, WarningLevel}
-import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute}
+import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute, WebRoute}
 import akka.http.scaladsl.server.Directives._
 import vbds.server.routes.AccessRoute.WebsocketResponseActorMsg
 
@@ -150,7 +149,7 @@ private[server] class SharedDataActor(
   // The local IP address, set at runtime via a message from the code that starts the HTTP server.
   // This is used to determine which HTTP server has the websocket connection to a client.
   var localAddress: InetSocketAddress = _
-  var binding: Http.ServerBinding = _
+  var binding: Http.ServerBinding     = _
 
   // Cache of shared subscription info
   var subscriptions = Set[AccessInfo]()
@@ -291,7 +290,8 @@ private[server] class SharedDataActor(
     val adminRoute    = new AdminRoute(adminApi)
     val accessRoute   = new AccessRoute(adminApi, accessApi)
     val transferRoute = new TransferRoute(adminApi, transferApi)
-    val route         = adminRoute.route ~ accessRoute.route ~ transferRoute.route
+    val webRoute      = new WebRoute()
+    val route         = adminRoute.route ~ accessRoute.route ~ transferRoute.route ~ webRoute.route
     val bindingF      = Http().newServerAt(httpHost, httpPort).bind(route)
 
     // Need to know this http server's address when subscribing

@@ -10,6 +10,7 @@ object Libs {
   val `akka-management-cluster-http` = "com.lightbend.akka" %% "akka-management-cluster-http" % "1.0.9" //N/A at the moment
   val `boopickle` = "io.suzaku" %% "boopickle" % "1.3.3" // Apache License 2.0
   val `commons-io` = "commons-io" % "commons-io" % "2.11.0"  // Apache License 2.0
+  val `scalajs-scripts` = "com.vmunier" %% "scalajs-scripts" % "1.2.0"
 }
 
 object Akka {

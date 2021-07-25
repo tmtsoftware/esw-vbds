@@ -26,6 +26,7 @@ for the development version, or:
 and then go to:
     
     http://localhost:12345/web/vbds-scala-js/target/scala-2.13/classes/index.html
+    (XXX http://192.168.178.32:7777/web/vbds-scala-js/target/scala-2.13/classes/index.html)
 
 for the optimized Javascript.
 

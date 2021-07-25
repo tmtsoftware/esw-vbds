@@ -4,9 +4,14 @@ val optStage = if (sys.env.contains("SCALAJS_PROD")) FullOptStage else FastOptSt
 def toPathMapping(f: File): (File, String) = f -> f.getName
 
 lazy val `vbds-server` = project
-  .enablePlugins(DeployApp, VbdsBuildInfo, AutoMultiJvm)
+  .enablePlugins(SbtWeb, DeployApp, SbtTwirl, VbdsBuildInfo, AutoMultiJvm)
   .settings(
-    libraryDependencies ++= Dependencies.vbdsServer
+    scalaJSProjects := Seq(`web-client`),
+    Assets / pipelineStages := Seq(scalaJSPipeline),
+    Compile / compile := ((Compile / compile) dependsOn scalaJSPipeline).value,
+    libraryDependencies ++= Dependencies.vbdsServer,
+    Assets / WebKeys.packagePrefix := "public/",
+    Runtime / managedClasspath += (Assets / packageBin).value
   )
   .dependsOn(`vbds-client` % "test")
 
