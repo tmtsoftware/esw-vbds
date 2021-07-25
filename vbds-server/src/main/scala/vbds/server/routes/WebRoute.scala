@@ -12,9 +12,9 @@ class WebRoute() extends Directives {
         }
       }
     } ~
-    pathPrefix("assets" / Remaining) { file =>
+    pathPrefix("js9" / Remaining) { file =>
       encodeResponse {
-        getFromResource("public/" + file)
+        getFromResource("js9/" + file)
       }
     }
   }

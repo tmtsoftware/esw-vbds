@@ -1,6 +1,6 @@
 import sbt._
 
-val optStage = if (sys.env.contains("SCALAJS_PROD")) FullOptStage else FastOptStage
+val optStage                               = if (sys.env.contains("SCALAJS_PROD")) FullOptStage else FastOptStage
 def toPathMapping(f: File): (File, String) = f -> f.getName
 
 lazy val `vbds-server` = project
@@ -24,10 +24,16 @@ lazy val `vbds-client` = project
 // ScalaJS client JavaScript dependencies
 val clientJsDeps = Def.setting(
   Seq(
-    "org.webjars" % "jquery" % "2.2.1" / "jquery.js" minified "jquery.min.js"
+    "org.webjars" % "jquery" % "2.2.1" / "jquery.js" minified "jquery.min.js",
+    ProvidedJS / "js9/astroem.js",
+    ProvidedJS / "js9/astroemw.js",
+    ProvidedJS / "js9/js9.min.js",
+    ProvidedJS / "js9/js9plugins.js",
+    ProvidedJS / "js9/js9prefs.js",
+    ProvidedJS / "js9/js9support.min.js",
+    ProvidedJS / "js9/js9worker.js"
   )
 )
-
 
 lazy val `web-client` = (project in file("web/vbds-scala-js"))
   .settings(
