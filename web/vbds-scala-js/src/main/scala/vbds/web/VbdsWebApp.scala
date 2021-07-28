@@ -30,7 +30,6 @@ object VbdsWebApp {
 
   val closeProps = js.Dynamic.literal("clear" -> false).asInstanceOf[BlobPropertyBag]
 
-  // XXX: Set to true to test displaying with HTML canvas instead of JS9
   val canvasWidth  = 1920
   val canvasHeight = 1080
   val URL          = js.Dynamic.global.window.URL.asInstanceOf[org.scalajs.dom.URL.type]

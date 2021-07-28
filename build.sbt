@@ -20,7 +20,7 @@ val clientJsDeps = Def.setting(
 
 
 lazy val `web-client` = (project in file("web/vbds-scala-js"))
-  .enablePlugins(WorkbenchPlugin, JSDependenciesPlugin)
+  .enablePlugins(JSDependenciesPlugin)
   .settings(
     libraryDependencies ++= Dependencies.webClient.value,
     packageJSDependencies / skip   := false,
