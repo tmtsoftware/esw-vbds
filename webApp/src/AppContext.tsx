@@ -8,7 +8,9 @@ export type AppContextState = {
   availableStreams: Array<StreamInfo>,
   setAvailableStreams: (_: Array<StreamInfo>) => void,
   selectedStream: StreamInfo | undefined,
-  setSelectedStream: (_: StreamInfo | undefined) => void
+  setSelectedStream: (_: StreamInfo | undefined) => void,
+  mainMenuSelectedKeys: Array<string>,
+  setMainMenuSelectedKeys: (_: Array<string>) => void
 }
 
 const appContextDefaultValue: AppContextState = {
@@ -17,8 +19,16 @@ const appContextDefaultValue: AppContextState = {
   availableStreams: [],
   setAvailableStreams: (_: Array<StreamInfo>) => {},
   selectedStream: undefined,
-  setSelectedStream: (_: StreamInfo | undefined) => {}
+  setSelectedStream: (_: StreamInfo | undefined) => {},
+  mainMenuSelectedKeys: ['settings'],
+  setMainMenuSelectedKeys: (_: Array<string>) => {}
 }
 
 export const appContext = createContext<AppContextState>(appContextDefaultValue)
 export const useAppContext = () => useContext(appContext)
+
+// --- Constants ---
+export const settingsMenuKey = 'settings'
+export const imageDisplayMenuKey = 'imageDisplay'
+export const adminRoute  = "/vbds/admin/streams"
+export const accessRoute = "/vbds/access/streams"

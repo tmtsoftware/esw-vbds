@@ -1,0 +1,6 @@
+{
+  "short_name": "sample",
+  "name": "sample",
+  "start_url": "./index.html",
+  "display": "standalone"
+}
