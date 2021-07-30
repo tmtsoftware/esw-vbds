@@ -1,5 +1,6 @@
 import React, {createContext, useContext} from "react"
 import type {ServerInfo, StreamInfo} from "./models/Models";
+import type {WebSocketLike} from "react-use-websocket/dist/lib/types";
 
 // Application context: Holds values and functions that are shared by different components in the app
 export type AppContextState = {
@@ -10,7 +11,9 @@ export type AppContextState = {
   selectedStream: StreamInfo | undefined,
   setSelectedStream: (_: StreamInfo | undefined) => void,
   mainMenuSelectedKeys: Array<string>,
-  setMainMenuSelectedKeys: (_: Array<string>) => void
+  setMainMenuSelectedKeys: (_: Array<string>) => void,
+  currentWebSocket: WebSocketLike | null,
+  setCurrentWebSocket: (_: WebSocketLike | null) => void
 }
 
 const appContextDefaultValue: AppContextState = {
@@ -21,7 +24,9 @@ const appContextDefaultValue: AppContextState = {
   selectedStream: undefined,
   setSelectedStream: (_: StreamInfo | undefined) => {},
   mainMenuSelectedKeys: ['settings'],
-  setMainMenuSelectedKeys: (_: Array<string>) => {}
+  setMainMenuSelectedKeys: (_: Array<string>) => {},
+  currentWebSocket: null,
+  setCurrentWebSocket: (_: WebSocketLike | null) => {}
 }
 
 export const appContext = createContext<AppContextState>(appContextDefaultValue)

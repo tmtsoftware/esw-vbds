@@ -1,13 +1,19 @@
-import React, {useState} from 'react'
-import {useAppContext} from "../../AppContext";
+import React from 'react'
+import {accessRoute, useAppContext} from "../../AppContext";
 import {StreamSelector} from "../StreamSelector";
+import {ImageConsumer} from "./ImageConsumer";
 
 export const ImageSubscriber = (): JSX.Element => {
-  const [canvasWidth, setCanvasWidth] = useState<number>(1920)
-  const [canvasHeight, setCanvasHeight] = useState<number>(1080)
+  const {serverInfo, selectedStream} = useAppContext()
+
+  const webSocketUri = (serverInfo && selectedStream) ?
+    `ws://${serverInfo.host}:${serverInfo.port}${accessRoute}/${selectedStream.name}`
+    : undefined
+
+  console.log(`XXX webSocketUri = ${webSocketUri}`)
 
   return <div>
     <StreamSelector/>
-    <canvas width={canvasWidth} height={canvasHeight}/>
+    {webSocketUri ? <ImageConsumer webSocketUri={webSocketUri}/> : <></>}
   </div>
 }

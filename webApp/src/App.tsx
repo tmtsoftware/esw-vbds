@@ -9,6 +9,7 @@ import {useQuery} from './hooks/useQuery'
 import {Routes} from './routes/Routes'
 import {appContext, AppContextState} from './AppContext'
 import type {ServerInfo, StreamInfo} from "./models/Models";
+import type {WebSocketLike} from "react-use-websocket/dist/lib/types";
 
 const basename =
   import.meta.env.NODE_ENV === 'production' ? AppConfig.applicationName : ''
@@ -19,6 +20,7 @@ export const App = (): JSX.Element => {
   const [availableStreams, setAvailableStreams] = useState<Array<StreamInfo>>([])
   const [selectedStream, setSelectedStream] = useState<StreamInfo | undefined>(undefined)
   const [mainMenuSelectedKeys, setMainMenuSelectedKeys] = useState<Array<string>>(['settings'])
+  const [currentWebSocket, setCurrentWebSocket] = useState<WebSocketLike | null>(null)
 
   const appContextValues: AppContextState = {
     serverInfo,
@@ -28,7 +30,9 @@ export const App = (): JSX.Element => {
     selectedStream,
     setSelectedStream,
     mainMenuSelectedKeys,
-    setMainMenuSelectedKeys
+    setMainMenuSelectedKeys,
+    currentWebSocket,
+    setCurrentWebSocket
   }
 
   if (loading) return (
