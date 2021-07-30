@@ -12,8 +12,8 @@ export type AppContextState = {
   setSelectedStream: (_: StreamInfo | undefined) => void,
   mainMenuSelectedKeys: Array<string>,
   setMainMenuSelectedKeys: (_: Array<string>) => void,
-  currentWebSocket: WebSocketLike | null,
-  setCurrentWebSocket: (_: WebSocketLike | null) => void
+  // currentWebSocket: WebSocketLike | null,
+  // setCurrentWebSocket: (_: WebSocketLike | null) => void
 }
 
 const appContextDefaultValue: AppContextState = {
@@ -25,8 +25,8 @@ const appContextDefaultValue: AppContextState = {
   setSelectedStream: (_: StreamInfo | undefined) => {},
   mainMenuSelectedKeys: ['settings'],
   setMainMenuSelectedKeys: (_: Array<string>) => {},
-  currentWebSocket: null,
-  setCurrentWebSocket: (_: WebSocketLike | null) => {}
+  // currentWebSocket: null,
+  // setCurrentWebSocket: (_: WebSocketLike | null) => {}
 }
 
 export const appContext = createContext<AppContextState>(appContextDefaultValue)

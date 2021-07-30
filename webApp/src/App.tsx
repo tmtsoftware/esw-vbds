@@ -20,7 +20,7 @@ export const App = (): JSX.Element => {
   const [availableStreams, setAvailableStreams] = useState<Array<StreamInfo>>([])
   const [selectedStream, setSelectedStream] = useState<StreamInfo | undefined>(undefined)
   const [mainMenuSelectedKeys, setMainMenuSelectedKeys] = useState<Array<string>>(['settings'])
-  const [currentWebSocket, setCurrentWebSocket] = useState<WebSocketLike | null>(null)
+  // const [currentWebSocket, setCurrentWebSocket] = useState<WebSocketLike | null>(null)
 
   const appContextValues: AppContextState = {
     serverInfo,
@@ -31,8 +31,8 @@ export const App = (): JSX.Element => {
     setSelectedStream,
     mainMenuSelectedKeys,
     setMainMenuSelectedKeys,
-    currentWebSocket,
-    setCurrentWebSocket
+    // currentWebSocket,
+    // setCurrentWebSocket
   }
 
   if (loading) return (
