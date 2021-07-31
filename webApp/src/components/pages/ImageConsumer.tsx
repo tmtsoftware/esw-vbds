@@ -49,9 +49,9 @@ export const ImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Element =
   })
 
   const ws = getWebSocket()
+  // setCurrentWebSocket(getWebSocket())
   if (ws) {
     (ws as WebSocket).binaryType = 'arraybuffer'
-    // setCurrentWebSocket(getWebSocket())
   }
 
   useEffect(() => {

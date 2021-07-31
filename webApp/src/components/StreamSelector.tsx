@@ -1,15 +1,14 @@
-import React, {useEffect, useMemo} from 'react'
+import React, {useEffect} from 'react'
 import {Select, Typography} from "antd";
-import {accessRoute, adminRoute, useAppContext} from "../AppContext";
+import {adminRoute, useAppContext} from "../AppContext";
 import {get} from '../utils/Http'
 import type {StreamInfo} from "../models/Models";
-import {useSocketIO} from "react-use-websocket";
 
 const {Option} = Select;
 
 export const StreamSelector = (): JSX.Element => {
 
-  const {serverInfo, availableStreams, setAvailableStreams, selectedStream, setSelectedStream, currentWebSocket} = useAppContext()
+  const {serverInfo, availableStreams, setAvailableStreams, selectedStream, setSelectedStream} = useAppContext()
 
   const {Text} = Typography;
 
@@ -26,7 +25,10 @@ export const StreamSelector = (): JSX.Element => {
 
   function streamSelected(stream: string | undefined) {
     console.log('XXX Selected stream is ', stream)
-    // if (currentWebSocket) currentWebSocket.close()
+    // if (currentWebSocket) {
+    //   console.log('XXX Closing websocket: ', currentWebSocket)
+    //   currentWebSocket.close()
+    // }
     setSelectedStream(availableStreams.find(s => s.name == stream))
   }
 
