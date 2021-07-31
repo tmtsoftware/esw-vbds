@@ -13,7 +13,6 @@ export const StreamSelector = (): JSX.Element => {
   const {Text} = Typography;
 
   useEffect(() => {
-    console.log(`XXX StreamSelector: serverInfo changed: ${serverInfo?.host}:${serverInfo?.port}`)
     const uri = serverInfo ? `http://${serverInfo.host}:${serverInfo.port}${adminRoute}` : undefined
     if (uri) {
       get<Array<StreamInfo>>(uri).then((resp) => {
@@ -24,11 +23,6 @@ export const StreamSelector = (): JSX.Element => {
   }, [serverInfo])
 
   function streamSelected(stream: string | undefined) {
-    console.log('XXX Selected stream is ', stream)
-    // if (currentWebSocket) {
-    //   console.log('XXX Closing websocket: ', currentWebSocket)
-    //   currentWebSocket.close()
-    // }
     setSelectedStream(availableStreams.find(s => s.name == stream))
   }
 

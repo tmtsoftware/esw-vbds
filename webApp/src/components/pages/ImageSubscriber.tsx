@@ -10,8 +10,6 @@ export const ImageSubscriber = (): JSX.Element => {
     `ws://${serverInfo.host}:${serverInfo.port}${accessRoute}/${selectedStream.name}`
     : undefined
 
-  console.log(`XXX webSocketUri = ${webSocketUri}`)
-
   return <div>
     <StreamSelector/>
     {webSocketUri ? <ImageConsumer webSocketUri={webSocketUri}/> : <></>}

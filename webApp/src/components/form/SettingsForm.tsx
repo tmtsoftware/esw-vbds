@@ -16,7 +16,6 @@ export const SettingsForm = (): JSX.Element => {
   }
 
   function onFinish(serverInfo: ServerInfo) {
-    console.log('XXX SettingsForm: serverInfo = ', serverInfo)
     setServerInfo(serverInfo)
     setMainMenuSelectedKeys([imageDisplayMenuKey])
     history.push(`/${imageDisplayMenuKey}`);
