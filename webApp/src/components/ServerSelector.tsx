@@ -25,7 +25,11 @@ export const ServerSelector = (): JSX.Element => {
 
   useEffect(() => {
     locationService.listByConnectionType('http')
-      .then(ar => setServers(ar.map(loc => makeServerInfo(loc.connection.prefix.componentName, loc.uri))))
+      .then(ar =>
+        setServers(ar.filter(loc =>
+          loc.connection.prefix.subsystem == "ESW")
+          .map(loc =>
+            makeServerInfo(loc.connection.prefix.componentName, loc.uri))))
   }, [])
 
   const {Text} = Typography;

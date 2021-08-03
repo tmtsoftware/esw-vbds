@@ -76,7 +76,7 @@ object VbdsServer {
         HttpConnection(
           ComponentId(
             // XXX TODO: Which Subsystem?
-            Prefix(Subsystem.CSW, name),
+            Prefix(Subsystem.ESW, name),
             ComponentType.Service
           )
         ),

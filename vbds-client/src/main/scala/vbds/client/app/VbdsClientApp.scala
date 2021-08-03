@@ -136,7 +136,7 @@ object VbdsClientApp extends App {
     val maybeLocation = Await.result(locationService.find(
       HttpConnection(
         ComponentId(
-          Prefix(Subsystem.CSW, options.name),
+          Prefix(Subsystem.ESW, options.name),
           ComponentType.Service
         ))), 10.seconds)
 
