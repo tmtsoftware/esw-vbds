@@ -1,5 +1,6 @@
 // Host, port for VBDS server
 export interface ServerInfo {
+  name: string
   host: string
   port: number
 }

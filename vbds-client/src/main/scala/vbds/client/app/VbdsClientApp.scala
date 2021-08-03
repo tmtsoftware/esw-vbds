@@ -1,15 +1,20 @@
 package vbds.client.app
 
 import java.io.File
-
 import akka.Done
 import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
 import akka.http.scaladsl.model.HttpResponse
+import csw.location.api.models.{ComponentId, ComponentType, HttpLocation}
+import csw.location.api.models.Connection.HttpConnection
+import csw.location.client.scaladsl.HttpLocationServiceFactory
+import csw.prefix.models.{Prefix, Subsystem}
 import vbds.client.VbdsClient
+import akka.actor.typed.scaladsl.adapter.ClassicActorSystemOps
 
 import scala.concurrent.{Await, Future}
-import scala.concurrent.duration._
-import vbds.client.WebSocketActor._
+import scala.concurrent.duration.*
+import vbds.client.WebSocketActor.*
+import vbds.server.app.BuildInfo
 
 /**
  * A VIZ Bulk Data System HTTP client command line application.
@@ -19,8 +24,6 @@ object VbdsClientApp extends App {
 
   // Command line options
   private case class Options(name: String = "vbds",
-                             host: String = "127.0.0.1",
-                             port: Int = 80,
                              create: Option[String] = None,
                              contentType: Option[String] = None,
                              delete: Option[String] = None,
@@ -40,19 +43,11 @@ object VbdsClientApp extends App {
 
   // Parser for the command line options
   private val parser = new scopt.OptionParser[Options]("vbds-client") {
-    head("vbds-client", "0.0.1") // XXX FIXME: BuildInfo is in vbds-server, but don't want to depend on it (also issue with application.conf)
+    head(BuildInfo.name, BuildInfo.version)
 
     opt[String]('n', "name") valueName "<name>" action { (x, c) =>
       c.copy(name = x)
-    } text "The name of the vbds-server server(default: vbds)" // XXX TODO: Implement location service lookup via name
-
-    opt[String]("host") valueName "<host name>" action { (x, c) =>
-      c.copy(host = x)
-    } text "The VBDS HTTP server host name (default: 127.0.0.1)"
-
-    opt[Int]('p', "port") valueName "<number>" action { (x, c) =>
-      c.copy(port = x)
-    } text "The VBDS HTTP server port number (default: 80)"
+    } text "The name of the vbds-server server(default: vbds)"
 
     opt[String]("create") valueName "<stream name>" action { (x, c) =>
       c.copy(create = Some(x))
@@ -137,8 +132,25 @@ object VbdsClientApp extends App {
 
   // Run the application (The actor system is only used locally, no need for remote)
   private def run(options: Options): Unit = {
+    val locationService = HttpLocationServiceFactory.makeLocalClient(system.toTyped)
+    val maybeLocation = Await.result(locationService.find(
+      HttpConnection(
+        ComponentId(
+          Prefix(Subsystem.CSW, options.name),
+          ComponentType.Service
+        ))), 10.seconds)
 
-    val client = new VbdsClient(options.name, options.host, options.port, options.chunkSize)
+    maybeLocation match {
+      case Some(loc) =>
+        runClient(options, loc)
+      case None =>
+        println(s"Could not locate VBDS server ${options.name}")
+        System.exit(1)
+    }
+  }
+
+  private def runClient(options: Options, loc: HttpLocation): Unit = {
+    val client = new VbdsClient(options.name, loc.uri.getHost, loc.uri.getPort, options.chunkSize)
     options.create.foreach(s => handleHttpResponse(s"create $s", client.createStream(s, options.contentType.getOrElse(""))))
     options.delete.foreach(s => handleHttpResponse(s"delete $s", client.deleteStream(s)))
     if (options.list) handleHttpResponse("list", client.listStreams())
@@ -177,7 +189,7 @@ object VbdsClientApp extends App {
 
   // XXX TODO: Change to actor or callback
   private def doAction(r: ReceivedFile, action: String): Unit = {
-    import sys.process._
+    import sys.process.*
     try {
       s"$action ${r.path}".!
     } catch {

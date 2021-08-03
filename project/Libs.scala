@@ -12,6 +12,15 @@ object Libs {
   val `commons-io` = "commons-io" % "commons-io" % "2.11.0"  // Apache License 2.0
 }
 
+object CSW {
+  private val Org = "com.github.tmtsoftware.csw"
+  //  private val Version = "0.1.0-SNAPSHOT"
+  private val Version = "4.0.0-M1"
+
+  val `csw-network-utils` = Org %% "csw-network-utils" % Version
+  val `csw-location-client` = Org %% "csw-location-client" % Version
+}
+
 object Akka {
   val Version = "2.6.15" //all akka is Apache License 2.0
   val `akka-stream` = "com.typesafe.akka" %% "akka-stream" % Version

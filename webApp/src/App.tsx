@@ -7,20 +7,18 @@ import {AppConfig} from './config/AppConfig'
 import {LocationServiceProvider} from './contexts/LocationServiceContext'
 import {useQuery} from './hooks/useQuery'
 import {Routes} from './routes/Routes'
-import {appContext, AppContextState} from './AppContext'
+import {appContext, AppContextState, imageDisplayMenuKey} from './AppContext'
 import type {ServerInfo, StreamInfo} from "./models/Models";
-import type {WebSocketLike} from "react-use-websocket/dist/lib/types";
 
 const basename =
   import.meta.env.NODE_ENV === 'production' ? AppConfig.applicationName : ''
 
 export const App = (): JSX.Element => {
   const {data: locationService, loading, error} = useQuery(LocationService)
-  const [serverInfo, setServerInfo] = useState<ServerInfo | undefined>({host: 'localhost', port: 7777})
+  const [serverInfo, setServerInfo] = useState<ServerInfo | undefined>(undefined)
   const [availableStreams, setAvailableStreams] = useState<Array<StreamInfo>>([])
   const [selectedStream, setSelectedStream] = useState<StreamInfo | undefined>(undefined)
-  const [mainMenuSelectedKeys, setMainMenuSelectedKeys] = useState<Array<string>>(['settings'])
-  const [currentWebSocket, setCurrentWebSocket] = useState<WebSocketLike | null>(null)
+  const [mainMenuSelectedKeys, setMainMenuSelectedKeys] = useState<Array<string>>([imageDisplayMenuKey])
 
   const appContextValues: AppContextState = {
     serverInfo,
@@ -30,9 +28,7 @@ export const App = (): JSX.Element => {
     selectedStream,
     setSelectedStream,
     mainMenuSelectedKeys,
-    setMainMenuSelectedKeys,
-    currentWebSocket,
-    setCurrentWebSocket
+    setMainMenuSelectedKeys
   }
 
   if (loading) return (

@@ -14,6 +14,7 @@ object Common extends AutoPlugin {
     organizationName := "TMT",
     scalaVersion := Libs.ScalaVersion,
     organizationHomepage := Some(url("http://www.tmt.org")),
+    resolvers += "jitpack" at "https://jitpack.io",
 
     scalacOptions ++= Seq(
       "-encoding",

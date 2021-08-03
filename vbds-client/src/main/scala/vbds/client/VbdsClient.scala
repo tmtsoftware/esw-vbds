@@ -8,13 +8,13 @@ import akka.Done
 import akka.actor.{ActorRef, ActorSystem}
 import akka.event.{LogSource, Logging}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model._
+import akka.http.scaladsl.model.*
 import akka.http.scaladsl.model.ws.Message
 import akka.stream.scaladsl.MergeHub
 import vbds.client.VbdsClient.Subscription
 
 import scala.concurrent.{Await, Future}
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.{Failure, Success, Try}
 
 object VbdsClient {
@@ -33,6 +33,7 @@ object VbdsClient {
  * @param chunkSize optional chunk size in bytes for exchanging image data
  * @param system akka actor system
  */
+//noinspection HttpUrlsUsage
 class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem) {
 
   implicit val executionContext = system.dispatcher
@@ -44,7 +45,7 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
   implicit val logSource: LogSource[AnyRef] = new LogSource[AnyRef] {
     def genString(o: AnyRef): String = o.getClass.getName
 
-    override def getClazz(o: AnyRef): Class[_] = o.getClass
+    override def getClazz(o: AnyRef): Class[?] = o.getClass
   }
 
   val log = Logging(system, this)
@@ -140,7 +141,7 @@ class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 
 
     val uri = s"http://$host:$port$transferRoute/$streamName"
     val paths = if (file.isDirectory) {
-      val filter = suffix.map(s => (f: File) => f.getName.endsWith(s)).getOrElse((f: File) => true)
+      val filter = suffix.map(s => (f: File) => f.getName.endsWith(s)).getOrElse((_: File) => true)
       // Sort files: Note: Added this to test with extracted video images so they are posted in the correct order
       file.listFiles().filter(filter).map(_.toPath).toList.sortWith {
         case (p1, p2) => comparePaths(p1, p2)

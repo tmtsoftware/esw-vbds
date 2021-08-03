@@ -2,8 +2,9 @@ import sbt._
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
 
 object Dependencies {
-
   val vbdsServer = Seq(
+    CSW.`csw-location-client`,
+    CSW.`csw-network-utils`,
     Akka.`akka-stream-typed`,
     Akka.`akka-actor-typed`,
     Akka.`akka-cluster-typed`,
@@ -23,6 +24,7 @@ object Dependencies {
   )
 
   val vbdsClient = Seq(
+    CSW.`csw-location-client`,
     Akka.`akka-stream`,
     Akka.`akka-slf4j`,
     AkkaHttp.`akka-http`,

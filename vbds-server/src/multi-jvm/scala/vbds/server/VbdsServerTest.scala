@@ -1,7 +1,6 @@
 package vbds.server
 
 import java.io.{BufferedOutputStream, File, FileOutputStream}
-
 import akka.actor.{Actor, ActorLogging, PoisonPill, Props}
 import vbds.client.VbdsClient
 import vbds.server.app.VbdsServer
@@ -14,6 +13,7 @@ import akka.event.LoggingAdapter
 import akka.http.scaladsl.model.StatusCodes
 import akka.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.{Config, ConfigFactory}
+import csw.network.utils.SocketUtils
 import org.apache.commons.io.FileUtils
 import org.scalatest.BeforeAndAfterAll
 import vbds.client.WebSocketActor.ReceivedFile
@@ -161,8 +161,8 @@ class VbdsServerTest
     with ImplicitSender
     with BeforeAndAfterAll {
 
-  import VbdsServerTestConfig._
-  import VbdsServerTest._
+  import VbdsServerTestConfig.*
+  import VbdsServerTest.*
 
   def initialParticipants = roles.size
 
@@ -178,8 +178,8 @@ class VbdsServerTest
         val vbdsSystem = VbdsServer.start(
           host,
           server1HttpPort,
-          host,
           seedPort,
+          "server1",
           s"$host:$seedPort"
         )
         expectNoMessage(2.seconds)
@@ -202,8 +202,8 @@ class VbdsServerTest
         val vbdsSystem = VbdsServer.start(
           host,
           server2HttpPort,
-          host,
-          0,
+          SocketUtils.getFreePort,
+          "server2",
           s"$serverHost:$seedPort"
         )
 
