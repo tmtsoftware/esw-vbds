@@ -1,4 +1,4 @@
-import React, {useEffect, useRef} from 'react'
+import React, {useEffect, useLayoutEffect, useRef} from 'react'
 import {useAppContext} from "../../AppContext";
 
 type ImageConsumerProps = {
@@ -16,11 +16,6 @@ export const ImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Element =
   const canvasHeight = 1080
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const canvas = <canvas
-    ref={canvasRef}
-    height={canvasHeight}
-    width={canvasWidth}
-    style={{border: '3px'}}/>
 
   const ws = useRef<WebSocket | null>(null);
   useEffect(() => {
@@ -41,12 +36,20 @@ export const ImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Element =
         messageHistory.current = messageHistory.current.concat(arrayBuffer)
       }
     }
-
     return () => {
       if (ws.current) ws.current.close();
     };
-  }, [webSocketUri]);
+  }, [selectedStream, webSocketUri])
 
+  // useLayoutEffect(() => {
+  //   return () => {
+  //     console.log('XXX unmount ImageConsumer')
+  //     if (ws.current) {
+  //       ws.current.close()
+  //       ws.current = null
+  //     }
+  //   }
+  // }, [])
 
   img.onload = () => {
     const ctx = canvasRef.current?.getContext("2d")
@@ -65,5 +68,11 @@ export const ImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Element =
     img.src = urlCreator.createObjectURL(blob)
   }
 
-  return canvas
+  return (
+    <canvas
+      ref={canvasRef}
+      height={canvasHeight}
+      width={canvasWidth}
+      style={{border: '3px'}}/>
+  )
 }

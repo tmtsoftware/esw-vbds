@@ -18,8 +18,12 @@ export const StreamSelector = (): JSX.Element => {
       get<Array<StreamInfo>>(uri).then((resp) => {
         const result = resp.parsedBody
         setAvailableStreams(result ? result : [])
+        setSelectedStream(undefined)
       })
-    } else setAvailableStreams([])
+    } else {
+      setAvailableStreams([])
+      setSelectedStream(undefined)
+    }
   }, [serverInfo])
 
   function streamSelected(stream: string | undefined) {
