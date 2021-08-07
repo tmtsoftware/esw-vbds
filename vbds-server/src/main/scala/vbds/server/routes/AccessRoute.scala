@@ -115,21 +115,22 @@ class AccessRoute(adminData: AdminApi, accessData: AccessApi)(implicit val actor
             }
           }
         }
-      } ~
-      // Deletes a stream subscription: Response: 204 – Success (no content) or 404 – Subscription not found
-      delete {
-        path(Remaining) { id => // id returned as part of AccessData response to subscription request
-          onSuccess(accessData.subscriptionExists(id)) { exists =>
-            if (exists) {
-              onSuccess(accessData.deleteSubscription(id)) {
-                Cors.cors(complete(StatusCodes.Accepted))
-              }
-            } else {
-              Cors.cors(complete(StatusCodes.NotFound -> s"The subscription with the id $id does not exist"))
-            }
-          }
-
-        }
       }
+      // ~
+      // Deletes a stream subscription: Response: 204 – Success (no content) or 404 – Subscription not found
+//      delete {
+//        path(Remaining) { id => // id returned as part of AccessData response to subscription request
+//          onSuccess(accessData.subscriptionExists(id)) { exists =>
+//            if (exists) {
+//              onSuccess(accessData.deleteSubscription(id)) {
+//                Cors.cors(complete(StatusCodes.Accepted))
+//              }
+//            } else {
+//              Cors.cors(complete(StatusCodes.NotFound -> s"The subscription with the id $id does not exist"))
+//            }
+//          }
+//
+//        }
+//      }
     }
 }

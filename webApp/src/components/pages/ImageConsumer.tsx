@@ -1,9 +1,12 @@
-import React, {useEffect, useLayoutEffect, useRef} from 'react'
+import React, {useEffect, useRef} from 'react'
 import {useAppContext} from "../../AppContext";
 
 type ImageConsumerProps = {
   webSocketUri: string,
 }
+
+// Keeping this reference outside the component seems to work better (tried useRef, but had issues)
+var imageConsumerWebSocket: WebSocket
 
 export const ImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Element => {
   const {selectedStream} = useAppContext()
@@ -18,11 +21,11 @@ export const ImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Element =
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   console.log('XXX new websocket ', webSocketUri)
-  const ws = useRef<WebSocket>(new WebSocket(webSocketUri));
+  imageConsumerWebSocket = new WebSocket(webSocketUri);
 
   useEffect(() => {
-    ws.current.binaryType = 'arraybuffer'
-    ws.current.onmessage = (event) => {
+    imageConsumerWebSocket.binaryType = 'arraybuffer'
+    imageConsumerWebSocket.onmessage = (event) => {
       const arrayBuffer = new Uint8Array(event.data)
       if (arrayBuffer.byteLength == 1) {
         const buffers = messageHistory.current
@@ -37,9 +40,9 @@ export const ImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Element =
 
   useEffect(() => () => {
     console.log('XXX  closing websocket')
-    ws.current.close()
+    imageConsumerWebSocket.close()
     messageHistory.current = []
-  }, [ws])
+  }, [imageConsumerWebSocket])
 
 
   img.onload = () => {
@@ -48,9 +51,9 @@ export const ImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Element =
       ctx.drawImage(img, 0, 0, img.naturalHeight, img.naturalWidth)
     }
     URL.revokeObjectURL(img.src)
-    if (ws.current.readyState == WebSocket.OPEN) {
-      ws.current.send('ACK')
-    } else console.log('XXX readyState = ', ws.current.readyState)
+    if (imageConsumerWebSocket.readyState == WebSocket.OPEN) {
+      imageConsumerWebSocket.send('ACK')
+    } else console.log('XXX readyState = ', imageConsumerWebSocket.readyState)
   }
 
   const urlCreator = window.URL || window.webkitURL;

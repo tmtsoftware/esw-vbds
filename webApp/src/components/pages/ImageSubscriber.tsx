@@ -14,6 +14,10 @@ export const ImageSubscriber = (): JSX.Element => {
 
   const isFits = selectedStream && selectedStream.contentType == "image/fits"
 
+  // Hide js9 if not displaying FITS
+  const js9div = document.getElementById("centerdiv")
+  if (js9div) js9div.style.display = isFits ? 'block' : 'none'
+
   if (webSocketUri) {
     if (isFits) {
       return (
@@ -33,9 +37,9 @@ export const ImageSubscriber = (): JSX.Element => {
     )
   }
   return (
-    <div>
-      <ServerSelector/>
-      <StreamSelector/>
-    </div>
-  )
+      <div>
+        <ServerSelector/>
+        <StreamSelector/>
+      </div>
+    )
 }
