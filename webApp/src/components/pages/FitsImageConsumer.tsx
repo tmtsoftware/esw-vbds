@@ -9,15 +9,10 @@ export const FitsImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Eleme
   const {selectedStream} = useAppContext()
   const messageHistory = useRef<Array<Uint8Array>>([])
 
-  const ws = useRef<WebSocket | null>(null);
+  console.log('XXX new websocket ', webSocketUri)
+  const ws = useRef<WebSocket>(new WebSocket(webSocketUri));
+
   useEffect(() => {
-    // if (ws.current) {
-    //   console.log('XXX closing websocket before open')
-    //   ws.current.close()
-    //   ws.current = null
-    // }
-    console.log('XXX new websocket ', webSocketUri)
-    ws.current = new WebSocket(webSocketUri)
     ws.current.binaryType = 'arraybuffer'
     ws.current.onclose = () => {
       console.log('XXX ws onclose')
@@ -39,51 +34,36 @@ export const FitsImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Eleme
         messageHistory.current = messageHistory.current.concat(arrayBuffer)
       }
     }
-    return () => {
-      if (ws.current) {
-        console.log('XXX  closing websocket')
-        ws.current.close()
-        ws.current = null
-        messageHistory.current = []
-      }
-    }
   }, [webSocketUri])
 
-  // useEffect(() => {
-  //   if (ws.current) {
-  //     console.log('XXX  closing websocket (2)')
-  //   }
-  //
-  // }, [selectedStream])
+  useEffect(() => () => {
+    console.log('XXX  closing websocket')
+    sendAck()
+    ws.current.close()
+    messageHistory.current = []
+  }, [ws])
 
-  // useEffect(() => {
-  //   console.log('XXX init JS9')
-  //   // @ts-ignore
-  //   JS9.globalOpts.alerts = false
-  //   // @ts-ignore
-  //   JS9.imageOpts.inherit = true
-  //   // @ts-ignore
-  //   JS9.init()
-  // }, [])
 
-  // useLayoutEffect(() => {
-  //   return () => {
-  //     console.log('XXX unmount FitsImageConsumer')
-  //     if (ws.current) {
-  //       ws.current.close()
-  //       ws.current = null
-  //     }
-  //   }
-  // }, [])
+  useEffect(() => {
+    console.log('XXX init JS9')
+    // @ts-ignore
+    JS9.globalOpts.alerts = false
+    // @ts-ignore
+    JS9.imageOpts.inherit = true
+    // @ts-ignore
+    JS9.init()
+  }, [])
+
+  function sendAck() {
+    if (ws.current.readyState == WebSocket.OPEN) {
+      ws.current.send('ACK')
+      console.log('XXX sent ACK')
+    } else console.log('XXX Cannot send ACK: readyState = ', ws.current.readyState)
+  }
 
   function onloadHandler(_: Event) {
     console.log('XXX FITS onloadHandler')
-    if (ws.current) {
-      if (ws.current.readyState == WebSocket.OPEN) {
-        console.log('XXX FITS send ACK')
-        ws.current.send('ACK')
-      } else console.log('XXX readyState = ', ws.current.readyState)
-    } else console.log('XXX websocket is undefined')
+    sendAck()
   }
 
   const settings = {
@@ -98,19 +78,31 @@ export const FitsImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Eleme
     JS9.CloseImage({clear: false})
     // @ts-ignore
     JS9.Load(blob, {...settings, ...savedSettings})
-    console.log('XXX loading new image')
+    console.log('XXX loading new image', {...settings, ...savedSettings})
   }
 
+  /*
+        position: absolute;
+        margin: auto;
+        top: 100px;
+        right: 0;
+        bottom: 0;
+        left: 20px;
+        width: 512px;
+        height: 512px;
+   */
+
   return (
-    // <div id="centerdiv" style={{
-    //   margin: '20px',
-    // }}>
-    //   <div className='JS9Menubar'/>
-    //   <div className='JS9'/>
-    //   <div style={{marginTop: '2px'}}>
-    //     <div className='JS9Colorbar'/>
-    //   </div>
-    // </div>
-    <></>
+    <div className='resize both' id="centerdiv" style={{
+      width: '1024px',
+      height: '1024px',
+      margin: '20px',
+    }}>
+      <div className='JS9Menubar'/>
+      <div className='JS9'/>
+      <div style={{marginTop: '2px'}}>
+        <div className='JS9Colorbar'/>
+      </div>
+    </div>
   )
 }

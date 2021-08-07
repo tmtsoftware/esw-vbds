@@ -4,3 +4,20 @@ body {
   padding: 0;
   font-family: sans-serif;
 }
+
+.resize {
+  border: 1px solid black;
+  overflow:auto;
+}
+.resize.horizontal {
+  resize: horizontal;
+}
+.resize.vertical {
+  resize: vertical;
+}
+.resize.both {
+  resize: both;
+}
+.wrap {
+  max-width: 80%;
+}

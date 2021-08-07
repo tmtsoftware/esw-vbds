@@ -17,13 +17,10 @@ export const ImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Element =
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const ws = useRef<WebSocket | null>(null);
+  console.log('XXX new websocket ', webSocketUri)
+  const ws = useRef<WebSocket>(new WebSocket(webSocketUri));
+
   useEffect(() => {
-    if (ws.current) {
-      ws.current.close()
-      ws.current = null
-    }
-    ws.current = new WebSocket(webSocketUri)
     ws.current.binaryType = 'arraybuffer'
     ws.current.onmessage = (event) => {
       const arrayBuffer = new Uint8Array(event.data)
@@ -36,20 +33,14 @@ export const ImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Element =
         messageHistory.current = messageHistory.current.concat(arrayBuffer)
       }
     }
-    return () => {
-      if (ws.current) ws.current.close();
-    };
-  }, [selectedStream, webSocketUri])
+  }, [webSocketUri])
 
-  // useLayoutEffect(() => {
-  //   return () => {
-  //     console.log('XXX unmount ImageConsumer')
-  //     if (ws.current) {
-  //       ws.current.close()
-  //       ws.current = null
-  //     }
-  //   }
-  // }, [])
+  useEffect(() => () => {
+    console.log('XXX  closing websocket')
+    ws.current.close()
+    messageHistory.current = []
+  }, [ws])
+
 
   img.onload = () => {
     const ctx = canvasRef.current?.getContext("2d")
@@ -57,9 +48,9 @@ export const ImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Element =
       ctx.drawImage(img, 0, 0, img.naturalHeight, img.naturalWidth)
     }
     URL.revokeObjectURL(img.src)
-    if (ws.current && ws.current.readyState == WebSocket.OPEN) {
+    if (ws.current.readyState == WebSocket.OPEN) {
       ws.current.send('ACK')
-    }
+    } else console.log('XXX readyState = ', ws.current.readyState)
   }
 
   const urlCreator = window.URL || window.webkitURL;

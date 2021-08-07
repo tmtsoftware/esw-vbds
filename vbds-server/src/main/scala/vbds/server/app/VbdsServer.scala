@@ -1,13 +1,20 @@
 package vbds.server.app
 
+import akka.actor
+import akka.actor.CoordinatedShutdown
+import akka.actor.typed.scaladsl.adapter.TypedActorSystemOps
 import akka.actor.typed.{SpawnProtocol, _}
 import com.typesafe.config.ConfigFactory
 import csw.location.api.models.Connection.HttpConnection
 import csw.location.api.models.{ComponentId, ComponentType, HttpRegistration, Metadata, NetworkType}
 import csw.location.client.scaladsl.HttpLocationServiceFactory
+import csw.logging.client.scaladsl.LoggingSystemFactory
 import csw.prefix.models.{Prefix, Subsystem}
 import vbds.server.actors.SharedDataActor
 import vbds.server.actors.AkkaTypedExtension.UserActorFactory
+
+import scala.concurrent.duration.*
+import scala.concurrent.Await
 
 object VbdsServer {
 
@@ -58,6 +65,9 @@ object VbdsServer {
             """).withFallback(ConfigFactory.load())
 
     implicit val system = ActorSystem(SpawnProtocol(), clusterName, config)
+
+    LoggingSystemFactory.start(BuildInfo.name, BuildInfo.version, host, system)
+
     system.spawn(SharedDataActor(host, httpPort), name)
     registerWithLocationService(httpPort, name)
     system
@@ -68,24 +78,39 @@ object VbdsServer {
   }
 
   // Registers this service with the Location Service
-  private def registerWithLocationService(httpPort: Int, name: String)
-                                         (implicit system: ActorSystem[SpawnProtocol.Command]): Unit = {
+  private def registerWithLocationService(httpPort: Int, name: String)(
+      implicit system: ActorSystem[SpawnProtocol.Command]
+  ): Unit = {
     val locationService = HttpLocationServiceFactory.makeLocalClient
-    locationService.register(
-      new HttpRegistration(
-        HttpConnection(
-          ComponentId(
-            // XXX TODO: Which Subsystem?
-            Prefix(Subsystem.ESW, name),
-            ComponentType.Service
-          )
-        ),
-        httpPort,
-        "/",
-        // XXX TODO: Inside or outside?
-        NetworkType.Inside,
-        Metadata.empty
+    val connection = HttpConnection(
+      ComponentId(
+        // XXX TODO: Which Subsystem?
+        Prefix(Subsystem.ESW, name),
+        ComponentType.Service
       )
     )
+    val timeout = 3.seconds
+    if (Await.result(locationService.find(connection), timeout).nonEmpty) {
+      Await.result(locationService.unregister(connection), timeout)
+    }
+    val registrationResult = Await.result(
+      locationService.register(
+        new HttpRegistration(
+          connection,
+          httpPort,
+          "/",
+          // XXX TODO: Inside or outside?
+          NetworkType.Inside,
+          Metadata.empty
+        )
+      ),
+      timeout
+    )
+    val classicSystem: actor.ActorSystem         = system.toClassic
+    val coordinatedShutdown: CoordinatedShutdown = CoordinatedShutdown(classicSystem)
+    coordinatedShutdown.addTask(
+      CoordinatedShutdown.PhaseBeforeServiceUnbind,
+      s"unregistering-${registrationResult.location}"
+    )(() => registrationResult.unregister())
   }
 }

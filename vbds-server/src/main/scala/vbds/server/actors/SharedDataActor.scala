@@ -1,11 +1,10 @@
 package vbds.server.actors
 
 import java.net.InetSocketAddress
-
 import akka.{Done, NotUsed}
 import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
 import akka.cluster.ddata.typed.scaladsl.{DistributedData, ReplicatorMessageAdapter}
-import akka.cluster.ddata.typed.scaladsl.Replicator._
+import akka.cluster.ddata.typed.scaladsl.Replicator.*
 import akka.stream.ClosedShape
 import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
 import akka.util.{ByteString, Timeout}
@@ -13,16 +12,17 @@ import vbds.server.models.{AccessInfo, ServerInfo, StreamInfo}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest, HttpResponse}
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
-import SharedDataActor._
+import SharedDataActor.*
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop, Scheduler, Signal, SpawnProtocol}
 import akka.cluster.ddata.{ORSet, ORSetKey, SelfUniqueAddress}
-import akka.actor.typed.scaladsl.AskPattern._
+import akka.actor.typed.scaladsl.AskPattern.*
 import akka.event.Logging.{DebugLevel, ErrorLevel, InfoLevel, LogLevel, WarningLevel}
 import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute}
-import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.Directives.*
+import csw.logging.client.scaladsl.GenericLoggerFactory
 import vbds.server.routes.AccessRoute.WebsocketResponseActorMsg
 
 /**
@@ -63,11 +63,9 @@ private[server] object SharedDataActor {
   // It is necessary to match on the key later.
   private sealed trait InternalMsg extends SharedDataActorMessages
 
-//  private case class InfoChanged(chg: Changed[ORSet[_]]) extends InternalMsg
+  private case class InfoUpdateResponse(rsp: UpdateResponse[ORSet[?]]) extends InternalMsg
 
-  private case class InfoUpdateResponse(rsp: UpdateResponse[ORSet[_]]) extends InternalMsg
-
-  private case class InternalSubscribeResponse(chg: SubscribeResponse[ORSet[_]]) extends InternalMsg
+  private case class InternalSubscribeResponse(chg: SubscribeResponse[ORSet[?]]) extends InternalMsg
 
   /**
    * Represents a remote http server that receives data files that it then distributes to its local subscribers
@@ -120,7 +118,7 @@ private[server] object SharedDataActor {
       implicit actorSystem: ActorSystem[SpawnProtocol.Command]
   ): Behavior[SharedDataActorMessages] = {
     Behaviors.setup { ctx =>
-      DistributedData.withReplicatorMessageAdapter[SharedDataActorMessages, ORSet[_]] { replicatorAdapter =>
+      DistributedData.withReplicatorMessageAdapter[SharedDataActorMessages, ORSet[?]] { replicatorAdapter =>
         // Subscribe to changes of the given keys
         replicatorAdapter.subscribe(adminDataKey, InternalSubscribeResponse.apply)
         replicatorAdapter.subscribe(accessDataKey, InternalSubscribeResponse.apply)
@@ -134,15 +132,16 @@ private[server] object SharedDataActor {
  * A cluster actor that shares stream and subscription info via CRDT and implements
  * the publish/subscribe features.
  */
+//noinspection HttpUrlsUsage
 private[server] class SharedDataActor(
     ctx: ActorContext[SharedDataActorMessages],
     httpHost: String,
     httpPort: Int,
-    replicatorAdapter: ReplicatorMessageAdapter[SharedDataActorMessages, ORSet[_]]
+    replicatorAdapter: ReplicatorMessageAdapter[SharedDataActorMessages, ORSet[?]]
 )(implicit actorSystem: ActorSystem[SpawnProtocol.Command])
     extends AbstractBehavior(ctx) {
 
-  import ctx.log
+  private val log = GenericLoggerFactory.getLogger
   implicit val ec: ExecutionContext    = ctx.executionContext
   implicit val scheduler: Scheduler    = actorSystem.scheduler
   implicit val node: SelfUniqueAddress = DistributedData(actorSystem).selfUniqueAddress
@@ -164,7 +163,7 @@ private[server] class SharedDataActor(
 
   // A map with information about remote HTTP servers with subscribers.
   // The key is from shared cluster data (CRDT) and the value is a flow that sends requests to the remote server.
-  var remoteConnections = Map[ServerInfo, Flow[HttpRequest, HttpResponse, _]]()
+  var remoteConnections = Map[ServerInfo, Flow[HttpRequest, HttpResponse, ?]]()
 
   startHttpServer()
 
@@ -176,7 +175,7 @@ private[server] class SharedDataActor(
         binding = b
 
       case AddStream(name, contentType, replyTo) =>
-        log.debug("Adding: {}: {}", name, contentType)
+        log.debug(s"Adding: $name, $contentType")
         val info = StreamInfo(name, contentType)
         replicatorAdapter.askUpdate(
           askReplyTo =>
@@ -188,7 +187,7 @@ private[server] class SharedDataActor(
         replyTo ! info
 
       case DeleteStream(name, replyTo) =>
-        log.debug("Removing: {}", name)
+        log.debug(s"Removing: $name")
         streams.find(_.name == name).foreach { info =>
           replicatorAdapter.askUpdate(
             askReplyTo =>
@@ -220,7 +219,7 @@ private[server] class SharedDataActor(
       case DeleteSubscription(id, replyTo) =>
         val s = subscriptions.find(_.id == id)
         s.foreach { info =>
-          log.debug("Removing Subscription with id: {}", info)
+          log.debug(s"Removing Subscription with id: $info")
           replicatorAdapter.askUpdate(
             askReplyTo =>
               Update(accessDataKey, ORSet.empty[StreamInfo], WriteLocal, askReplyTo)(
@@ -262,12 +261,12 @@ private[server] class SharedDataActor(
           case InternalSubscribeResponse(c @ Changed(`adminDataKey`)) =>
             val data = c.get(adminDataKey)
             streams = data.elements
-            log.debug("Subscribe response: Current streams: {}", streams)
+            log.debug(s"Subscribe response: Current streams: $streams")
 
           case InternalSubscribeResponse(c @ Changed(`accessDataKey`)) =>
             val data = c.get(accessDataKey)
             subscriptions = data.elements
-            log.debug("Subscribe response: Current subscriptions: {}", streams)
+            log.debug(s"Subscribe response: Current subscriptions: $streams")
 
           case x => log.error(s"XXX Unexpected internal message: $x")
         }
@@ -365,7 +364,7 @@ private[server] class SharedDataActor(
 
     // Construct a runnable graph that broadcasts the published data to all of the subscribers
     val g = RunnableGraph.fromGraph(GraphDSL.create(Sink.ignore) { implicit builder => out =>
-      import GraphDSL.Implicits._
+      import GraphDSL.Implicits.*
 
       // Broadcast with an output for each subscriber
       val bcast = builder.add(Broadcast[ByteString](numOut))
