@@ -6,6 +6,8 @@ import {useLocationService} from "../contexts/LocationServiceContext";
 
 const {Option} = Select;
 
+// Displays select element with a choice of VBDS servers, based on
+// Location Service information.
 export const ServerSelector = (): JSX.Element => {
 
   const {serverInfo, setServerInfo} = useAppContext()

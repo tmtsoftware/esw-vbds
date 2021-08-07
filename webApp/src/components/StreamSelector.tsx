@@ -1,3 +1,5 @@
+// noinspection HttpUrlsUsage
+
 import React, {useEffect} from 'react'
 import {Select, Typography} from "antd";
 import {adminRoute, useAppContext} from "../AppContext";
@@ -6,6 +8,7 @@ import type {StreamInfo} from "../models/Models";
 
 const {Option} = Select;
 
+// Displays select element with a choice of VBDS image streams
 export const StreamSelector = (): JSX.Element => {
 
   const {serverInfo, availableStreams, setAvailableStreams, selectedStream, setSelectedStream} = useAppContext()

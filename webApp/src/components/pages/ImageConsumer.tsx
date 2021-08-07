@@ -1,17 +1,12 @@
 import React, {useEffect, useRef} from 'react'
-import {useAppContext} from "../../AppContext";
 
 type ImageConsumerProps = {
-  webSocketUri: string,
+  blob: Blob | undefined,
+  sendAck: () => void
 }
 
-// Keeping this reference outside the component seems to work better (tried useRef, but had issues)
-var imageConsumerWebSocket: WebSocket
-
-export const ImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Element => {
-  const {selectedStream} = useAppContext()
-  const messageHistory = useRef<Array<Uint8Array>>([])
-
+// Used to display jpeg images in a canvas
+export const ImageConsumer = ({blob, sendAck}: ImageConsumerProps): JSX.Element => {
   const img = new Image()
 
   // TODO
@@ -20,40 +15,17 @@ export const ImageConsumer = ({webSocketUri}: ImageConsumerProps): JSX.Element =
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  console.log('XXX new websocket ', webSocketUri)
-  imageConsumerWebSocket = new WebSocket(webSocketUri);
-
   useEffect(() => {
-    imageConsumerWebSocket.binaryType = 'arraybuffer'
-    imageConsumerWebSocket.onmessage = (event) => {
-      const arrayBuffer = new Uint8Array(event.data)
-      if (arrayBuffer.byteLength == 1) {
-        const buffers = messageHistory.current
-        const blob = new Blob(buffers, {type: selectedStream?.contentType})
-        displayImage(blob)
-        messageHistory.current = []
-      } else {
-        messageHistory.current = messageHistory.current.concat(arrayBuffer)
-      }
-    }
-  }, [webSocketUri])
-
-  useEffect(() => () => {
-    console.log('XXX  closing websocket')
-    imageConsumerWebSocket.close()
-    messageHistory.current = []
-  }, [imageConsumerWebSocket])
-
+    if (blob) displayImage(blob)
+  }, [blob])
 
   img.onload = () => {
     const ctx = canvasRef.current?.getContext("2d")
     if (ctx) {
       ctx.drawImage(img, 0, 0, img.naturalHeight, img.naturalWidth)
     }
+    sendAck()
     URL.revokeObjectURL(img.src)
-    if (imageConsumerWebSocket.readyState == WebSocket.OPEN) {
-      imageConsumerWebSocket.send('ACK')
-    } else console.log('XXX readyState = ', imageConsumerWebSocket.readyState)
   }
 
   const urlCreator = window.URL || window.webkitURL;

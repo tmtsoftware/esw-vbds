@@ -25,15 +25,13 @@ The main application is an HTTP server called `vbds-server`:
 vbds-server 0.0.1
 Usage: vbds-server [options]
 
-  -n, --name <name>        The name of this server(default: vbds)
-  --http-host <hostname>   The HTTP server host name (default: 127.0.0.1)
-  --http-port <number>     The HTTP server port number (default: 0)
-  --akka-host <hostname>   The Akka system host name (default: 127.0.0.1)
-  --akka-port <number>     The Akka system port number (default: 0)
+  -n, --name <name>        The name of this server (For the Location Service: default: vbds)
+  --http-port <number>     The HTTP server port number (default: 0 for random port)
+  --akka-port <number>     The Akka system port number (default: 0 for random port)
   -s, --seeds <host>:<port>,<host>:<port>,...
-                           Optional list of cluster seeds in the form host:port,host:port,...
-  --help                   
-  --version                
+                           Optional list of cluster seeds in the form 'host:port,host:port,...' for joining the VBDS cluster
+  --help
+  --version
 ```
 
 A `vbds-client` application is provided, for convenience and for use in tests, but any HTTP client will also work, as long as
@@ -49,15 +47,14 @@ vbds-client 0.0.1
 Usage: vbds-client [options]
 
   -n, --name <name>        The name of the vbds-server server(default: vbds)
-  --host <host name>       The VBDS HTTP server host name (default: 127.0.0.1)
-  -p, --port <number>      The VBDS HTTP server port number (default: 80)
   --create <stream name>   Creates a new VBDS stream with the given name
-  --contentType <content-type>
+  --content-type <content-type>
                            Specifies the content type of the files in the stream
   --delete <stream name>   Deletes the VBDS stream with the given name
   -l, --list               List the available streams
   --stats                  Print timing statistics when publishing files
   --repeat                 Keep publishing the same files forever, until killed (for testing)
+  --save-files             If true, save the files received by the subscription to the current directory with names like <streamName>-<count>
   --stats-interval <value>
                            If --stats option was given, controls how often statistics are printed (default: 1 = every time)
   --subscribe <stream name>
@@ -71,14 +68,14 @@ Usage: vbds-client [options]
   --suffix <suffix>        Optional suffix for files to publish if the file given by --data is a directory
   --chunk-size <num-bytes>
                            Optional chunk size (to tune file transfer performance)
-  --help                   
-  --version                
+  --help
+  --version
 ```
 
 ## Web App to Display FITS Image from VBDS Streams
 
-A prototype web app based on [Scala.js](https://www.scala-js.org/) and [JS9](https://js9.si.edu/) is available under 
-[web/vbds-scala-js](web/vbds-scala-js). 
+A prototype web app is available under [webApp](webApp).
+For jpeg images, an HTML canvas is used. For FITS, the [JS9](https://github.com/ericmandel/js9) application is embedded in the page.
 
 __Note__: In order to prevent overloading a subscriber when the publisher is too fast, a subscriber needs to reply on its websocket with a 
 short "ACK" message after receiving each message (image fragment). 
@@ -96,6 +93,14 @@ This should prevent too many messages from being queued in a browser's websocket
 | Create a subscription         | GET       | ws://host:port/vbds/access/streams/{streamName} | SwitchingProtocols (101) – Creates a websocket connection for receiving the data
 
 To delete a subscription, just close the websocket for it. Subscriptions are automatically deleted if a client disconnects.
+
+## Prerequisites
+
+VBDS uses the [CSW Location Service](https://tmtsoftware.github.io/csw/services/location.html)
+to register and locate the VBDS servers. To start the
+[CSW services](https://tmtsoftware.github.io/csw/apps/cswservices.html), run:
+
+    csw-services start
 
 ## Running the Server
 
