@@ -106,30 +106,33 @@ to register and locate the VBDS servers. To start the
 
 You can test `vbds-server` by first starting an instance as a seed node (hostA). For example:
 
-    vbds-server --http-host hostA --http-port 7777 --akka-host hostA --akka-port 8888 -s hostA:8888
+    vbds-server --name server1 --akka-port 7777
 
 and then starting one or more other instances on other hosts that can join the Akka cluster:
 
-    vbds-server --http-host hostB --http-port 7777 --akka-host hostB -s hostA:8888
+    vbds-server --name server2 --seeds server1Host:7777
 
-In the first case we specified an Akka port (8888) for the cluster seed node. In the second case, a random port was used,
-since no -akka-port option was specified. We need to know the akka host and port for the seed node, 
-and of course the HTTP host and port, so we can send requests to it.
-
+In the first case we specified the optional Akka port (7777) for the cluster seed node.
+If not specified, a random port will be chosen and printed out on startup.
+The host will be the primary IP address used to register the service with the Location Service.
+In the second case, a random port was used, since no -akka-port option was specified. 
+Clients can discover the host and port for the HTTP service by looking up the names ("server1" and "server2" here).
 
 ### Test using vbds-client Application
 
-Create a FITS stream named `WFS1-RAW`: (Note: The content type is optional, but may be used by image viewers)
+Create a FITS stream named `WFS1-RAW` (Note: The content type is optional, but may be used by image viewers).
+The --name option specified the name of the VBDS server to send the request to. The Location Service is used
+to lookup the HTTP server matching the name:
 
-    vbds-client --host hostA -p 7777 --create WFS1-RAW --content-type "image/fits"
+    vbds-client --name server1 --create WFS1-RAW --content-type "image/fits"
 
 Subscribe to the stream (`-a` or `--action` takes a shell command that receives a filename argument):
 
-    vbds-client --host hostA --port 7777 --subscribe WFS1-RAW -a echo
+    vbds-client --name server1 --subscribe WFS1-RAW -a echo
 
 Publish some data (Replace MyFile with the file name):
 
-    vbds-client --host hostA -p 7777 --publish WFS1-RAW --data myFile.fits
+    vbds-client --name server2 --publish WFS1-RAW --data myFile.fits
 
 Note that instead of a file, a directory can be specified, in which case all the files in the directory are sorted and sent (for testing).
 

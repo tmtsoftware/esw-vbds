@@ -19,6 +19,8 @@ import SharedDataActor.*
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop, Scheduler, Signal, SpawnProtocol}
 import akka.cluster.ddata.{ORSet, ORSetKey, SelfUniqueAddress}
 import akka.actor.typed.scaladsl.AskPattern.*
+import akka.cluster.ClusterEvent.{MemberEvent, ReachabilityEvent}
+import akka.cluster.typed.{Cluster, Leave}
 import akka.event.Logging.{DebugLevel, ErrorLevel, InfoLevel, LogLevel, WarningLevel}
 import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute}
 import akka.http.scaladsl.server.Directives.*
@@ -31,6 +33,9 @@ import vbds.server.routes.AccessRoute.WebsocketResponseActorMsg
 private[server] object SharedDataActor {
 
   sealed trait SharedDataActorMessages
+
+  // Tell the actor to terminate
+  case class StopSharedDataActor(replyTo: ActorRef[Done]) extends SharedDataActorMessages
 
   case class AddStream(streamName: String, contentType: String, replyTo: ActorRef[StreamInfo]) extends SharedDataActorMessages
 
@@ -66,6 +71,9 @@ private[server] object SharedDataActor {
   private case class InfoUpdateResponse(rsp: UpdateResponse[ORSet[?]]) extends InternalMsg
 
   private case class InternalSubscribeResponse(chg: SubscribeResponse[ORSet[?]]) extends InternalMsg
+
+  private case class ReachabilityChange(reachabilityEvent: ReachabilityEvent) extends InternalMsg
+  private case class MemberChange(event: MemberEvent)                         extends InternalMsg
 
   /**
    * Represents a remote http server that receives data files that it then distributes to its local subscribers
@@ -118,6 +126,12 @@ private[server] object SharedDataActor {
       implicit actorSystem: ActorSystem[SpawnProtocol.Command]
   ): Behavior[SharedDataActorMessages] = {
     Behaviors.setup { ctx =>
+      val memberEventAdapter: ActorRef[MemberEvent] = ctx.messageAdapter(MemberChange)
+      Cluster(ctx.system).subscriptions ! akka.cluster.typed.Subscribe(memberEventAdapter, classOf[MemberEvent])
+
+      val reachabilityAdapter = ctx.messageAdapter(ReachabilityChange)
+      Cluster(ctx.system).subscriptions ! akka.cluster.typed.Subscribe(reachabilityAdapter, classOf[ReachabilityEvent])
+
       DistributedData.withReplicatorMessageAdapter[SharedDataActorMessages, ORSet[?]] { replicatorAdapter =>
         // Subscribe to changes of the given keys
         replicatorAdapter.subscribe(adminDataKey, InternalSubscribeResponse.apply)
@@ -141,7 +155,7 @@ private[server] class SharedDataActor(
 )(implicit actorSystem: ActorSystem[SpawnProtocol.Command])
     extends AbstractBehavior(ctx) {
 
-  private val log = GenericLoggerFactory.getLogger
+  private val log                      = GenericLoggerFactory.getLogger
   implicit val ec: ExecutionContext    = ctx.executionContext
   implicit val scheduler: Scheduler    = actorSystem.scheduler
   implicit val node: SelfUniqueAddress = DistributedData(actorSystem).selfUniqueAddress
@@ -149,7 +163,7 @@ private[server] class SharedDataActor(
   // The local IP address, set at runtime via a message from the code that starts the HTTP server.
   // This is used to determine which HTTP server has the websocket connection to a client.
   var localAddress: InetSocketAddress = _
-  var binding: Http.ServerBinding = _
+  var binding: Http.ServerBinding     = _
 
   // Cache of shared subscription info
   var subscriptions = Set[AccessInfo]()
@@ -165,6 +179,7 @@ private[server] class SharedDataActor(
   // The key is from shared cluster data (CRDT) and the value is a flow that sends requests to the remote server.
   var remoteConnections = Map[ServerInfo, Flow[HttpRequest, HttpResponse, ?]]()
 
+  // Used to shutdown the HTTP server when done
   startHttpServer()
 
   override def onMessage(msg: SharedDataActorMessages): Behavior[SharedDataActorMessages] = {
@@ -219,6 +234,7 @@ private[server] class SharedDataActor(
       case DeleteSubscription(id, replyTo) =>
         val s = subscriptions.find(_.id == id)
         s.foreach { info =>
+          subscriptions = subscriptions - info
           log.debug(s"Removing Subscription with id: $info")
           replicatorAdapter.askUpdate(
             askReplyTo =>
@@ -254,6 +270,7 @@ private[server] class SharedDataActor(
           case ErrorLevel   => log.error(msg)
           case _            =>
         }
+
       case internal: InternalMsg =>
         internal match {
           case InfoUpdateResponse(_) => Behaviors.same
@@ -268,16 +285,36 @@ private[server] class SharedDataActor(
             subscriptions = data.elements
             log.debug(s"Subscribe response: Current subscriptions: $streams")
 
+          case ReachabilityChange(reachabilityEvent) =>
+            log.debug(s"ReachabilityChange: $reachabilityEvent")
+            // XXX TODO FIXME: Should not be needed!
+            Cluster(ctx.system).manager ! Leave(reachabilityEvent.member.address)
+
+          case MemberChange(memberEvent) =>
+            log.debug(s"MemberChange: $memberEvent")
+
           case x => log.error(s"XXX Unexpected internal message: $x")
         }
+
+      case StopSharedDataActor(replyTo) =>
+        println("XXX Stopping SharedDataActor")
+        val cluster = Cluster(ctx.system)
+        cluster.manager ! Leave(cluster.selfMember.address)
+        replyTo ! Done
     }
-    Behaviors.same
+
+    msg match {
+      case StopSharedDataActor(_) =>
+        Behaviors.stopped
+      case _ =>
+        Behaviors.same
+    }
   }
 
   override def onSignal: PartialFunction[Signal, Behavior[SharedDataActorMessages]] = {
     case signal if signal == PostStop =>
-      log.debug(s"XXX Terminating")
-      binding.terminate(60.seconds)
+      println(s"XXX onSignal SharedDataActor Terminating")
+      binding.terminate(5.seconds)
       Behaviors.stopped
   }
 

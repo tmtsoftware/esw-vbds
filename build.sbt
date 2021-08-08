@@ -1,5 +1,5 @@
 lazy val `vbds-server` = project
-  .enablePlugins(DeployApp, VbdsBuildInfo, AutoMultiJvm)
+  .enablePlugins(DeployApp, AutoMultiJvm)
   .settings(
     libraryDependencies ++= Dependencies.vbdsServer
   )

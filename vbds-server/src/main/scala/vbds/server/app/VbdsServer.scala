@@ -1,9 +1,12 @@
 package vbds.server.app
 
-import akka.actor
-import akka.actor.CoordinatedShutdown
+import akka.{Done, actor}
+import akka.actor.{AddressFromURIString, CoordinatedShutdown}
+import akka.actor.typed.scaladsl.AskPattern.Askable
 import akka.actor.typed.scaladsl.adapter.TypedActorSystemOps
 import akka.actor.typed.{SpawnProtocol, _}
+import akka.cluster.typed.{Cluster, JoinSeedNodes}
+import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import csw.location.api.models.Connection.HttpConnection
 import csw.location.api.models.{ComponentId, ComponentType, HttpRegistration, Metadata, NetworkType}
@@ -12,9 +15,10 @@ import csw.logging.client.scaladsl.LoggingSystemFactory
 import csw.prefix.models.{Prefix, Subsystem}
 import vbds.server.actors.SharedDataActor
 import vbds.server.actors.AkkaTypedExtension.UserActorFactory
+import vbds.server.actors.SharedDataActor.StopSharedDataActor
 
 import scala.concurrent.duration.*
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 
 object VbdsServer {
 
@@ -24,14 +28,13 @@ object VbdsServer {
   val clusterName = "vbds-system"
 
   // Gets the akka seed nodes config line
-  private def getSeedNodes(clusterSeeds: String): String = {
-    if (clusterSeeds.nonEmpty) {
-      val seeds = clusterSeeds
-        .split(",")
-        .map(s => s""""akka://$clusterName@$s"""")
-        .mkString(",")
-      s"akka.cluster.seed-nodes=[$seeds]"
-    } else throw new IllegalArgumentException("Missing required seed nodes")
+  private def getSeedNodes(clusterSeeds: String): List[String] = {
+    if (clusterSeeds.isEmpty)
+      throw new IllegalArgumentException("Missing required seed nodes")
+    clusterSeeds
+      .split(",")
+      .toList
+      .map(s => s"akka://$clusterName@$s")
   }
 
   /**
@@ -53,23 +56,21 @@ object VbdsServer {
   ): ActorSystem[SpawnProtocol.Command] = {
     checkPort(httpPort)
     checkPort(akkaPort)
-    val seedNodes = getSeedNodes(clusterSeeds)
 
     // Generate the akka config for the akka and http ports as well as the cluster seed nodes
     val config = ConfigFactory.parseString(s"""
-               akka.remote.netty.tcp.hostname=$host
-               akka.remote.netty.tcp.port=$akkaPort
                akka.remote.artery.canonical.hostname=$host
                akka.remote.artery.canonical.port=$akkaPort
-               $seedNodes
             """).withFallback(ConfigFactory.load())
 
     implicit val system = ActorSystem(SpawnProtocol(), clusterName, config)
-
     LoggingSystemFactory.start(BuildInfo.name, BuildInfo.version, host, system)
+    val seedNodes       = getSeedNodes(clusterSeeds).map(AddressFromURIString.parse)
+    val cluster         = Cluster(system)
+    cluster.manager ! JoinSeedNodes(seedNodes)
 
-    system.spawn(SharedDataActor(host, httpPort), name)
-    registerWithLocationService(httpPort, name)
+    val actorRef = system.spawn(SharedDataActor(host, httpPort), name)
+    registerWithLocationService(httpPort, name, actorRef)
     system
   }
 
@@ -78,7 +79,11 @@ object VbdsServer {
   }
 
   // Registers this service with the Location Service
-  private def registerWithLocationService(httpPort: Int, name: String)(
+  private def registerWithLocationService(
+      httpPort: Int,
+      name: String,
+      actorRef: ActorRef[SharedDataActor.SharedDataActorMessages]
+  )(
       implicit system: ActorSystem[SpawnProtocol.Command]
   ): Unit = {
     val locationService = HttpLocationServiceFactory.makeLocalClient
@@ -106,11 +111,34 @@ object VbdsServer {
       ),
       timeout
     )
+
+    // Unregister when shutting down ActorSystem
     val classicSystem: actor.ActorSystem         = system.toClassic
     val coordinatedShutdown: CoordinatedShutdown = CoordinatedShutdown(classicSystem)
     coordinatedShutdown.addTask(
       CoordinatedShutdown.PhaseBeforeServiceUnbind,
       s"unregistering-${registrationResult.location}"
-    )(() => registrationResult.unregister())
+    )(() => {
+      import system.*
+      println("XXX coordinatedShutdown")
+      val f = Future
+        .sequence(
+          List(
+            registrationResult.unregister(),
+            actorRef.ask(StopSharedDataActor)(Timeout(3.seconds), system.scheduler)
+          )
+        )
+        .map(_ => Done)
+      Await.ready(f, 5.seconds)
+      f
+    })
+
+    // Unregister when the app exits
+    Runtime.getRuntime.addShutdownHook(new Thread {
+      override def run(): Unit = {
+        println("XXX shutdown hook")
+        system.terminate()
+      }
+    })
   }
 }
