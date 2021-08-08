@@ -10,7 +10,7 @@ const {Option} = Select;
 // Location Service information.
 export const ServerSelector = (): JSX.Element => {
 
-  const {serverInfo, setServerInfo} = useAppContext()
+  const {serverInfo, setServerInfo, setSelectedStream} = useAppContext()
   const [servers, setServers] = useState<Array<ServerInfo>>([])
 
   const locationService = useLocationService()
@@ -38,6 +38,7 @@ export const ServerSelector = (): JSX.Element => {
 
   function serverSelected(name: string | undefined) {
     const s = servers.find(s => s.name == name)
+    setSelectedStream(undefined)
     setServerInfo(s)
   }
 

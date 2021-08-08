@@ -13,6 +13,11 @@ and this project from Github, first edit and then run this script to "minify" an
     cd webApp
     ./update-js9.sh         # Edit this script to set the location of the JS9 sources
 
+This is required, since JS9 is not a React component and is not easily usable in a React app or via "npm install"
+(although it is available via npm).
+The JavaScript and CSS for JS9 are declared in [public/index.html](public/index.html).
+Attempts to place it in a React component were so far not successful.
+
 ## Prerequisites Required for Running App
 
 The web app uses the [CSW Location Service](https://tmtsoftware.github.io/csw/services/location.html)

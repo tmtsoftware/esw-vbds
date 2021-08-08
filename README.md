@@ -211,6 +211,13 @@ This is the basic flow of a published data file:
   The clients need to collect the data until the file is complete and then can display it, do calculations, etc.
   The client also needs to acknowledge each websocket message with a short "ACK" message, for flow control reasons
   (to enable back-pressure back to the publisher).
+
+
+## Issues
+
+If multiple VBDS servers are running in the cluster and you kill one of them, many Akka warnings are logged in the
+other cluster members, although it does not appear to prevent them from functioning.
+More work is needed to identify the cause.
   
 ### Basic VBDS Flow
 
