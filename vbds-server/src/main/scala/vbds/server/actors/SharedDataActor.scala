@@ -296,7 +296,7 @@ private[server] class SharedDataActor(
     // Need to know this http server's address when subscribing
     bindingF.onComplete {
       case Success(binding) =>
-        println(s"HTTP Server running on: http:/${binding.localAddress}")
+        println(s"VBDS Server running on: http:/${binding.localAddress} (${actorSystem.address})")
         ctx.self ! LocalAddress(new InetSocketAddress(httpHost, binding.localAddress.getPort), binding)
       case Failure(error) =>
         println(error)
