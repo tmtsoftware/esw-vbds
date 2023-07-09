@@ -13,7 +13,7 @@ To build and install the applications, run:
 
     sbt publishLocal stage
 
-See [web/vbds-scala-js](web/vbds-scala-js) for instructions on how to build the JS9 based web app.
+See [webApp/README.md](webApp/README.md) for instructions on how to build the JS9 based web app.
 
 See [python-client](python-client) for information about an example VBDS python client that calculates the centroid of the received images.
 
@@ -84,13 +84,13 @@ This should prevent too many messages from being queued in a browser's websocket
 
 ## VBDS REST API
 
-| Description                   | Verb      | URI                               | Response |
-| ----------------------------- |-----------|---------------------------------- |--------- |          
-| List all streams              | GET       | /vbds/admin/streams              | OK (200) – Stream names in JSON; empty document if no streams
-| Create a stream               | POST      | /vbds/admin/streams/{streamName}?contentType=... | OK (200) – New stream name in JSON; Conflict (409) if stream exists
-| Delete a stream               | DELETE    | /vbds/admin/streams/{streamName} | OK (200) – Deleted stream name in JSON; NotFound (404) if stream does not exist
-| Publish an image to a stream  | POST      | /vbds/transfer/streams/{streamName}/image | Accepted (204) – (no content); Bad Request (400) – for non-existent stream
-| Create a subscription         | GET       | ws://host:port/vbds/access/streams/{streamName} | SwitchingProtocols (101) – Creates a websocket connection for receiving the data
+| Description                  | Verb   | URI                                              | Response                                                                         |
+|------------------------------|--------|--------------------------------------------------|----------------------------------------------------------------------------------|          
+| List all streams             | GET    | /vbds/admin/streams                              | OK (200) – Stream names in JSON; empty document if no streams                    |
+| Create a stream              | POST   | /vbds/admin/streams/{streamName}?contentType=... | OK (200) – New stream name in JSON; Conflict (409) if stream exists              |
+| Delete a stream              | DELETE | /vbds/admin/streams/{streamName}                 | OK (200) – Deleted stream name in JSON; NotFound (404) if stream does not exist  |
+| Publish an image to a stream | POST   | /vbds/transfer/streams/{streamName}/image        | Accepted (204) – (no content); Bad Request (400) – for non-existent stream       |
+| Create a subscription        | GET    | ws://host:port/vbds/access/streams/{streamName}  | SwitchingProtocols (101) – Creates a websocket connection for receiving the data |
 
 To delete a subscription, just close the websocket for it. Subscriptions are automatically deleted if a client disconnects.
 
