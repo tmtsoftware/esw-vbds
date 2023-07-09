@@ -9,15 +9,15 @@ object AutoMultiJvm extends AutoPlugin {
 
   override def projectSettings: Seq[Setting[_]] = SbtMultiJvm.multiJvmSettings ++ Seq(
     test := {
-      (test in Test).value
-      (test in MultiJvm).value
+      (Test / test).value
+      (MultiJvm / test).value
     },
-    multiNodeHosts in MultiJvm := multiNodeHostNames,
-    assemblyMergeStrategy in assembly in MultiJvm := {
+    MultiJvm / multiNodeHosts := multiNodeHostNames,
+    MultiJvm / assembly / assemblyMergeStrategy := {
       case "application.conf"                     => MergeStrategy.concat
       case x if x.contains("versions.properties") => MergeStrategy.discard
       case x =>
-        val oldStrategy = (assemblyMergeStrategy in assembly in MultiJvm).value
+        val oldStrategy = (MultiJvm / assembly / assemblyMergeStrategy).value
         oldStrategy(x)
     }
   )

@@ -17,6 +17,7 @@ import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.*
 import scala.util.{Failure, Success, Try}
 
+//noinspection SpellCheckingInspection
 object VbdsClient {
   trait Subscription {
     def unsubscribe(): Unit

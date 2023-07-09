@@ -9,12 +9,11 @@ object Dependencies {
     Akka.`akka-actor-typed`,
     Akka.`akka-cluster-typed`,
     Akka.`akka-slf4j`,
-//    Akka.`akka-remote`,
     AkkaHttp.`akka-http`,
     AkkaHttp.`akka-http-spray-json`,
     Libs.`scopt`,
     Libs.`boopickle`,
-    Chill.`chill-akka`,
+//    Chill.`chill-akka`,
     Libs.`logback-classic`,
 
     Libs.`commons-io` % Test,
@@ -39,7 +38,6 @@ object Dependencies {
   val webClient = Def.setting(Seq(
     "org.scala-js" %%% "scalajs-dom" % "1.1.0",
     "com.lihaoyi" %%% "scalatags" % "0.9.4",
-//    "org.querki" %%% "jquery-facade" % "2.0",
     "com.github.japgolly.scalacss" %%% "core" % "0.7.0",
     "com.github.japgolly.scalacss" %%% "ext-scalatags" % "0.7.0",
     "com.lihaoyi" %%% "upickle" % "1.4.0",

@@ -400,7 +400,7 @@ private[server] class SharedDataActor(
     val remoteResponses = remoteFlowPairs.map(_._1)
 
     // Construct a runnable graph that broadcasts the published data to all of the subscribers
-    val g = RunnableGraph.fromGraph(GraphDSL.create(Sink.ignore) { implicit builder => out =>
+    val g = RunnableGraph.fromGraph(GraphDSL.createGraph(Sink.ignore) { implicit builder => out =>
       import GraphDSL.Implicits.*
 
       // Broadcast with an output for each subscriber
