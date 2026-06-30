@@ -17,8 +17,8 @@ object BFormat {
     def write(o: T) = toBinary(o)
   }
 
-  implicit val stringFormat = make[String](_.utf8String, ByteString.apply)
-  implicit val byeStringFormat = make[ByteString](identity, identity)
+  implicit val stringFormat: BFormat[String] = make[String](_.utf8String, ByteString.apply)
+  implicit val byeStringFormat: BFormat[ByteString] = make[ByteString](identity, identity)
 
   implicit def objectFormat[T: Pickler]: BFormat[T] = BFormat.make[T](
     x => Unpickle[T].fromBytes(x.toByteBuffer),

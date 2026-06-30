@@ -3,7 +3,6 @@ package vbds.client
 import java.io.File
 import java.nio.file.Path
 import java.time.Instant
-
 import akka.Done
 import akka.actor.{ActorRef, ActorSystem}
 import akka.event.{LogSource, Logging}
@@ -13,7 +12,7 @@ import akka.http.scaladsl.model.ws.Message
 import akka.stream.scaladsl.MergeHub
 import vbds.client.VbdsClient.Subscription
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 import scala.concurrent.duration.*
 import scala.util.{Failure, Success, Try}
 
@@ -37,7 +36,7 @@ object VbdsClient {
 //noinspection HttpUrlsUsage
 class VbdsClient(name: String, host: String, port: Int, chunkSize: Int = 1024 * 1024)(implicit val system: ActorSystem) {
 
-  implicit val executionContext = system.dispatcher
+  implicit val executionContext: ExecutionContextExecutor = system.dispatcher
   val adminRoute                = "/vbds/admin/streams"
   val accessRoute               = "/vbds/access/streams"
   val transferRoute             = "/vbds/transfer/streams"

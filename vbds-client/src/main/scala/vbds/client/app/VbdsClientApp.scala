@@ -20,7 +20,7 @@ import vbds.server.app.BuildInfo
  * A VIZ Bulk Data System HTTP client command line application.
  */
 object VbdsClientApp extends App {
-  implicit val system       = ActorSystem("vbdsClient")
+  implicit val system: ActorSystem = ActorSystem("vbdsClient")
 
   // Command line options
   private case class Options(name: String = "vbds",
