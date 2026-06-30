@@ -1,6 +1,6 @@
 package vbds.server.marshalling
 
-import akka.util.ByteString
+import org.apache.pekko.util.ByteString
 import boopickle.Default._
 
 trait BFormat[T] {

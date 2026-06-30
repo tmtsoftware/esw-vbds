@@ -1,10 +1,10 @@
 package vbds.server.routes
 
-import akka.http.scaladsl.model.HttpMethods._
-import akka.http.scaladsl.model.{HttpHeader, HttpResponse}
-import akka.http.scaladsl.model.headers._
-import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.server.{Directive0, MethodRejection, RejectionHandler}
+import org.apache.pekko.http.scaladsl.model.HttpMethods._
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpResponse}
+import org.apache.pekko.http.scaladsl.model.headers._
+import org.apache.pekko.http.scaladsl.server.Directives._
+import org.apache.pekko.http.scaladsl.server.{Directive0, MethodRejection, RejectionHandler}
 
 object Cors {
   val corsAllowOrigins: List[String] = List("*")

@@ -1,13 +1,13 @@
 package vbds.server.actors
 
-import akka.actor.typed.{ActorRef, Scheduler}
-import akka.util.Timeout
+import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
+import org.apache.pekko.util.Timeout
 import vbds.server.actors.SharedDataActor.SharedDataActorMessages
 import vbds.server.models.StreamInfo
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
-import akka.actor.typed.scaladsl.AskPattern._
+import org.apache.pekko.actor.typed.scaladsl.AskPattern._
 
 /**
   * Internal Admin API
@@ -32,7 +32,7 @@ class AdminApiImpl(sharedDataActor: ActorRef[SharedDataActorMessages])(implicit 
   import SharedDataActor._
 
   def listStreams(): Future[Set[StreamInfo]] = {
-    sharedDataActor.ask(ListStreams)
+    sharedDataActor.ask(ListStreams.apply)
   }
 
   def streamExists(name: String): Future[Boolean] = {

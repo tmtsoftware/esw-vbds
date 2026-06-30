@@ -1,10 +1,10 @@
 package vbds.server.marshalling
 
-import akka.http.scaladsl.marshalling.Marshaller
-import akka.http.scaladsl.model.HttpEntity.Chunked
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
-import akka.http.scaladsl.unmarshalling.Unmarshaller
-import akka.stream.scaladsl.Source
+import org.apache.pekko.http.scaladsl.marshalling.Marshaller
+import org.apache.pekko.http.scaladsl.model.HttpEntity.Chunked
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity}
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshaller
+import org.apache.pekko.stream.scaladsl.Source
 
 trait BinaryMarshallers {
   implicit def byteStringMarshaller[T: BFormat]

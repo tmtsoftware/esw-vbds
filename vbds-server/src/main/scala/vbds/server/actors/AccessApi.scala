@@ -1,13 +1,13 @@
 package vbds.server.actors
 
-import akka.NotUsed
-import akka.actor.typed.{ActorRef, Scheduler}
-import akka.stream.scaladsl.Sink
-import akka.util.ByteString
-import akka.util.Timeout
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
+import org.apache.pekko.stream.scaladsl.Sink
+import org.apache.pekko.util.ByteString
+import org.apache.pekko.util.Timeout
 import vbds.server.actors.SharedDataActor.SharedDataActorMessages
 import vbds.server.models.AccessInfo
-import akka.actor.typed.scaladsl.AskPattern._
+import org.apache.pekko.actor.typed.scaladsl.AskPattern._
 import vbds.server.routes.AccessRoute.WebsocketResponseActorMsg
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -44,7 +44,7 @@ class AccessApiImpl(sharedDataActor: ActorRef[SharedDataActorMessages])(implicit
   }
 
   def listSubscriptions(): Future[Set[AccessInfo]] = {
-    sharedDataActor.ask(ListSubscriptions)
+    sharedDataActor.ask(ListSubscriptions.apply)
   }
 
   def subscriptionExists(id: String): Future[Boolean] = {

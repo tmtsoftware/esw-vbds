@@ -3,13 +3,13 @@ package vbds.client
 import java.io.File
 import java.nio.file.Path
 import java.time.Instant
-import akka.Done
-import akka.actor.{ActorRef, ActorSystem}
-import akka.event.{LogSource, Logging}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.*
-import akka.http.scaladsl.model.ws.Message
-import akka.stream.scaladsl.MergeHub
+import org.apache.pekko.Done
+import org.apache.pekko.actor.{ActorRef, ActorSystem}
+import org.apache.pekko.event.{LogSource, Logging}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.*
+import org.apache.pekko.http.scaladsl.model.ws.Message
+import org.apache.pekko.stream.scaladsl.MergeHub
 import vbds.client.VbdsClient.Subscription
 
 import scala.concurrent.{Await, ExecutionContextExecutor, Future}

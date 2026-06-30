@@ -1,11 +1,11 @@
 package vbds.client
 
-import akka.NotUsed
-import akka.actor.{ActorRef, ActorSystem}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.ws.{Message, WebSocketRequest}
-import akka.http.scaladsl.model.{HttpResponse, Uri}
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.{ActorRef, ActorSystem}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.ws.{Message, WebSocketRequest}
+import org.apache.pekko.http.scaladsl.model.{HttpResponse, Uri}
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 import vbds.client.WebSocketListener.SubscribeResult
 
 import scala.concurrent.{Future, Promise}

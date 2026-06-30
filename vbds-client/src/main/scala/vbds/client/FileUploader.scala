@@ -2,14 +2,14 @@ package vbds.client
 
 import java.nio.file.Path
 
-import akka.{Done, NotUsed}
-import akka.actor.ActorSystem
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.marshalling.Marshal
-import akka.http.scaladsl.model.Multipart.FormData
-import akka.http.scaladsl.model._
-import akka.stream.ThrottleMode
-import akka.stream.scaladsl._
+import org.apache.pekko.{Done, NotUsed}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.marshalling.Marshal
+import org.apache.pekko.http.scaladsl.model.Multipart.FormData
+import org.apache.pekko.http.scaladsl.model._
+import org.apache.pekko.stream.ThrottleMode
+import org.apache.pekko.stream.scaladsl._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

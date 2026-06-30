@@ -1,10 +1,10 @@
 package vbds.server.actors
 
-import akka.actor.typed.Scheduler
-import akka.actor.typed.SpawnProtocol.Spawn
-import akka.actor.typed._
-import akka.actor.typed.scaladsl.AskPattern._
-import akka.util.Timeout
+import org.apache.pekko.actor.typed.Scheduler
+import org.apache.pekko.actor.typed.SpawnProtocol.Spawn
+import org.apache.pekko.actor.typed._
+import org.apache.pekko.actor.typed.scaladsl.AskPattern._
+import org.apache.pekko.util.Timeout
 
 import scala.concurrent.Await
 import scala.concurrent.duration.{DurationInt, FiniteDuration}

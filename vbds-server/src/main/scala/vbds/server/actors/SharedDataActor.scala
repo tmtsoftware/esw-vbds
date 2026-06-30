@@ -1,29 +1,30 @@
 package vbds.server.actors
 
 import java.net.InetSocketAddress
-import akka.{Done, NotUsed}
-import akka.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
-import akka.cluster.ddata.typed.scaladsl.{DistributedData, ReplicatorMessageAdapter}
-import akka.cluster.ddata.typed.scaladsl.Replicator.*
-import akka.stream.ClosedShape
-import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
-import akka.util.{ByteString, Timeout}
+import org.apache.pekko.{Done, NotUsed}
+import org.apache.pekko.actor.typed.scaladsl.{AbstractBehavior, ActorContext, Behaviors}
+import org.apache.pekko.cluster.ddata.typed.scaladsl.{DistributedData, ReplicatorMessageAdapter}
+import org.apache.pekko.cluster.ddata.typed.scaladsl.Replicator.*
+import org.apache.pekko.stream.ClosedShape
+import org.apache.pekko.stream.scaladsl.{Broadcast, Flow, GraphDSL, Keep, Merge, RunnableGraph, Sink, Source}
+import org.apache.pekko.util.{ByteString, Timeout}
 import vbds.server.models.{AccessInfo, ServerInfo, StreamInfo}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest, HttpResponse}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest, HttpResponse}
 
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
+import scala.compiletime.uninitialized
 import SharedDataActor.*
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop, Scheduler, Signal, SpawnProtocol}
-import akka.cluster.ddata.{ORSet, ORSetKey, SelfUniqueAddress}
-import akka.actor.typed.scaladsl.AskPattern.*
-import akka.cluster.ClusterEvent.{MemberEvent, ReachabilityEvent}
-import akka.cluster.typed.{Cluster, Leave}
-import akka.event.Logging.{DebugLevel, ErrorLevel, InfoLevel, LogLevel, WarningLevel}
+import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Behavior, PostStop, Scheduler, Signal, SpawnProtocol}
+import org.apache.pekko.cluster.ddata.{ORSet, ORSetKey, SelfUniqueAddress}
+import org.apache.pekko.actor.typed.scaladsl.AskPattern.*
+import org.apache.pekko.cluster.ClusterEvent.{MemberEvent, ReachabilityEvent}
+import org.apache.pekko.cluster.typed.{Cluster, Leave}
+import org.apache.pekko.event.Logging.{DebugLevel, ErrorLevel, InfoLevel, LogLevel, WarningLevel}
 import vbds.server.routes.{AccessRoute, AdminRoute, TransferRoute}
-import akka.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.Directives.*
 import csw.logging.client.scaladsl.GenericLoggerFactory
 import vbds.server.routes.AccessRoute.WebsocketResponseActorMsg
 
@@ -126,11 +127,11 @@ private[server] object SharedDataActor {
       implicit actorSystem: ActorSystem[SpawnProtocol.Command]
   ): Behavior[SharedDataActorMessages] = {
     Behaviors.setup { ctx =>
-      val memberEventAdapter: ActorRef[MemberEvent] = ctx.messageAdapter(MemberChange)
-      Cluster(ctx.system).subscriptions ! akka.cluster.typed.Subscribe(memberEventAdapter, classOf[MemberEvent])
+      val memberEventAdapter: ActorRef[MemberEvent] = ctx.messageAdapter(MemberChange.apply)
+      Cluster(ctx.system).subscriptions ! org.apache.pekko.cluster.typed.Subscribe(memberEventAdapter, classOf[MemberEvent])
 
-      val reachabilityAdapter = ctx.messageAdapter(ReachabilityChange)
-      Cluster(ctx.system).subscriptions ! akka.cluster.typed.Subscribe(reachabilityAdapter, classOf[ReachabilityEvent])
+      val reachabilityAdapter = ctx.messageAdapter(ReachabilityChange.apply)
+      Cluster(ctx.system).subscriptions ! org.apache.pekko.cluster.typed.Subscribe(reachabilityAdapter, classOf[ReachabilityEvent])
 
       DistributedData.withReplicatorMessageAdapter[SharedDataActorMessages, ORSet[?]] { replicatorAdapter =>
         // Subscribe to changes of the given keys
@@ -162,8 +163,8 @@ private[server] class SharedDataActor(
 
   // The local IP address, set at runtime via a message from the code that starts the HTTP server.
   // This is used to determine which HTTP server has the websocket connection to a client.
-  var localAddress: InetSocketAddress = _
-  var binding: Http.ServerBinding     = _
+  var localAddress: InetSocketAddress = uninitialized
+  var binding: Http.ServerBinding     = uninitialized
 
   // Cache of shared subscription info
   var subscriptions = Set[AccessInfo]()
@@ -358,7 +359,7 @@ private[server] class SharedDataActor(
   ): Future[Done] = {
 
     // Split subscribers into local and remote
-    implicit val timeout      = Timeout(20.seconds)
+    implicit val timeout: Timeout = Timeout(20.seconds)
     val (localSet, remoteSet) = getSubscribers(subscriberSet, dist)
     val remoteHostSet         = remoteSet.map(a => ServerInfo(a.host, a.port))
     if (dist) checkRemoteConnections(remoteHostSet)
@@ -371,7 +372,7 @@ private[server] class SharedDataActor(
 
     // Wait for the client to acknowledge the message
     def waitForAck(a: AccessInfo): Future[Any] = {
-      localSubscribers(a).wsResponseActor.ask(AccessRoute.Get)(timeout, scheduler)
+      localSubscribers(a).wsResponseActor.ask(AccessRoute.Get.apply)(timeout, scheduler)
     }
 
     // Send data for a remote subscriber as HTTP POST to the server hosting its websocket
@@ -433,7 +434,7 @@ private[server] class SharedDataActor(
    * @param dist          true if published data should be distributed to remote subscribers
    */
   private def getSubscribers(subscriberSet: Set[AccessInfo], dist: Boolean): (Set[AccessInfo], Set[AccessInfo]) = {
-    val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains _)
+    val (localSet, remoteSet) = subscriberSet.partition(localSubscribers.contains)
     if (dist) (localSet, remoteSet) else (localSet, Set.empty[AccessInfo])
   }
 
