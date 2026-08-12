@@ -6,13 +6,13 @@ import csw.network.utils.{Networks, SocketUtils}
  * VIZ Bulk Data System HTTP server and Akka cluster.
  * This is the command line app used to start the server.
  */
-object VbdsServerApp extends App {
+object VbdsServerApp {
 
   // Command line options
   private case class Options(
       name: String = "vbds",
       httpPort: Int = 0,
-      akkaPort: Int = 0,
+      pekkoPort: Int = 0,
       clusterSeeds: String = ""
   )
 
@@ -28,9 +28,9 @@ object VbdsServerApp extends App {
       c.copy(httpPort = x)
     } text "The HTTP server port number (default: 0 for random port)"
 
-    opt[Int]("akka-port") valueName "<number>" action { (x, c) =>
-      c.copy(akkaPort = x)
-    } text "The Akka system port number (default: 0 for random port)"
+    opt[Int]("pekko-port") valueName "<number>" action { (x, c) =>
+      c.copy(pekkoPort = x)
+    } text "The Pekko system port number (default: 0 for random port)"
 
     opt[String]('s', "seeds") valueName "<host>:<port>,<host>:<port>,..." action { (x, c) =>
       c.copy(clusterSeeds = x)
@@ -41,26 +41,28 @@ object VbdsServerApp extends App {
   }
 
   // Parse the command line options
-  parser.parse(args, Options()) match {
-    case Some(options) =>
-      try {
-        run(options)
-      } catch {
-        case e: Throwable =>
-          e.printStackTrace()
-          System.exit(1)
-      }
-    case None => System.exit(1)
+  def main(args: Array[String]): Unit = {
+    parser.parse(args, Options()) match {
+      case Some(options) =>
+        try {
+          run(options)
+        } catch {
+          case e: Throwable =>
+            e.printStackTrace()
+            System.exit(1)
+        }
+      case None => System.exit(1)
+    }
   }
 
   // Run the application
   private def run(options: Options): Unit = {
     val host = Networks.publicInterface(None).hostname
-    val akkaPort = if (options.akkaPort != 0) options.akkaPort else SocketUtils.getFreePort
+    val pekkoPort = if (options.pekkoPort != 0) options.pekkoPort else SocketUtils.getFreePort
     val httpPort = if (options.httpPort != 0) options.httpPort else SocketUtils.getFreePort
     val clusterSeeds = if (options.clusterSeeds.nonEmpty)
-      options.clusterSeeds else s"${host}:$akkaPort"
+      options.clusterSeeds else s"${host}:$pekkoPort"
 
-    VbdsServer.start(host, httpPort, akkaPort, options.name, clusterSeeds)
+    VbdsServer.start(host, httpPort, pekkoPort, options.name, clusterSeeds)
   }
 }

@@ -1,17 +1,17 @@
 package vbds.server
 
 import java.io.{BufferedOutputStream, File, FileOutputStream}
-import akka.actor.{Actor, ActorLogging, PoisonPill, Props}
+import org.apache.pekko.actor.{Actor, ActorLogging, PoisonPill, Props}
 import vbds.client.VbdsClient
 import vbds.server.app.VbdsServer
 
 import scala.concurrent.duration.{Duration, DurationLong, FiniteDuration}
 import scala.concurrent.{Await, Future, Promise}
-import akka.remote.testkit.{MultiNodeConfig, MultiNodeSpec}
-import akka.testkit.ImplicitSender
-import akka.event.LoggingAdapter
-import akka.http.scaladsl.model.StatusCodes
-import akka.stream.scaladsl.{Sink, Source}
+import org.apache.pekko.remote.testkit.{MultiNodeConfig, MultiNodeSpec}
+import org.apache.pekko.testkit.ImplicitSender
+import org.apache.pekko.event.LoggingAdapter
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import com.typesafe.config.{Config, ConfigFactory}
 import csw.network.utils.SocketUtils
 import org.apache.commons.io.FileUtils
@@ -37,10 +37,10 @@ object VbdsServerTestConfig extends MultiNodeConfig {
 
   val configStr =
     """
-      | akka.loglevel = INFO
-      | akka.log-dead-letters-during-shutdown = off
-      | akka.testconductor.barrier-timeout = 30m
-      | akka.cluster.jmx.multi-mbeans-in-same-jvm = on
+      | pekko.loglevel = INFO
+      | pekko.log-dead-letters-during-shutdown = off
+      | pekko.testconductor.barrier-timeout = 30m
+      | pekko.cluster.jmx.multi-mbeans-in-same-jvm = on
       | remote {
       |    artery {
       |      enabled = on
@@ -53,8 +53,8 @@ object VbdsServerTestConfig extends MultiNodeConfig {
 
   commonConfig(ConfigFactory.parseString(configStr).withFallback(ConfigFactory.load()))
 
-//  def makeSystem(config: Config): akka.actor.ActorSystem = ActorSystem(SpawnProtocol(), VbdsServer.clusterName, config).classicSystem
-  def makeSystem(config: Config) = akka.actor.ActorSystem(VbdsServer.clusterName, config)
+//  def makeSystem(config: Config): org.apache.pekko.actor.ActorSystem = ActorSystem(SpawnProtocol(), VbdsServer.clusterName, config).classicSystem
+  def makeSystem(config: Config) = org.apache.pekko.actor.ActorSystem(VbdsServer.clusterName, config)
 }
 
 // One for each role

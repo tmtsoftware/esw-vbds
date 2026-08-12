@@ -2,16 +2,16 @@ package vbds.server.routes
 
 import java.util.UUID
 
-import akka.actor.typed.{ActorRef, ActorSystem, Behavior, SpawnProtocol}
-import akka.actor.typed.scaladsl.Behaviors
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message}
-import akka.http.scaladsl.server.Directives
-import akka.util.ByteString
+import org.apache.pekko.actor.typed.{ActorRef, ActorSystem, Behavior, SpawnProtocol}
+import org.apache.pekko.actor.typed.scaladsl.Behaviors
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, Message}
+import org.apache.pekko.http.scaladsl.server.Directives
+import org.apache.pekko.util.ByteString
 import vbds.server.actors.{AccessApi, AdminApi}
 import vbds.server.models.JsonSupport
 import AccessRoute._
-import akka.stream.scaladsl.{Flow, MergeHub, Sink}
+import org.apache.pekko.stream.scaladsl.{Flow, MergeHub, Sink}
 import vbds.server.actors.AkkaTypedExtension.UserActorFactory
 
 // Actor to handle ACK responses from websocket clients
@@ -23,13 +23,13 @@ object AccessRoute {
   final case class Get(replyTo: ActorRef[Ack.type]) extends WebsocketResponseActorMsg
 
   // Says there was a response from the ws client
-  final case object Put extends WebsocketResponseActorMsg
+  case object Put extends WebsocketResponseActorMsg
 
   // Stops the actor
-  final case object Stop extends WebsocketResponseActorMsg
+  case object Stop extends WebsocketResponseActorMsg
 
   // Reponse to Get message
-  final case object Ack
+  case object Ack
 
   // Actor that handles responses from the websocket
   private def websocketResponseBehavior(

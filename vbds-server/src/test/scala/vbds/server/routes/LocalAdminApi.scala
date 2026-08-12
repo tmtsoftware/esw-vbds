@@ -1,6 +1,6 @@
 package vbds.server.routes
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import vbds.server.actors.AdminApi
 import vbds.server.models.StreamInfo
 

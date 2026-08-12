@@ -1,12 +1,12 @@
 package vbds.client
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{BroadcastHub, Keep, Sink, Source}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{BroadcastHub, Keep, Sink, Source}
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 object StreamTest extends App {
-  implicit val system       = ActorSystem("StreamTest")
+  implicit val system: ActorSystem = ActorSystem("StreamTest")
   import system._
 
   val source         = Source(0 to 5)

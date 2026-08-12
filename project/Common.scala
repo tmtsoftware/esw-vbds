@@ -16,19 +16,14 @@ object Common extends AutoPlugin {
     organizationHomepage := Some(url("http://www.tmt.org")),
     resolvers += "jitpack" at "https://jitpack.io",
 
+    // Scala 3 (3.6.4). The following Scala 2-only flags were removed in the port:
+    //   -Wdead-code, -Xlint:_,-missing-interpolator, -Xsource:3, -Xcheckinit, -Xasync
     scalacOptions ++= Seq(
       "-encoding",
       "UTF-8",
       "-feature",
       "-unchecked",
-      "-deprecation",
-      //-W Options
-      "-Wdead-code",
-      //-X Options
-      "-Xlint:_,-missing-interpolator",
-      "-Xsource:3",
-      "-Xcheckinit",
-      "-Xasync"
+      "-deprecation"
     ),
     Compile / doc / javacOptions ++= Seq("-Xdoclint:none"),
     Test / testOptions ++= Seq(

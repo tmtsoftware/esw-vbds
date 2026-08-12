@@ -1,6 +1,6 @@
 package vbds.server
 
-import akka.remote.testkit.{MultiNodeSpec, MultiNodeSpecCallbacks}
+import org.apache.pekko.remote.testkit.{MultiNodeSpec, MultiNodeSpecCallbacks}
 
 import scala.language.implicitConversions
 import org.scalatest.BeforeAndAfterAll

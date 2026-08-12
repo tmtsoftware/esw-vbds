@@ -1,15 +1,15 @@
 package vbds.client.app
 
 import java.io.File
-import akka.Done
-import akka.actor.{Actor, ActorLogging, ActorSystem, Props}
-import akka.http.scaladsl.model.HttpResponse
+import org.apache.pekko.Done
+import org.apache.pekko.actor.{Actor, ActorLogging, ActorSystem, Props}
+import org.apache.pekko.http.scaladsl.model.HttpResponse
 import csw.location.api.models.{ComponentId, ComponentType, HttpLocation}
 import csw.location.api.models.Connection.HttpConnection
 import csw.location.client.scaladsl.HttpLocationServiceFactory
 import csw.prefix.models.{Prefix, Subsystem}
 import vbds.client.VbdsClient
-import akka.actor.typed.scaladsl.adapter.ClassicActorSystemOps
+import org.apache.pekko.actor.typed.scaladsl.adapter.ClassicActorSystemOps
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.*
@@ -19,8 +19,8 @@ import vbds.server.app.BuildInfo
 /**
  * A VIZ Bulk Data System HTTP client command line application.
  */
-object VbdsClientApp extends App {
-  implicit val system       = ActorSystem("vbdsClient")
+object VbdsClientApp {
+  implicit val system: ActorSystem = ActorSystem("vbdsClient")
 
   // Command line options
   private case class Options(name: String = "vbds",
@@ -118,16 +118,18 @@ object VbdsClientApp extends App {
   }
 
   // Parse the command line options
-  parser.parse(args, Options()) match {
-    case Some(options) =>
-      try {
-        run(options)
-      } catch {
-        case e: Throwable =>
-          e.printStackTrace()
-          System.exit(1)
-      }
-    case None => System.exit(1)
+  def main(args: Array[String]): Unit = {
+    parser.parse(args, Options()) match {
+      case Some(options) =>
+        try {
+          run(options)
+        } catch {
+          case e: Throwable =>
+            e.printStackTrace()
+            System.exit(1)
+        }
+      case None => System.exit(1)
+    }
   }
 
   // Run the application (The actor system is only used locally, no need for remote)

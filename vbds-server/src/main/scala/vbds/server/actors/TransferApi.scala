@@ -1,11 +1,11 @@
 package vbds.server.actors
 
-import akka.Done
-import akka.actor.typed.{ActorRef, Scheduler}
-import akka.stream.scaladsl.Source
-import akka.util.{ByteString, Timeout}
+import org.apache.pekko.Done
+import org.apache.pekko.actor.typed.{ActorRef, Scheduler}
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.{ByteString, Timeout}
 import vbds.server.actors.SharedDataActor.{Publish, SharedDataActorMessages}
-import akka.actor.typed.scaladsl.AskPattern._
+import org.apache.pekko.actor.typed.scaladsl.AskPattern._
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

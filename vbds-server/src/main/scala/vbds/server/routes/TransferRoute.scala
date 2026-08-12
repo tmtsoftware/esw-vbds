@@ -1,13 +1,13 @@
 package vbds.server.routes
 
-import akka.actor.typed.{ActorSystem, SpawnProtocol}
-import akka.http.scaladsl.model.StatusCodes._
-import akka.http.scaladsl.server.Directives
+import org.apache.pekko.actor.typed.{ActorSystem, SpawnProtocol}
+import org.apache.pekko.http.scaladsl.model.StatusCodes._
+import org.apache.pekko.http.scaladsl.server.Directives
 import vbds.server.actors.{AdminApi, TransferApi}
 import vbds.server.models.JsonSupport
 import vbds.server.marshalling.BinaryMarshallers
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
+import org.apache.pekko.stream.scaladsl.Source
+import org.apache.pekko.util.ByteString
 
 /**
  * Provides the HTTP route for the VBDS Transfer Service.

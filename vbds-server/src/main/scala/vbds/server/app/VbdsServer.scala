@@ -1,12 +1,12 @@
 package vbds.server.app
 
-import akka.{Done, actor}
-import akka.actor.{AddressFromURIString, CoordinatedShutdown}
-import akka.actor.typed.scaladsl.AskPattern.Askable
-import akka.actor.typed.scaladsl.adapter.TypedActorSystemOps
-import akka.actor.typed.{SpawnProtocol, _}
-import akka.cluster.typed.{Cluster, JoinSeedNodes}
-import akka.util.Timeout
+import org.apache.pekko.{Done, actor}
+import org.apache.pekko.actor.{AddressFromURIString, CoordinatedShutdown}
+import org.apache.pekko.actor.typed.scaladsl.AskPattern.Askable
+import org.apache.pekko.actor.typed.scaladsl.adapter.TypedActorSystemOps
+import org.apache.pekko.actor.typed.{SpawnProtocol, _}
+import org.apache.pekko.cluster.typed.{Cluster, JoinSeedNodes}
+import org.apache.pekko.util.Timeout
 import com.typesafe.config.ConfigFactory
 import csw.location.api.models.Connection.HttpConnection
 import csw.location.api.models.{ComponentId, ComponentType, HttpRegistration, Metadata, NetworkType}
@@ -34,7 +34,7 @@ object VbdsServer {
     clusterSeeds
       .split(",")
       .toList
-      .map(s => s"akka://$clusterName@$s")
+      .map(s => s"pekko://$clusterName@$s")
   }
 
   /**
@@ -42,7 +42,7 @@ object VbdsServer {
    *
    * @param host         Akka and HTTP server bind host
    * @param httpPort     HTTP server port (must be > 0)
-   * @param akkaPort     akka ActorSystem port (must be > 0)
+   * @param pekkoPort     akka ActorSystem port (must be > 0)
    * @param name         the name of this server (for LocationService and ActorSystem)
    * @param clusterSeeds list of cluster seeds in the form host:port,host:port,... (Required even for seed node)
    * @return the root actor system
@@ -50,17 +50,17 @@ object VbdsServer {
   def start(
       host: String,
       httpPort: Int,
-      akkaPort: Int,
+      pekkoPort: Int,
       name: String,
       clusterSeeds: String
   ): ActorSystem[SpawnProtocol.Command] = {
     checkPort(httpPort)
-    checkPort(akkaPort)
+    checkPort(pekkoPort)
 
     // Generate the akka config for the akka and http ports as well as the cluster seed nodes
     val config = ConfigFactory.parseString(s"""
-               akka.remote.artery.canonical.hostname=$host
-               akka.remote.artery.canonical.port=$akkaPort
+               pekko.remote.artery.canonical.hostname=$host
+               pekko.remote.artery.canonical.port=$pekkoPort
             """).withFallback(ConfigFactory.load())
 
     implicit val system = ActorSystem(SpawnProtocol(), clusterName, config)
@@ -125,7 +125,7 @@ object VbdsServer {
         .sequence(
           List(
             registrationResult.unregister(),
-            actorRef.ask(StopSharedDataActor)(Timeout(3.seconds), system.scheduler)
+            actorRef.ask(StopSharedDataActor.apply)(Timeout(3.seconds), system.scheduler)
           )
         )
         .map(_ => Done)

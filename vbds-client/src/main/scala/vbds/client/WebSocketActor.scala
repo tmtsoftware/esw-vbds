@@ -3,16 +3,17 @@ package vbds.client
 import java.io.{File, FileOutputStream}
 import java.nio.file.Path
 
-import akka.NotUsed
-import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
-import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
-import akka.util.{ByteString, Timeout}
-import akka.stream.scaladsl.{Sink, Source}
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props}
+import org.apache.pekko.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
+import org.apache.pekko.util.{ByteString, Timeout}
+import org.apache.pekko.stream.scaladsl.{Sink, Source}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util._
-import akka.pattern.ask
+import scala.compiletime.uninitialized
+import org.apache.pekko.pattern.ask
 
 /**
  * An actor that receives websocket messages from the VBDS server.
@@ -74,9 +75,9 @@ class WebSocketActor(name: String,
   import system.dispatcher
 
   var count                = 0
-  var file: File           = _
-  var os: FileOutputStream = _
-  implicit val askTimeout  = Timeout(20.seconds)
+  var file: File           = uninitialized
+  var os: FileOutputStream = uninitialized
+  implicit val askTimeout: Timeout = Timeout(20.seconds)
 
   log.debug(s"$name: Started WebSocketActor")
 
